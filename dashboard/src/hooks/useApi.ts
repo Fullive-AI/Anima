@@ -27,6 +27,18 @@ export interface ScanResult {
   total: number
 }
 
+export interface ChatResponse {
+  reply: string
+  action?: string
+  status?: string
+  error?: string
+  country?: string
+  qr_image_b64?: string
+  new_devices?: number
+  total?: number
+  refresh_devices?: boolean
+}
+
 const api = {
   async getDevices(): Promise<Device[]> {
     const res = await fetch('/api/devices')
@@ -52,7 +64,7 @@ const api = {
     return res.json()
   },
 
-  async chat(message: string): Promise<{ reply: string }> {
+  async chat(message: string): Promise<ChatResponse> {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

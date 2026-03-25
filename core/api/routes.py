@@ -7,6 +7,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from core.chat_agent import ChatAgent
 from core.models import DeviceCommand
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,15 @@ class ActivateDeviceRequest(BaseModel):
 
 def create_app(app_state: dict[str, Any]) -> FastAPI:
     app = FastAPI(title="Anima", description="Make Every Hardware Intelligent", version="0.1.0")
+
+    def has_devices_needing_token() -> bool:
+        discovery = app_state["discovery"]
+        for adapter in discovery._adapters:
+            infos = getattr(adapter, "_device_infos", {})
+            for info in infos.values():
+                if info.get("needs_token"):
+                    return True
+        return False
 
     app.add_middleware(
         CORSMiddleware,
@@ -90,9 +100,25 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.post("/api/chat")
     async def chat(body: dict):
         message = body.get("message", "")
-        # Simple chat: pass user message as a command event
-        # Full chat implementation in v0.2
-        return {"reply": f"Received: {message}", "status": "chat coming in v0.2"}
+        agent = ChatAgent(app_state["brain"]._skill_loader)
+        return await agent.handle_message(message, app_state)
+
+    @app.get("/api/onboarding/status")
+    async def onboarding_status():
+        store = app_state["settings"]
+        flow = app_state.get("_xiaomi_qr_flow")
+        qr_image_b64 = app_state.get("_xiaomi_qr_image_b64", "")
+        if flow and qr_image_b64:
+            return {
+                "status": "qr_required",
+                "qr_image_b64": qr_image_b64,
+                "country": store.get("xiaomi_cloud_country", "cn"),
+            }
+
+        if not has_devices_needing_token() and len(store.get("xiaomi_cloud_devices", [])) > 0:
+            return {"status": "connected"}
+
+        return {"status": "idle"}
 
     @app.get("/api/decisions")
     async def list_decisions():
@@ -268,6 +294,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         if result["status"] == "error":
             return {"success": False, "error": result["error"]}
         app_state["_xiaomi_qr_flow"] = flow
+        app_state["_xiaomi_qr_image_b64"] = result.get("qr_image_b64", "")
         return {
             "success": True,
             "status": "qr_required",
@@ -292,6 +319,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             return {"status": "qr_pending"}
         if result["status"] in ("error", "qr_expired"):
             app_state.pop("_xiaomi_qr_flow", None)
+            app_state.pop("_xiaomi_qr_image_b64", None)
             return {"status": "error", "error": result.get("error", "登录失败")}
         if result["status"] != "ok":
             return {"status": "error", "error": "未知状态"}
@@ -302,9 +330,11 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         except Exception as e:
             logger.exception("Failed to fetch devices after QR login")
             app_state.pop("_xiaomi_qr_flow", None)
+            app_state.pop("_xiaomi_qr_image_b64", None)
             return {"status": "error", "error": f"获取设备列表失败: {e}"}
 
         app_state.pop("_xiaomi_qr_flow", None)
+        app_state.pop("_xiaomi_qr_image_b64", None)
         store = app_state["settings"]
         store.set("xiaomi_cloud_devices", cloud_devices)
         store.set("xiaomi_cloud_country", region)

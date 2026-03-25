@@ -6,6 +6,7 @@ import DecisionLog from './components/DecisionLog'
 import ChatBar from './components/ChatBar'
 import SettingsPanel from './components/SettingsPanel'
 import HelpPanel from './components/HelpPanel'
+import StartupOnboardingModal from './components/StartupOnboardingModal'
 import { useDevices, useDecisions } from './hooks/useApi'
 
 export default function App() {
@@ -34,7 +35,8 @@ export default function App() {
         <DecisionLog decisions={decisions} />
       </div>
 
-      <ChatBar />
+      <ChatBar onDevicesChanged={refresh} />
+      <StartupOnboardingModal onDevicesChanged={refresh} />
 
       <SettingsPanel
         open={settingsOpen}

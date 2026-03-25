@@ -1,0 +1,5 @@
+name: device_discovery
+description: Device discovery assistant — knows when to run local scans and when Xiaomi QR onboarding is required
+device_types:
+  - assistant
+version: 0.1.0

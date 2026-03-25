@@ -37,3 +37,8 @@ class TestSkillLoader:
     def test_coordinator_skill(self):
         skill = self.loader.get_skill_for_device("coordinator")
         assert skill is not None
+
+    def test_load_skill_by_name(self):
+        skill = self.loader.get_skill("device_discovery")
+        assert skill is not None
+        assert skill.chat_prompt is not None

@@ -62,10 +62,13 @@ class Anima:
         # Wire up event handlers
         self.bus.subscribe(EventType.SENSOR_UPDATED, self._on_sensor_update)
 
-        # Initial device scan
-        logger.info("Scanning for devices...")
-        await self.discovery.scan()
-        logger.info("Found %d device(s)", len(self.discovery.devices))
+        app_state = {
+            "discovery": self.discovery,
+            "brain": self.brain,
+            "memory": self.memory,
+            "bus": self.bus,
+            "settings": self.settings_store,
+        }
 
         # Setup scheduled jobs
         self.scheduler.add_job("device_scan", self.discovery.scan, interval_seconds=300)
@@ -76,6 +79,11 @@ class Anima:
         )
 
         if mode == "cli":
+            logger.info("Scanning for devices...")
+            await self.discovery.scan()
+            logger.info("Found %d device(s)", len(self.discovery.devices))
+            await self._maybe_start_onboarding(app_state)
+
             # Run CLI mode
             scheduler_task = asyncio.create_task(self.scheduler.start())
             await interactive_cli(self.discovery, self.brain)
@@ -84,13 +92,6 @@ class Anima:
 
         elif mode == "full":
             # Run API server + scheduler
-            app_state = {
-                "discovery": self.discovery,
-                "brain": self.brain,
-                "memory": self.memory,
-                "bus": self.bus,
-                "settings": self.settings_store,
-            }
             app = create_app(app_state)
 
             config = uvicorn.Config(app, host="0.0.0.0", port=8080, log_level="info")
@@ -99,7 +100,53 @@ class Anima:
             await asyncio.gather(
                 server.serve(),
                 self.scheduler.start(),
+                self._bootstrap_startup(app_state),
             )
+
+    async def _bootstrap_startup(self, app_state: dict[str, object]) -> None:
+        logger.info("Scanning for devices...")
+        await self.discovery.scan()
+        logger.info("Found %d device(s)", len(self.discovery.devices))
+        await self._maybe_start_onboarding(app_state)
+
+    async def _maybe_start_onboarding(self, app_state: dict[str, object]) -> None:
+        if app_state.get("_xiaomi_qr_flow"):
+            return
+
+        if not self._has_devices_needing_token():
+            logger.info("No devices waiting for token activation, skip startup onboarding")
+            return
+
+        skill = self.skill_loader.get_skill("device_discovery")
+        if not skill:
+            logger.warning("device_discovery skill not found, skip startup onboarding")
+            return
+
+        actions_module = self.skill_loader.load_actions(skill)
+        if not actions_module or not hasattr(actions_module, "start_xiaomi_qr_scan"):
+            logger.warning("device_discovery skill has no start_xiaomi_qr_scan action")
+            return
+
+        try:
+            result = await actions_module.start_xiaomi_qr_scan(
+                context=app_state,
+                params={"country": self.settings_store.get("xiaomi_cloud_country", "cn")},
+                reply="启动时已自动生成米家扫码二维码，请让用户打开米家 App 登录。",
+            )
+            if result.get("status") == "qr_required":
+                logger.info("Startup onboarding QR generated")
+            elif result.get("error"):
+                logger.warning("Startup onboarding skipped: %s", result["error"])
+        except Exception:
+            logger.exception("Failed to auto-start startup onboarding QR flow")
+
+    def _has_devices_needing_token(self) -> bool:
+        for adapter in self.discovery._adapters:
+            infos = getattr(adapter, "_device_infos", {})
+            for info in infos.values():
+                if info.get("needs_token"):
+                    return True
+        return False
 
     async def _on_sensor_update(self, event: Event) -> None:
         device_id = event.device_id

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
+import importlib.util
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import ModuleType
 
 import yaml
 
@@ -27,11 +30,20 @@ class LoadedSkill:
             return p.read_text(encoding="utf-8")
         return None
 
+    @property
+    def chat_prompt(self) -> str | None:
+        p = self.path / "prompts" / "chat.md"
+        if p.exists():
+            return p.read_text(encoding="utf-8")
+        return None
+
 
 class SkillLoader:
     def __init__(self, skills_dir: str = "skills") -> None:
         self._dir = Path(skills_dir)
         self._cache: dict[str, LoadedSkill] = {}
+        self._cache_by_name: dict[str, LoadedSkill] = {}
+        self._actions_cache: dict[str, ModuleType] = {}
 
     def discover(self) -> list[LoadedSkill]:
         skills = []
@@ -47,6 +59,7 @@ class SkillLoader:
             try:
                 skill = self._load_skill(skill_dir)
                 skills.append(skill)
+                self._cache_by_name[skill.meta.name] = skill
                 for dt in skill.meta.device_types:
                     self._cache[dt] = skill
             except Exception:
@@ -88,3 +101,28 @@ class SkillLoader:
         if not self._cache:
             self.discover()
         return self._cache.get(device_type)
+
+    def get_skill(self, name: str) -> LoadedSkill | None:
+        if not self._cache_by_name:
+            self.discover()
+        return self._cache_by_name.get(name)
+
+    def load_actions(self, skill: LoadedSkill) -> ModuleType | None:
+        if not skill.actions_module_path:
+            return None
+
+        cache_key = skill.meta.name
+        if cache_key in self._actions_cache:
+            return self._actions_cache[cache_key]
+
+        module_name = f"anima_skill_{cache_key}"
+        spec = importlib.util.spec_from_file_location(module_name, skill.actions_module_path)
+        if not spec or not spec.loader:
+            logger.warning("Failed to load actions module for skill %s", cache_key)
+            return None
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        self._actions_cache[cache_key] = module
+        return module
