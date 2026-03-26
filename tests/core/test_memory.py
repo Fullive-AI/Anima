@@ -45,6 +45,13 @@ class TestMemoryStore:
         learned = await self.store.get_learned("default")
         assert "cool environments" in learned
 
+    async def test_update_learned_for_skill(self):
+        await self.store.update_learned_for_skill("default", "humidifier", '{"stable_preferences":["55% humidity"]}')
+        learned = await self.store.get_learned_for_skill("default", "humidifier")
+        profiles = await self.store.get_learned_profiles("default")
+        assert "55% humidity" in learned
+        assert "humidifier" in profiles
+
     async def test_get_full_context(self):
         await self.store.update_preferences("default", "comfort.temperature", "23°C")
         await self.store.append_history("default", {"action": "turn_on"})
@@ -52,3 +59,4 @@ class TestMemoryStore:
         assert "preferences" in ctx
         assert "history" in ctx
         assert "learned" in ctx
+        assert "learned_profiles" in ctx

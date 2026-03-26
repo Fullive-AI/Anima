@@ -60,10 +60,16 @@ class TestDeviceCommand:
             params={"value": 55},
             source="brain",
             reason="User prefers 55%, currently 45%",
+            confidence=0.9,
+            expected_outcome="raise humidity",
+            should_wait_seconds=900,
         )
         assert cmd.action == "set_humidity"
         assert cmd.params["value"] == 55
         assert cmd.source == "brain"
+        assert cmd.confidence == 0.9
+        assert cmd.expected_outcome == "raise humidity"
+        assert cmd.should_wait_seconds == 900
 
 
 class TestEvent:

@@ -9,6 +9,9 @@ from adapters.base import BaseAdapter
 class MockAdapter(BaseAdapter):
     name = "mock"
 
+    def __init__(self):
+        self.subscribed = []
+
     async def discover(self) -> list[Device]:
         return [
             Device(device_id="mock_01", name="Mock Light", adapter="mock", type="light"),
@@ -16,7 +19,7 @@ class MockAdapter(BaseAdapter):
         ]
 
     async def subscribe(self, device) -> None:
-        pass
+        self.subscribed.append(device.device_id)
 
     async def execute(self, device_id, action, params):
         pass
@@ -73,3 +76,12 @@ class TestDiscoveryOrchestrator:
         await disco.scan()  # second scan
 
         assert len(events) == 2  # only first scan emits events
+
+    async def test_scan_subscribes_new_devices(self):
+        bus = EventBus()
+        adapter = MockAdapter()
+        disco = DiscoveryOrchestrator(bus=bus, adapters=[adapter])
+
+        await disco.scan()
+
+        assert adapter.subscribed == ["mock_01", "mock_02"]
