@@ -49,6 +49,7 @@ class Anima:
         # Adapters
         adapters = [MIoTAdapter(settings_store=self.settings_store)]
         self.discovery = DiscoveryOrchestrator(bus=self.bus, adapters=adapters)
+        self.brain.set_environment_provider(self.discovery.get_all_devices)
 
     async def start(self, mode: str = "full") -> None:
         logger.info("Starting Anima v0.1 — Make Every Hardware Intelligent")
@@ -61,6 +62,7 @@ class Anima:
 
         # Wire up event handlers
         self.bus.subscribe(EventType.SENSOR_UPDATED, self._on_sensor_update)
+        self.bus.subscribe(EventType.DEVICE_DISCOVERED, self._on_device_discovered)
 
         app_state = {
             "discovery": self.discovery,
@@ -68,6 +70,7 @@ class Anima:
             "memory": self.memory,
             "bus": self.bus,
             "settings": self.settings_store,
+            "ensure_system_skills": self._ensure_system_skills_for_devices,
         }
 
         # Setup scheduled jobs
@@ -82,6 +85,7 @@ class Anima:
             logger.info("Scanning for devices...")
             await self.discovery.scan()
             logger.info("Found %d device(s)", len(self.discovery.devices))
+            await self._ensure_system_skills_for_devices(app_state)
             await self._maybe_start_onboarding(app_state)
 
             # Run CLI mode
@@ -107,6 +111,7 @@ class Anima:
         logger.info("Scanning for devices...")
         await self.discovery.scan()
         logger.info("Found %d device(s)", len(self.discovery.devices))
+        await self._ensure_system_skills_for_devices(app_state)
         await self._maybe_start_onboarding(app_state)
 
     async def _maybe_start_onboarding(self, app_state: dict[str, object]) -> None:
@@ -172,6 +177,50 @@ class Anima:
             command = await self.brain.decide(device, sensor_data)
             if command:
                 await self.discovery.execute_command(command.device_id, command.action, command.params)
+
+    async def _on_device_discovered(self, event: Event) -> None:
+        device_id = event.device_id
+        if not device_id:
+            return
+
+        device = self.discovery.get_device(device_id)
+        if not device:
+            return
+
+        await self._ensure_system_skills_for_devices({
+            "discovery": self.discovery,
+            "brain": self.brain,
+            "memory": self.memory,
+            "bus": self.bus,
+            "settings": self.settings_store,
+        }, devices=[device])
+
+    async def _ensure_system_skills_for_devices(
+        self,
+        app_state: dict[str, object],
+        devices: list[object] | None = None,
+    ) -> None:
+        skill = self.skill_loader.get_skill("skill_creator")
+        if not skill:
+            logger.warning("skill_creator skill not found, skip system skill generation")
+            return
+
+        actions_module = self.skill_loader.load_actions(skill)
+        if not actions_module or not hasattr(actions_module, "ensure_system_skills_for_devices"):
+            logger.warning("skill_creator skill has no ensure_system_skills_for_devices action")
+            return
+
+        try:
+            result = await actions_module.ensure_system_skills_for_devices(
+                context=app_state,
+                params={"devices": devices} if devices is not None else {},
+                reply="",
+            )
+            created = result.get("created_skills", [])
+            if created:
+                logger.info("Auto-generated system skills: %s", ", ".join(created))
+        except Exception:
+            logger.exception("Failed to auto-generate missing system skills")
 
 
 def cli_entry():

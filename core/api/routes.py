@@ -126,10 +126,28 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         history = await memory.get_history("default", limit=50)
         return history
 
+    @app.get("/api/environment")
+    async def get_environment():
+        brain = app_state["brain"]
+        return brain.get_environment_state()
+
+    @app.post("/api/environment/refresh")
+    async def refresh_environment():
+        discovery = app_state["discovery"]
+        result = await discovery.refresh_device_states()
+        brain = app_state["brain"]
+        return {
+            **result,
+            "environment": brain.get_environment_state(),
+        }
+
     @app.post("/api/scan")
     async def trigger_scan():
         discovery = app_state["discovery"]
         new_devices = await discovery.scan()
+        ensure_system_skills = app_state.get("ensure_system_skills")
+        if ensure_system_skills:
+            await ensure_system_skills(app_state)
         return {"new_devices": len(new_devices), "total": len(discovery.devices)}
 
     @app.post("/api/devices/add")
@@ -166,7 +184,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             adapter="miot",
             type=device_type,
             online=True,
-            capabilities=miot._default_capabilities(device_type),
+            capabilities=miot._build_capabilities(model, has_token=True),
             sensors=miot._default_sensors(device_type),
         )
 
@@ -190,6 +208,10 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             "device_type": device_type, "model": model,
         })
         store.set("manual_devices", manual_devices)
+
+        ensure_system_skills = app_state.get("ensure_system_skills")
+        if ensure_system_skills:
+            await ensure_system_skills(app_state, [device])
 
         return {
             "success": True,
@@ -241,7 +263,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         # Update device object
         device.name = f"{model} ({ip})"
         device.type = device_type
-        device.capabilities = miot._default_capabilities(device_type)
+        device.capabilities = miot._build_capabilities(model, has_token=True)
         device.sensors = miot._default_sensors(device_type)
 
         # Save as manual device for persistence
@@ -252,6 +274,10 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             "device_type": device_type, "model": model,
         })
         store.set("manual_devices", manual_devices)
+
+        ensure_system_skills = app_state.get("ensure_system_skills")
+        if ensure_system_skills:
+            await ensure_system_skills(app_state, [device])
 
         return {
             "success": True,
@@ -372,7 +398,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                     device.type = device_type
                     device.online = bool(cd.get("isOnline", False))
                     if has_token:
-                        device.capabilities = miot._default_capabilities(device_type)
+                        device.capabilities = miot._build_capabilities(model, has_token=True)
                         device.sensors = miot._default_sensors(device_type)
                     miot._device_infos[existing_id] = {
                         "ip": ip, "token": token, "model": model, "did": did,
@@ -388,7 +414,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                         adapter="miot",
                         type=device_type,
                         online=bool(cd.get("isOnline", False)),
-                        capabilities=miot._default_capabilities(device_type) if has_token else [],
+                        capabilities=miot._build_capabilities(model, has_token=has_token),
                         sensors=miot._default_sensors(device_type) if has_token else [],
                     )
                     miot._device_infos[device_id] = {
@@ -399,6 +425,10 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                         discovery.devices[device_id] = device
                         discovery._adapter_map[device_id] = miot
                         registered += 1
+
+        ensure_system_skills = app_state.get("ensure_system_skills")
+        if ensure_system_skills:
+            await ensure_system_skills(app_state)
 
         return {
             "status": "ok",

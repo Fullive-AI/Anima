@@ -80,6 +80,24 @@ class MemoryStore:
 
     # ── Learned Profile (Markdown) ──
 
+    def _learned_json_path(self, user_id: str) -> Path:
+        return self._user_dir(user_id) / "learned.json"
+
+    def _load_learned_profiles(self, user_id: str) -> dict[str, str]:
+        path = self._learned_json_path(user_id)
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return {str(k): str(v) for k, v in data.items()}
+
+        legacy_path = self._user_dir(user_id) / "learned.md"
+        if legacy_path.exists():
+            legacy = legacy_path.read_text(encoding="utf-8").strip()
+            if legacy:
+                return {"global": legacy}
+
+        return {}
+
     async def get_learned(self, user_id: str = "default") -> str:
         path = self._user_dir(user_id) / "learned.md"
         if not path.exists():
@@ -90,6 +108,19 @@ class MemoryStore:
         path = self._user_dir(user_id) / "learned.md"
         path.write_text(content, encoding="utf-8")
 
+    async def get_learned_profiles(self, user_id: str = "default") -> dict[str, str]:
+        return self._load_learned_profiles(user_id)
+
+    async def get_learned_for_skill(self, user_id: str = "default", skill_type: str = "") -> str:
+        profiles = self._load_learned_profiles(user_id)
+        return profiles.get(skill_type, "")
+
+    async def update_learned_for_skill(self, user_id: str, skill_type: str, content: str) -> None:
+        profiles = self._load_learned_profiles(user_id)
+        profiles[skill_type] = content
+        path = self._learned_json_path(user_id)
+        path.write_text(json.dumps(profiles, ensure_ascii=False, indent=2), encoding="utf-8")
+
     # ── Full Context (for LLM) ──
 
     async def get_full_context(self, user_id: str = "default") -> dict[str, Any]:
@@ -97,4 +128,5 @@ class MemoryStore:
             "preferences": await self.get_preferences(user_id),
             "history": await self.get_history(user_id, limit=20),
             "learned": await self.get_learned(user_id),
+            "learned_profiles": await self.get_learned_profiles(user_id),
         }

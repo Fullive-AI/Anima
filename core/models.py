@@ -47,6 +47,9 @@ class DeviceCommand(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     source: str = "brain"  # brain / rules / user
     reason: str = ""
+    confidence: float | None = None
+    expected_outcome: str = ""
+    should_wait_seconds: int | None = None
 
 
 class ActionResult(BaseModel):

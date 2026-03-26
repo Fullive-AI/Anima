@@ -27,6 +27,10 @@ class DiscoveryOrchestrator:
                     if device.device_id not in self.devices:
                         self.devices[device.device_id] = device
                         self._adapter_map[device.device_id] = adapter
+                        try:
+                            await adapter.subscribe(device)
+                        except Exception:
+                            logger.exception("Adapter %s subscribe failed for %s", adapter.name, device.device_id)
                         newly_found.append(device)
                         await self._bus.emit(Event(
                             type=EventType.DEVICE_DISCOVERED,
@@ -51,6 +55,26 @@ class DiscoveryOrchestrator:
 
     def get_all_devices(self) -> list[Device]:
         return list(self.devices.values())
+
+    async def refresh_device_states(self, device_ids: list[str] | None = None) -> dict[str, int]:
+        target_ids = device_ids or list(self.devices.keys())
+        refreshed = 0
+        failed = 0
+
+        for device_id in target_ids:
+            device = self.devices.get(device_id)
+            adapter = self._adapter_map.get(device_id)
+            if not device or not adapter:
+                continue
+
+            try:
+                await adapter.subscribe(device)
+                refreshed += 1
+            except Exception:
+                failed += 1
+                logger.exception("Adapter %s refresh failed for %s", adapter.name, device_id)
+
+        return {"refreshed": refreshed, "failed": failed}
 
     async def execute_command(
         self, device_id: str, action: str, params: dict[str, Any]

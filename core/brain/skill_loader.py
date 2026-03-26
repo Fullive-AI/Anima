@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import re
 import logging
 import importlib.util
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
@@ -20,22 +21,10 @@ class LoadedSkill:
     knowledge: str
     decide_prompt: str | None
     learn_prompt: str | None
+    orchestrate_prompt: str | None
+    chat_prompt: str | None
     actions_module_path: Path | None
     path: Path
-
-    @property
-    def orchestrate_prompt(self) -> str | None:
-        p = self.path / "prompts" / "orchestrate.md"
-        if p.exists():
-            return p.read_text(encoding="utf-8")
-        return None
-
-    @property
-    def chat_prompt(self) -> str | None:
-        p = self.path / "prompts" / "chat.md"
-        if p.exists():
-            return p.read_text(encoding="utf-8")
-        return None
 
 
 class SkillLoader:
@@ -51,11 +40,11 @@ class SkillLoader:
             logger.warning("Skills directory not found: %s", self._dir)
             return skills
 
-        for skill_dir in sorted(self._dir.iterdir()):
-            yaml_path = skill_dir / "skill.yaml"
-            if not yaml_path.exists():
-                continue
+        self._cache.clear()
+        self._cache_by_name.clear()
+        self._actions_cache.clear()
 
+        for skill_dir in self._iter_skill_dirs():
             try:
                 skill = self._load_skill(skill_dir)
                 skills.append(skill)
@@ -68,34 +57,133 @@ class SkillLoader:
         logger.info("Loaded %d skills: %s", len(skills), [s.meta.name for s in skills])
         return skills
 
+    def _iter_skill_dirs(self) -> list[Path]:
+        markers = ("SKILL.md", "skill.yaml")
+        seen: set[Path] = set()
+        skill_dirs: list[Path] = []
+
+        for marker in markers:
+            for path in sorted(self._dir.rglob(marker)):
+                skill_dir = path.parent
+                if self._should_skip_dir(skill_dir):
+                    continue
+                if skill_dir in seen:
+                    continue
+                seen.add(skill_dir)
+                skill_dirs.append(skill_dir)
+
+        return sorted(skill_dirs)
+
+    def _should_skip_dir(self, path: Path) -> bool:
+        return any(
+            part.startswith(".") or part.startswith("_") or part == "__pycache__"
+            for part in path.parts
+        )
+
     def _load_skill(self, skill_dir: Path) -> LoadedSkill:
-        # Load metadata
-        with open(skill_dir / "skill.yaml", encoding="utf-8") as f:
-            raw = yaml.safe_load(f)
-        meta = SkillMeta(**raw)
+        skill_md_path = skill_dir / "SKILL.md"
+        legacy_yaml_path = skill_dir / "skill.yaml"
 
-        # Load knowledge
-        knowledge_path = skill_dir / "knowledge.md"
-        knowledge = knowledge_path.read_text(encoding="utf-8") if knowledge_path.exists() else ""
+        if skill_md_path.exists():
+            return self._load_skill_from_skill_md(skill_dir, skill_md_path)
+        if legacy_yaml_path.exists():
+            return self._load_skill_from_legacy(skill_dir, legacy_yaml_path)
 
-        # Load prompts
-        decide_path = skill_dir / "prompts" / "decide.md"
-        decide_prompt = decide_path.read_text(encoding="utf-8") if decide_path.exists() else None
+        raise FileNotFoundError(f"No SKILL.md or skill.yaml found in {skill_dir}")
 
-        learn_path = skill_dir / "prompts" / "learn.md"
-        learn_prompt = learn_path.read_text(encoding="utf-8") if learn_path.exists() else None
+    def _load_skill_from_skill_md(self, skill_dir: Path, skill_md_path: Path) -> LoadedSkill:
+        frontmatter, _body = self._parse_frontmatter(skill_md_path.read_text(encoding="utf-8"))
+        metadata = frontmatter.get("metadata", {}) if isinstance(frontmatter.get("metadata"), dict) else {}
 
-        # Actions module
-        actions_path = skill_dir / "actions.py"
+        meta = SkillMeta(
+            name=frontmatter["name"],
+            description=frontmatter["description"],
+            device_types=frontmatter.get("device_types") or metadata.get("device_types") or [],
+            version=frontmatter.get("version") or metadata.get("version") or "0.1.0",
+        )
+
+        references_dir = skill_dir / "references"
+        prompts_dir = skill_dir / "prompts"
 
         return LoadedSkill(
             meta=meta,
-            knowledge=knowledge,
-            decide_prompt=decide_prompt,
-            learn_prompt=learn_prompt,
-            actions_module_path=actions_path if actions_path.exists() else None,
+            knowledge=self._read_optional(
+                references_dir / "knowledge.md",
+                fallback=skill_dir / "knowledge.md",
+                default="",
+            ),
+            decide_prompt=self._read_optional(
+                references_dir / "decide.md",
+                fallback=prompts_dir / "decide.md",
+            ),
+            learn_prompt=self._read_optional(
+                references_dir / "learn.md",
+                fallback=prompts_dir / "learn.md",
+            ),
+            orchestrate_prompt=self._read_optional(
+                references_dir / "orchestrate.md",
+                fallback=prompts_dir / "orchestrate.md",
+            ),
+            chat_prompt=self._read_optional(
+                references_dir / "chat.md",
+                fallback=prompts_dir / "chat.md",
+            ),
+            actions_module_path=self._find_actions_module(skill_dir),
             path=skill_dir,
         )
+
+    def _load_skill_from_legacy(self, skill_dir: Path, legacy_yaml_path: Path) -> LoadedSkill:
+        with legacy_yaml_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+        meta = SkillMeta(**raw)
+
+        return LoadedSkill(
+            meta=meta,
+            knowledge=self._read_optional(skill_dir / "knowledge.md", default=""),
+            decide_prompt=self._read_optional(skill_dir / "prompts" / "decide.md"),
+            learn_prompt=self._read_optional(skill_dir / "prompts" / "learn.md"),
+            orchestrate_prompt=self._read_optional(skill_dir / "prompts" / "orchestrate.md"),
+            chat_prompt=self._read_optional(skill_dir / "prompts" / "chat.md"),
+            actions_module_path=self._find_actions_module(skill_dir),
+            path=skill_dir,
+        )
+
+    @staticmethod
+    def _parse_frontmatter(content: str) -> tuple[dict[str, object], str]:
+        match = re.match(r"^---\n(.*?)\n---\n?(.*)$", content, re.DOTALL)
+        if not match:
+            raise ValueError("SKILL.md is missing YAML frontmatter")
+
+        frontmatter = yaml.safe_load(match.group(1)) or {}
+        if not isinstance(frontmatter, dict):
+            raise ValueError("SKILL.md frontmatter must be a YAML mapping")
+        if "name" not in frontmatter or "description" not in frontmatter:
+            raise ValueError("SKILL.md frontmatter must include name and description")
+
+        return frontmatter, match.group(2)
+
+    @staticmethod
+    def _read_optional(path: Path, fallback: Path | None = None, default: str | None = None) -> str | None:
+        candidates = [path]
+        if fallback is not None:
+            candidates.append(fallback)
+
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate.read_text(encoding="utf-8")
+
+        return default
+
+    @staticmethod
+    def _find_actions_module(skill_dir: Path) -> Path | None:
+        candidates = [
+            skill_dir / "scripts" / "actions.py",
+            skill_dir / "actions.py",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return None
 
     def get_skill_for_device(self, device_type: str) -> LoadedSkill | None:
         if not self._cache:
@@ -106,6 +194,16 @@ class SkillLoader:
         if not self._cache_by_name:
             self.discover()
         return self._cache_by_name.get(name)
+
+    def get_system_skill_for_device(self, device_type: str) -> LoadedSkill | None:
+        if not self._cache:
+            self.discover()
+
+        skill = self._cache.get(device_type)
+        if not skill:
+            return None
+
+        return skill if "system" in skill.path.parts else None
 
     def load_actions(self, skill: LoadedSkill) -> ModuleType | None:
         if not skill.actions_module_path:
