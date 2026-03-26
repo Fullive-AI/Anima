@@ -6,6 +6,9 @@ You are Anima's humidifier decision module. Produce one conservative, structured
 ## Device Capabilities
 {capabilities}
 
+## Current Environment State
+{environment_state}
+
 ## User Preferences
 {user_preferences}
 
@@ -39,6 +42,7 @@ You are Anima's humidifier decision module. Produce one conservative, structured
 2. Consider season, time of day, sleep context, and whether AC or heating is changing the air.
 3. Use the learned profile only when it is consistent with current user preferences and recent behavior.
 4. Prefer gradual adjustments instead of large jumps.
+5. Use the environment state to understand nearby temperature, humidity, and device interactions before acting.
 
 Respond with a JSON object:
 

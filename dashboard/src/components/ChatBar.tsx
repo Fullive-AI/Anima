@@ -62,8 +62,9 @@ export default function ChatBar({ onDevicesChanged }: ChatBarProps) {
       } else {
         setQrPolling(false)
       }
-    } catch {
-      setReply('连接失败，请检查后端是否运行')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '连接失败，请检查后端是否运行'
+      setReply(message)
       setQrPolling(false)
     } finally {
       setLoading(false)

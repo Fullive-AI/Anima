@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import re
@@ -7,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from langchain_openai import ChatOpenAI
-import yaml
 
 from core.config import settings as env_settings
 
@@ -15,7 +15,7 @@ from core.config import settings as env_settings
 def _build_llm(context: dict[str, Any]) -> ChatOpenAI | None:
     store = context["settings"]
     api_key = store.get("llm_api_key", "") or env_settings.llm_api_key
-    if not api_key:
+    if not api_key or api_key.strip() in {"your-api-key-here", "sk-xxx"}:
         return None
 
     extra_body = {}
@@ -33,20 +33,45 @@ def _build_llm(context: dict[str, Any]) -> ChatOpenAI | None:
     )
 
 
-def _extract_json(text: str) -> dict[str, Any] | None:
-    match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
-    json_str = match.group(1).strip() if match else None
-    if not json_str:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        json_str = match.group(0) if match else None
-    if not json_str:
-        return None
+def _extract_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+            else:
+                text = getattr(item, "text", None)
+                if isinstance(text, str):
+                    parts.append(text)
+        return "\n".join(part for part in parts if part)
+    return str(content or "")
 
-    try:
-        data = json.loads(json_str)
-    except json.JSONDecodeError:
-        return None
-    return data if isinstance(data, dict) else None
+
+def _strip_code_fence(text: str) -> str:
+    match = re.match(r"^\s*```(?:[a-zA-Z0-9_+-]+)?\s*\n(.*)\n```\s*$", text, re.DOTALL)
+    return match.group(1).strip() if match else text.strip()
+
+
+def _extract_json(text: str) -> dict[str, Any] | None:
+    candidates = [_strip_code_fence(text), text.strip()]
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        candidates.append(match.group(0))
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            data = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
 
 
 def _normalize_slug(raw: str, fallback_seed: str) -> str:
@@ -142,269 +167,401 @@ def _system_spec_from_device(device: Any) -> dict[str, Any]:
         ],
     }
 
+REQUIRED_FILES = [
+    "SKILL.md",
+    "references/knowledge.md",
+    "references/decide.md",
+    "references/learn.md",
+    "scripts/actions.py",
+]
 
-def _fallback_spec(request: str) -> dict[str, Any]:
-    folder_name = _normalize_slug("", request)
+FILE_REQUIREMENTS = {
+    "SKILL.md": [
+        "Return raw markdown only. Do not wrap it in JSON or code fences.",
+        "Start with valid YAML frontmatter delimited by ---.",
+        "Frontmatter must include `name`, `description`, and metadata.device_types.",
+        "The body should briefly explain when to use this skill and what files matter.",
+    ],
+    "references/knowledge.md": [
+        "Return raw markdown only.",
+        "Describe domain knowledge, safe operating goals, and important context.",
+        "Do not include placeholders unrelated to this skill.",
+    ],
+    "references/decide.md": [
+        "Return raw markdown only.",
+        "Use the prompt variables {current_data}, {capabilities}, {user_preferences}, {learned_profile}, {recent_history}, and {knowledge}.",
+        "The output schema must explicitly allow the action `none`.",
+        "Only mention actions that exist in scripts/actions.py.",
+    ],
+    "references/learn.md": [
+        "Return raw markdown only.",
+        "Use the prompt variables {history} and {current_profile}.",
+        "Require structured JSON output with fields like stable_preferences, time_based_patterns, seasonal_patterns, weak_signals, and confidence_notes.",
+    ],
+    "scripts/actions.py": [
+        "Return raw Python source only. No markdown fences.",
+        "Import DeviceCommand from core.models.",
+        "Define helper functions only for supported actions.",
+        "Each helper must return a DeviceCommand.",
+    ],
+}
+
+
+def _normalize_supported_actions(raw_actions: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    if not isinstance(raw_actions, list):
+        return normalized
+
+    for action in raw_actions:
+        if not isinstance(action, dict):
+            continue
+        name = _normalize_slug(str(action.get("name", "")), "action")
+        if not name:
+            continue
+        params: list[dict[str, str]] = []
+        raw_params = action.get("params", [])
+        if isinstance(raw_params, list):
+            for param in raw_params:
+                if not isinstance(param, dict):
+                    continue
+                param_name = _normalize_slug(str(param.get("name", "")), "value")
+                if not param_name:
+                    continue
+                param_type = str(param.get("type", "string"))
+                if param_type not in {"string", "number", "boolean"}:
+                    param_type = "string"
+                params.append({"name": param_name, "type": param_type})
+        normalized.append({"name": name, "params": params})
+    return normalized
+
+
+def _default_supported_actions() -> list[dict[str, Any]]:
+    return [{"name": "turn_on", "params": []}, {"name": "turn_off", "params": []}]
+
+
+def _validate_generated_spec(
+    data: dict[str, Any],
+    *,
+    request: str,
+    skill_name_hint: str,
+    existing_names: list[str],
+    device_context: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    errors: list[str] = []
+    device_context = device_context or {}
+
+    folder_name = _normalize_slug(str(data.get("folder_name", skill_name_hint)), request)
+    skill_name = _normalize_slug(str(data.get("skill_name", folder_name)), request)
+    description = str(data.get("description", "")).strip()
+
+    raw_device_types = data.get("device_types")
+    if not isinstance(raw_device_types, list):
+        raw_device_types = device_context.get("device_types", [])
+    device_types = [
+        _normalize_slug(str(item), str(item))
+        for item in raw_device_types
+        if isinstance(item, str) and item.strip()
+    ]
+    device_types = [item for item in device_types if item]
+
+    if not folder_name:
+        errors.append("Spec must include a valid `folder_name`.")
+    if folder_name in existing_names:
+        errors.append(f"Spec folder_name `{folder_name}` already exists.")
+    if not skill_name:
+        errors.append("Spec must include a valid `skill_name`.")
+    if not description:
+        errors.append("Spec must include a non-empty `description`.")
+    if not device_types:
+        errors.append("Spec must include at least one `device_types` entry.")
+
+    domain_summary = str(data.get("domain_summary", "")).strip() or str(device_context.get("domain_summary", "")).strip()
+    if not domain_summary:
+        domain_summary = f"This skill handles the automation request: {request}"
+
+    def _string_list(value: Any, fallback: list[str]) -> list[str]:
+        if not isinstance(value, list):
+            return fallback
+        result = [str(item).strip() for item in value if str(item).strip()]
+        return result or fallback
+
+    knowledge_points = _string_list(data.get("knowledge_points"), list(device_context.get("knowledge_points", [])))
+    hard_rules = _string_list(data.get("hard_rules"), list(device_context.get("hard_rules", [])))
+    learning_focus = _string_list(data.get("learning_focus"), list(device_context.get("learning_focus", [])))
+    supported_actions = _normalize_supported_actions(data.get("supported_actions"))
+    if not supported_actions:
+        supported_actions = _normalize_supported_actions(device_context.get("supported_actions"))
+    if not supported_actions:
+        supported_actions = _default_supported_actions()
+
+    if errors:
+        return None, errors
+
     return {
         "folder_name": folder_name,
-        "skill_name": folder_name,
-        "description": f"Use when handling this custom user requirement in Anima: {request}",
-        "device_types": [folder_name],
-        "domain_summary": request,
-        "knowledge_points": [
-            "Capture the user's routine, preferred timing, and desired device behavior.",
-            "Translate the request into clear on/off or mode-change rules.",
-            "Prefer safe no-op decisions when context is incomplete.",
-        ],
-        "hard_rules": [
-            "Return none if the triggering context is missing.",
-            "Do not invent actions outside scripts/actions.py.",
-            "Avoid repeating identical commands when recent history already shows an adjustment.",
-        ],
-        "supported_actions": [
-            {"name": "activate_routine", "params": [{"name": "routine_name", "type": "string"}]},
-            {"name": "turn_on", "params": []},
-            {"name": "turn_off", "params": []},
-            {"name": "set_mode", "params": [{"name": "mode", "type": "string"}]},
-        ],
-        "learning_focus": [
-            "What time the user usually wants this routine to trigger",
-            "Which actions are consistently preferred",
-            "Whether the routine changes by weekday, season, or occupancy pattern",
-        ],
-    }
+        "skill_name": skill_name,
+        "description": description,
+        "device_types": device_types,
+        "domain_summary": domain_summary,
+        "knowledge_points": knowledge_points,
+        "hard_rules": hard_rules,
+        "supported_actions": supported_actions,
+        "learning_focus": learning_focus,
+    }, []
 
 
-async def _generate_spec_with_llm(request: str, existing_custom_skills: list[str], llm: ChatOpenAI) -> dict[str, Any] | None:
-    prompt = f"""
-You are generating a custom Anima skill package specification.
+async def _generate_skill_spec_with_llm(
+    llm: ChatOpenAI,
+    *,
+    mode: str,
+    request: str,
+    skill_name_hint: str,
+    existing_names: list[str],
+    device_context: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    device_context_json = json.dumps(device_context or {}, ensure_ascii=False, indent=2)
+    base_prompt = f"""
+You are designing an Anima skill package.
 
+Mode: {mode}
 User request:
 {request}
 
-Existing custom skills:
-{json.dumps(existing_custom_skills, ensure_ascii=False, indent=2)}
+Skill name hint:
+{skill_name_hint}
 
-Return one JSON object with this schema:
+Existing skill names in the target directory:
+{json.dumps(existing_names, ensure_ascii=False, indent=2)}
+
+Device context:
+{device_context_json}
+
+Return exactly one compact JSON object with this schema:
 {{
   "folder_name": "filesystem-safe lower_snake_case name",
-  "skill_name": "same as folder_name unless you have a strong reason",
-  "description": "one sentence saying when this skill should be used",
-  "device_types": ["custom device types this skill should map to"],
-  "domain_summary": "one short paragraph",
-  "knowledge_points": ["3 to 6 bullet-like statements"],
-  "hard_rules": ["3 to 6 concrete guardrails"],
+  "skill_name": "stable skill id",
+  "description": "one sentence summary",
+  "device_types": ["device_type"],
+  "domain_summary": "brief domain summary",
+  "knowledge_points": ["bullet", "bullet"],
+  "hard_rules": ["rule", "rule"],
   "supported_actions": [
-    {{
-      "name": "action_name",
-      "params": [
-        {{"name": "param_name", "type": "string | number | boolean"}}
-      ]
-    }}
+    {{"name": "turn_on", "params": []}},
+    {{"name": "set_mode", "params": [{{"name": "mode", "type": "string"}}]}}
   ],
-  "learning_focus": ["2 to 5 things this skill should learn over time"]
+  "learning_focus": ["signal", "signal"]
 }}
 
-Constraints:
-- Keep names stable and filesystem-safe.
-- Do not reuse an existing custom skill name.
-- Include `none` handling in hard rules implicitly; do not list it as an action.
-- Prefer 2 to 5 concrete actions.
-- Keep the skill specific to the user's requirement.
-"""
-    response = await llm.ainvoke(prompt)
-    data = _extract_json(response.content)
-    if not data:
-        return None
-    return data
-
-
-def _param_type_hint(param_type: str) -> str:
-    return {"number": "int | float", "boolean": "bool"}.get(param_type, "str")
-
-
-def _example_param_value(param_type: str) -> str:
-    return {"number": "0", "boolean": "False"}.get(param_type, '""')
-
-
-def _render_skill_md(spec: dict[str, Any]) -> str:
-    actions = ", ".join(action["name"] for action in spec["supported_actions"])
-    frontmatter = {
-        "name": spec["skill_name"],
-        "description": spec["description"],
-        "metadata": {
-            "device_types": spec["device_types"],
-            "version": "0.1.0",
-        },
-    }
-    frontmatter_text = yaml.safe_dump(frontmatter, allow_unicode=True, sort_keys=False).strip()
-    return f"""---
-{frontmatter_text}
----
-
-# {spec["skill_name"].replace("_", " ").title()}
-
-This custom skill was generated from a user request.
-
-## Scope
-
-{spec["domain_summary"]}
-
-## Load These Resources
-
-- `references/knowledge.md` for the domain rules and constraints.
-- `references/decide.md` when generating a single-device or routine decision.
-- `references/learn.md` when updating the learned profile from usage history.
-- `scripts/actions.py` for the structured action helpers exposed to Anima.
-
-## Supported Actions
-
-- {actions}
+Hard constraints:
+- Return JSON only. No markdown fences. No explanation.
+- Do not reuse an existing skill folder name.
+- Keep the skill specific to the request or device type.
+- supported_actions must stay compatible with the device context when provided.
 """
 
+    prompt = base_prompt
+    last_errors: list[str] = []
+    for _attempt in range(3):
+        response = await llm.ainvoke(prompt)
+        data = _extract_json(_extract_text(response.content))
+        if not data:
+            last_errors = ["The model response was not valid JSON."]
+            prompt = base_prompt + "\nYour previous response was not valid JSON. Return one JSON object only."
+            continue
 
-def _render_knowledge_md(spec: dict[str, Any], request: str) -> str:
-    points = "\n".join(f"- {item}" for item in spec["knowledge_points"])
-    return f"""# {spec["skill_name"].replace("_", " ").title()} — Domain Knowledge
-
-## Original User Request
-
-- {request}
-
-## Operating Knowledge
-
-{points}
-"""
-
-
-def _render_decide_md(spec: dict[str, Any]) -> str:
-    hard_rules = "\n".join(f"- {rule}" for rule in spec["hard_rules"])
-    action_names = " | ".join(action["name"] for action in spec["supported_actions"])
-    return f"""You are Anima's decision module for `{spec["skill_name"]}`. Produce one conservative, structured control decision for a single device or routine instance.
-
-## Current Data
-{{current_data}}
-
-## Device Capabilities
-{{capabilities}}
-
-## User Preferences
-{{user_preferences}}
-
-## Learned Profile
-{{learned_profile}}
-
-## Recent Decision History
-{{recent_history}}
-
-## Domain Knowledge
-{{knowledge}}
-
-## Decision Priority
-
-1. Safety and device protection
-2. Avoid oscillation and redundant commands
-3. Match the user's stated routine or preference
-4. Energy and resource efficiency
-
-## Hard Rules
-
-{hard_rules}
-
-## Instructions
-
-1. Compare the current context against the user's intended behavior.
-2. Prefer explicit user intent first, then learned profile if it is consistent.
-3. If there is not enough context to act safely, return `none`.
-
-Respond with a JSON object:
-
-```json
-{{
-  "action": "{action_names} | none",
-  "params": {{}},
-  "reason": "brief explanation",
-  "confidence": 0.0,
-  "expected_outcome": "what should improve",
-  "should_wait_seconds": 0
-}}
-```
-"""
-
-
-def _render_learn_md(spec: dict[str, Any]) -> str:
-    focus = "\n".join(f"- {item}" for item in spec["learning_focus"])
-    return f"""Analyze the user's history for `{spec["skill_name"]}` and update the learned profile.
-
-## History
-{{history}}
-
-## Current Learned Profile
-{{current_profile}}
-
-## Focus Areas
-
-{focus}
-
-Respond with a JSON object:
-
-```json
-{{
-  "stable_preferences": [
-    "clear preference statements backed by repeated history"
-  ],
-  "time_based_patterns": [
-    "patterns tied to time of day or routines"
-  ],
-  "seasonal_patterns": [
-    "patterns tied to season, weekday, or longer cycles"
-  ],
-  "weak_signals": [
-    "possible preferences that need more evidence"
-  ],
-  "confidence_notes": "short note about certainty and data quality"
-}}
-```
-"""
-
-
-def _render_actions_py(spec: dict[str, Any]) -> str:
-    blocks: list[str] = ["from core.models import DeviceCommand", ""]
-    for action in spec["supported_actions"]:
-        func_name = action["name"]
-        params = action.get("params", [])
-        signature = ", ".join(
-            [f'{param["name"]}: {_param_type_hint(param.get("type", "string"))}' for param in params]
+        spec, errors = _validate_generated_spec(
+            data,
+            request=request,
+            skill_name_hint=skill_name_hint,
+            existing_names=existing_names,
+            device_context=device_context,
         )
-        if signature:
-            signature = f"{signature}, "
-        params_dict = ", ".join(
-            [f'"{param["name"]}": {param["name"]}' for param in params]
+        if spec:
+            return spec, []
+
+        last_errors = errors
+        prompt = (
+            base_prompt
+            + "\nThe previous response was invalid. Fix these issues:\n- "
+            + "\n- ".join(errors)
+            + "\nReturn one corrected JSON object only."
         )
-        params_literal = "{" + params_dict + "}" if params_dict else "{}"
-        blocks.append(
-            f"""def {func_name}(device_id: str, {signature}reason: str = "") -> DeviceCommand:
-    return DeviceCommand(
-        device_id=device_id,
-        action="{func_name}",
-        params={params_literal},
-        source="brain",
-        reason=reason,
+
+    return None, last_errors
+
+
+def _validate_generated_file(file_path: str, content: str) -> list[str]:
+    errors: list[str] = []
+    stripped = content.strip()
+    if not stripped:
+        return [f"`{file_path}` was empty."]
+
+    if file_path == "SKILL.md":
+        if not re.match(r"^---\n.*?\n---\n", stripped, re.DOTALL):
+            errors.append("`SKILL.md` must start with valid YAML frontmatter delimited by `---`.")
+    elif file_path == "references/decide.md":
+        lowered = stripped.lower()
+        if "`none`" not in stripped and '"none"' not in lowered and " none" not in lowered:
+            errors.append("`references/decide.md` must explicitly allow `none`.")
+        for placeholder in ("{current_data}", "{capabilities}", "{user_preferences}", "{learned_profile}", "{recent_history}", "{knowledge}"):
+            if placeholder not in stripped:
+                errors.append(f"`references/decide.md` must include `{placeholder}`.")
+    elif file_path == "references/learn.md":
+        lowered = stripped.lower()
+        if "{history}" not in stripped or "{current_profile}" not in stripped:
+            errors.append("`references/learn.md` must include `{history}` and `{current_profile}`.")
+        if "json" not in lowered:
+            errors.append("`references/learn.md` must require structured JSON output.")
+    elif file_path == "scripts/actions.py":
+        if "DeviceCommand" not in stripped:
+            errors.append("`scripts/actions.py` must reference `DeviceCommand`.")
+        try:
+            ast.parse(stripped)
+        except SyntaxError as exc:
+            errors.append(f"`scripts/actions.py` must be valid Python: {exc.msg}.")
+    return errors
+
+
+async def _generate_file_with_llm(
+    llm: ChatOpenAI,
+    *,
+    mode: str,
+    request: str,
+    spec: dict[str, Any],
+    file_path: str,
+) -> tuple[str | None, list[str]]:
+    requirements = "\n".join(f"- {item}" for item in FILE_REQUIREMENTS[file_path])
+    spec_json = json.dumps(spec, ensure_ascii=False, indent=2)
+    base_prompt = f"""
+You are generating one file for an Anima skill package.
+
+Mode: {mode}
+User request:
+{request}
+
+Skill spec:
+{spec_json}
+
+Target file:
+{file_path}
+
+Requirements:
+{requirements}
+
+Return only the raw file content for `{file_path}`. Do not wrap it in JSON. Do not add commentary.
+"""
+
+    prompt = base_prompt
+    last_errors: list[str] = []
+    for _attempt in range(3):
+        response = await llm.ainvoke(prompt)
+        content = _strip_code_fence(_extract_text(response.content))
+        errors = _validate_generated_file(file_path, content)
+        if not errors:
+            return content, []
+
+        last_errors = errors
+        prompt = (
+            base_prompt
+            + "\nThe previous file content was invalid. Fix these issues:\n- "
+            + "\n- ".join(errors)
+            + "\nReturn only the corrected raw file content."
+        )
+
+    return None, last_errors
+
+
+def _validate_generated_package(data: dict[str, Any], *, request: str, skill_name_hint: str) -> tuple[dict[str, Any] | None, list[str]]:
+    errors: list[str] = []
+    files = data.get("files")
+    if not isinstance(files, dict):
+        return None, ["Top-level `files` must be a JSON object."]
+
+    missing = [path for path in REQUIRED_FILES if not isinstance(files.get(path), str) or not files.get(path).strip()]
+    if missing:
+        errors.append(f"Missing or empty required files: {', '.join(missing)}.")
+
+    folder_name = _normalize_slug(str(data.get("folder_name", skill_name_hint)), request)
+    skill_name = _normalize_slug(str(data.get("skill_name", folder_name)), request)
+
+    skill_md = files.get("SKILL.md", "")
+    if not isinstance(skill_md, str) or not re.match(r"^---\n.*?\n---\n", skill_md, re.DOTALL):
+        errors.append("`SKILL.md` must start with valid YAML frontmatter delimited by `---`.")
+
+    decide_md = files.get("references/decide.md", "")
+    if isinstance(decide_md, str):
+        lowered_decide = decide_md.lower()
+        if "`none`" not in decide_md and "| none" not in lowered_decide and '"none"' not in lowered_decide and " none" not in lowered_decide:
+            errors.append("`references/decide.md` must explicitly allow `none`.")
+
+    actions_py = files.get("scripts/actions.py", "")
+    if isinstance(actions_py, str) and "DeviceCommand" not in actions_py:
+        errors.append("`scripts/actions.py` must return `DeviceCommand` helpers.")
+
+    if errors:
+        return None, errors
+
+    return {
+        "folder_name": folder_name,
+        "skill_name": skill_name,
+        "files": {path: files[path] for path in REQUIRED_FILES},
+    }, []
+
+
+async def _generate_package_with_llm(
+    llm: ChatOpenAI,
+    *,
+    mode: str,
+    request: str,
+    skill_name_hint: str,
+    existing_names: list[str],
+    device_context: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    spec, spec_errors = await _generate_skill_spec_with_llm(
+        llm,
+        mode=mode,
+        request=request,
+        skill_name_hint=skill_name_hint,
+        existing_names=existing_names,
+        device_context=device_context,
     )
-"""
+    if not spec:
+        return None, spec_errors
+
+    files: dict[str, str] = {}
+    last_errors: list[str] = []
+    for file_path in REQUIRED_FILES:
+        content, file_errors = await _generate_file_with_llm(
+            llm,
+            mode=mode,
+            request=request,
+            spec=spec,
+            file_path=file_path,
         )
-    return "\n".join(blocks).strip() + "\n"
+        if content is None:
+            return None, file_errors
+        files[file_path] = content
+        last_errors = file_errors
+
+    package, package_errors = _validate_generated_package(
+        {
+            "folder_name": spec["folder_name"],
+            "skill_name": spec["skill_name"],
+            "files": files,
+        },
+        request=request,
+        skill_name_hint=skill_name_hint,
+    )
+    if not package:
+        return None, package_errors or last_errors
+    return package, []
 
 
-def _write_skill_package(target_dir: Path, spec: dict[str, Any], request: str) -> None:
-    (target_dir / "references").mkdir(parents=True)
-    (target_dir / "scripts").mkdir(parents=True)
-
-    (target_dir / "SKILL.md").write_text(_render_skill_md(spec), encoding="utf-8")
-    (target_dir / "references" / "knowledge.md").write_text(_render_knowledge_md(spec, request), encoding="utf-8")
-    (target_dir / "references" / "decide.md").write_text(_render_decide_md(spec), encoding="utf-8")
-    (target_dir / "references" / "learn.md").write_text(_render_learn_md(spec), encoding="utf-8")
-    (target_dir / "scripts" / "actions.py").write_text(_render_actions_py(spec), encoding="utf-8")
+def _write_generated_package(target_dir: Path, package: dict[str, Any]) -> None:
+    for relative_path, content in package["files"].items():
+        file_path = target_dir / relative_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(content, encoding="utf-8")
 
 
 async def create_custom_skill(
@@ -422,50 +579,29 @@ async def create_custom_skill(
 
     existing_custom_skills = [path.name for path in base_dir.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))]
     llm = _build_llm(context)
-    spec = None
-    if llm:
-        try:
-            spec = await _generate_spec_with_llm(request, existing_custom_skills, llm)
-        except Exception:
-            spec = None
+    if not llm:
+        return {
+            "reply": "创建 skill 需要先配置可用的 LLM。",
+            "error": "llm_required",
+        }
 
-    if not spec:
-        spec = _fallback_spec(request)
+    package, errors = await _generate_package_with_llm(
+        llm,
+        mode="custom",
+        request=request,
+        skill_name_hint=_normalize_slug("", request),
+        existing_names=existing_custom_skills,
+    )
+    if not package:
+        detail = f" 失败原因：{'；'.join(errors[:3])}" if errors else ""
+        return {
+            "reply": f"我没能生成有效的 skill 文件，请调整需求后再试一次。{detail}",
+            "error": "skill_generation_failed",
+            "details": errors,
+        }
 
-    folder_name = _normalize_slug(str(spec.get("folder_name", spec.get("skill_name", ""))), request)
-    skill_name = _normalize_slug(str(spec.get("skill_name", folder_name)), request)
-    spec["folder_name"] = folder_name
-    spec["skill_name"] = skill_name
-    spec["device_types"] = [item for item in spec.get("device_types", [folder_name]) if isinstance(item, str) and item] or [folder_name]
-    spec["knowledge_points"] = [item for item in spec.get("knowledge_points", []) if isinstance(item, str) and item] or _fallback_spec(request)["knowledge_points"]
-    spec["hard_rules"] = [item for item in spec.get("hard_rules", []) if isinstance(item, str) and item] or _fallback_spec(request)["hard_rules"]
-    spec["learning_focus"] = [item for item in spec.get("learning_focus", []) if isinstance(item, str) and item] or _fallback_spec(request)["learning_focus"]
-    supported_actions = []
-    for action in spec.get("supported_actions", []):
-        if not isinstance(action, dict):
-            continue
-        name = action.get("name")
-        if not isinstance(name, str) or not name:
-            continue
-        normalized_name = _normalize_slug(name, name)
-        params_list = []
-        for param in action.get("params", []):
-            if not isinstance(param, dict):
-                continue
-            param_name = param.get("name")
-            if not isinstance(param_name, str) or not param_name:
-                continue
-            param_type = param.get("type", "string")
-            if param_type not in {"string", "number", "boolean"}:
-                param_type = "string"
-            params_list.append({"name": _normalize_slug(param_name, param_name), "type": param_type})
-        supported_actions.append({"name": normalized_name, "params": params_list})
-    spec["supported_actions"] = supported_actions or _fallback_spec(request)["supported_actions"]
-    spec["description"] = str(spec.get("description", f"Use when handling this custom requirement: {request}"))
-    spec["domain_summary"] = str(spec.get("domain_summary", request))
-
-    target_dir = _unique_dir(base_dir, folder_name)
-    _write_skill_package(target_dir, spec, request)
+    target_dir = _unique_dir(base_dir, package["folder_name"])
+    _write_generated_package(target_dir, package)
 
     skill_loader.discover()
 
@@ -474,7 +610,7 @@ async def create_custom_skill(
         "reply": reply or f"已创建自定义 skill：{created_name}",
         "action": "create_custom_skill",
         "status": "created",
-        "skill_name": spec["skill_name"],
+        "skill_name": package["skill_name"],
         "folder_name": created_name,
         "path": str(target_dir),
         "refresh_skills": True,
@@ -496,6 +632,16 @@ async def ensure_system_skills_for_devices(
         devices = discovery.get_all_devices()
 
     created: list[str] = []
+    llm = _build_llm(context)
+    if not llm:
+        return {
+            "reply": reply or "未配置 LLM，跳过自动生成 system skill。",
+            "action": "ensure_system_skills_for_devices",
+            "status": "noop",
+            "created_skills": [],
+            "refresh_skills": False,
+        }
+
     for device in devices:
         device_type = getattr(device, "type", "") or ""
         if not isinstance(device_type, str) or not device_type or device_type == "unknown":
@@ -503,17 +649,28 @@ async def ensure_system_skills_for_devices(
         if skill_loader.get_system_skill_for_device(device_type):
             continue
 
-        spec = _system_spec_from_device(device)
-        target_dir = target_root / spec["folder_name"]
+        system_spec = _system_spec_from_device(device)
+        target_dir = target_root / system_spec["folder_name"]
         if target_dir.exists():
             continue
 
-        _write_skill_package(
-            target_dir,
-            spec,
+        package, _errors = await _generate_package_with_llm(
+            llm,
+            mode="system",
             request=f"Auto-generated system skill for discovered device type `{device_type}`.",
+            skill_name_hint=system_spec["skill_name"],
+            existing_names=[path.name for path in target_root.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))],
+            device_context=system_spec,
         )
-        created.append(spec["folder_name"])
+        if not package:
+            continue
+
+        target_dir = target_root / package["folder_name"]
+        if target_dir.exists():
+            continue
+
+        _write_generated_package(target_dir, package)
+        created.append(package["folder_name"])
 
     if created:
         skill_loader.discover()
@@ -525,4 +682,3 @@ async def ensure_system_skills_for_devices(
         "created_skills": created,
         "refresh_skills": bool(created),
     }
-
