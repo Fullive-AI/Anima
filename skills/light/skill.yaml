@@ -1,8 +1,0 @@
-name: light
-description: Intelligent lighting — circadian-aware brightness and color temperature control
-device_types:
-  - light
-  - ceiling_light
-  - desk_lamp
-  - led_strip
-version: 0.1.0

@@ -1,5 +1,0 @@
-name: coordinator
-description: Cross-device orchestration — coordinates multiple devices to avoid conflicts and create synergies
-device_types:
-  - coordinator
-version: 0.1.0

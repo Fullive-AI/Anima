@@ -148,13 +148,20 @@ Each Skill teaches Anima **how a device type becomes autonomously intelligent** 
 
 ```
 skills/
-  humidifier/
-    skill.yaml          # Metadata + compatible device types
-    knowledge.md        # Domain knowledge (comfort ranges, seasonal tips, device interactions)
-    actions.py          # Executable actions (set_humidity, set_mode, turn_on/off)
-    prompts/
-      decide.md         # Decision prompt template for LLM
-      learn.md          # Preference learning prompt template
+  system/               # Built-in skills maintained by Anima
+    humidifier/
+      SKILL.md
+      references/
+        knowledge.md
+        decide.md
+        learn.md
+      scripts/
+        actions.py
+  custom/               # User-added skills live here
+    <your-skill>/
+      SKILL.md
+      references/
+      scripts/
 ```
 
 ### Built-in Skills
@@ -182,7 +189,9 @@ Anima/
 │   └── main.py                 # Main entrypoint
 ├── adapters/                   # Device protocol adapters
 │   └── miot/                   # Xiaomi MIoT adapter
-├── skills/                     # AI Skill packages (4 built-in)
+├── skills/
+│   ├── system/                # Built-in skills shipped with Anima
+│   └── custom/                # User-created skills loaded from the same runtime
 ├── tests/                      # 55 tests
 ├── docs/plans/                 # Design doc + implementation plan
 ├── package.json                # pnpm monorepo root
@@ -204,7 +213,8 @@ Anima/
 
 Anima is designed for easy contribution:
 
-- **Write a Skill** — 3 files: `skill.yaml`, `knowledge.md`, `prompts/decide.md`
+- **Write a Skill** — create a new folder under `skills/custom/` with `SKILL.md`, `references/`, and optional `scripts/`
+  Start from `skills/custom/_template/` and copy it to `skills/custom/<your-skill-name>/`.
 - **Write an Adapter** — 1 class, 3 methods: `discover()`, `subscribe()`, `execute()`
 
 See [Design Document](docs/plans/2026-03-17-anima-design.md) for full architecture details.

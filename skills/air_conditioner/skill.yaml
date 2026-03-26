@@ -1,5 +1,0 @@
-name: air_conditioner
-description: Intelligent temperature control — energy-efficient cooling/heating with humidity awareness
-device_types:
-  - air_conditioner
-version: 0.1.0

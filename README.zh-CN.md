@@ -148,13 +148,20 @@ ANIMA_LLM_DISABLE_THINKING=false
 
 ```
 skills/
-  humidifier/
-    skill.yaml          # 元数据 + 兼容设备类型
-    knowledge.md        # 领域知识（舒适范围、季节建议、设备联动）
-    actions.py          # 可执行操作（set_humidity、set_mode、turn_on/off）
-    prompts/
-      decide.md         # LLM 决策提示词模板
-      learn.md          # 偏好学习提示词模板
+  system/               # Anima 自带内置 skill
+    humidifier/
+      SKILL.md
+      references/
+        knowledge.md
+        decide.md
+        learn.md
+      scripts/
+        actions.py
+  custom/               # 用户自己新增的 skill 放这里
+    <your-skill>/
+      SKILL.md
+      references/
+      scripts/
 ```
 
 ### 内置技能
@@ -182,7 +189,9 @@ Anima/
 │   └── main.py                 # 主入口
 ├── adapters/                   # 设备协议适配器
 │   └── miot/                   # 小米 MIoT 适配器
-├── skills/                     # AI 技能包（4 个内置）
+├── skills/
+│   ├── system/                # Anima 内置 skill
+│   └── custom/                # 用户自定义 skill
 ├── tests/                      # 55 个测试
 ├── docs/plans/                 # 设计文档 + 实施计划
 ├── package.json                # pnpm monorepo 根配置
@@ -204,7 +213,8 @@ Anima/
 
 Anima 的设计让贡献变得简单：
 
-- **编写技能** — 3 个文件：`skill.yaml`、`knowledge.md`、`prompts/decide.md`
+- **编写技能** — 在 `skills/custom/` 下新建一个目录，至少包含 `SKILL.md` 和 `references/`
+  建议直接复制 `skills/custom/_template/` 到 `skills/custom/<your-skill-name>/` 再修改。
 - **编写适配器** — 1 个类、3 个方法：`discover()`、`subscribe()`、`execute()`
 
 详见[设计文档](docs/plans/2026-03-17-anima-design.zh-CN.md)。

@@ -1,6 +1,0 @@
-name: humidifier
-description: Intelligent humidity control — knows optimal ranges, seasonal adjustments, and learns user preferences
-device_types:
-  - humidifier
-  - dehumidifier
-version: 0.1.0

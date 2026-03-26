@@ -135,11 +135,13 @@ The brain should not:
 
 Skills define device-type intelligence through:
 
-- `skill.yaml`
-- `knowledge.md`
-- `prompts/decide.md`
-- `prompts/learn.md`
-- optional `actions.py`
+- `skills/system/` for built-in skills shipped by Anima
+- `skills/custom/` for user-authored skills
+- `SKILL.md`
+- `references/knowledge.md`
+- `references/decide.md`
+- `references/learn.md`
+- optional `scripts/actions.py`
 
 When adding support for a new intelligent device type:
 

@@ -135,11 +135,13 @@ Brain 不应该：
 
 Skill 通过以下内容定义设备类型智能：
 
-- `skill.yaml`
-- `knowledge.md`
-- `prompts/decide.md`
-- `prompts/learn.md`
-- 可选 `actions.py`
+- `skills/system/` 用于系统内置 skill
+- `skills/custom/` 用于用户新增 skill
+- `SKILL.md`
+- `references/knowledge.md`
+- `references/decide.md`
+- `references/learn.md`
+- 可选 `scripts/actions.py`
 
 当要支持新的“智能设备类型”时：
 
