@@ -7,29 +7,24 @@ import re
 from pathlib import Path
 from typing import Any
 
-from langchain_openai import ChatOpenAI
-
 from core.config import settings as env_settings
+from core.llm.openai_text_client import OpenAITextClient
 
 
-def _build_llm(context: dict[str, Any]) -> ChatOpenAI | None:
+def _build_llm(context: dict[str, Any]) -> OpenAITextClient | None:
     store = context["settings"]
     api_key = store.get("llm_api_key", "") or env_settings.llm_api_key
     if not api_key or api_key.strip() in {"your-api-key-here", "sk-xxx"}:
         return None
 
-    extra_body = {}
     disable_thinking = store.get("llm_disable_thinking", env_settings.llm_disable_thinking)
-    if disable_thinking:
-        extra_body["thinking"] = {"type": "disabled"}
-
-    return ChatOpenAI(
+    return OpenAITextClient(
         api_key=api_key,
         model=store.get("llm_model", "") or env_settings.llm_model,
         base_url=store.get("llm_base_url", "") or env_settings.llm_base_url or None,
         temperature=0.2,
         max_tokens=1800,
-        extra_body=extra_body or None,
+        disable_thinking=disable_thinking,
     )
 
 
@@ -311,7 +306,7 @@ def _validate_generated_spec(
 
 
 async def _generate_skill_spec_with_llm(
-    llm: ChatOpenAI,
+    llm: OpenAITextClient,
     *,
     mode: str,
     request: str,
@@ -423,7 +418,7 @@ def _validate_generated_file(file_path: str, content: str) -> list[str]:
 
 
 async def _generate_file_with_llm(
-    llm: ChatOpenAI,
+    llm: OpenAITextClient,
     *,
     mode: str,
     request: str,
@@ -509,7 +504,7 @@ def _validate_generated_package(data: dict[str, Any], *, request: str, skill_nam
 
 
 async def _generate_package_with_llm(
-    llm: ChatOpenAI,
+    llm: OpenAITextClient,
     *,
     mode: str,
     request: str,
