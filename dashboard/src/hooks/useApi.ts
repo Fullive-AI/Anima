@@ -1,5 +1,23 @@
 import { useState, useEffect, useCallback } from 'react'
 
+export interface CapabilityInput {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'enum'
+  required?: boolean
+  default?: string | number | boolean
+  options?: string[]
+}
+
+export interface DeviceCapability {
+  name: string
+  params?: {
+    label?: string
+    help?: string
+    inputs?: CapabilityInput[]
+    [key: string]: unknown
+  }
+}
+
 export interface Device {
   device_id: string
   name: string
@@ -7,7 +25,7 @@ export interface Device {
   type: string
   room: string | null
   online: boolean
-  capabilities: { name: string; params?: Record<string, unknown> }[]
+  capabilities: DeviceCapability[]
   sensors: { name: string; unit: string; value: number | string | boolean | null }[]
   needs_token?: boolean
   ip?: string
@@ -20,6 +38,37 @@ export interface Decision {
   action?: string
   params?: Record<string, unknown>
   reason?: string
+}
+
+export interface EnvironmentSignalReading {
+  device_id: string
+  device_type: string
+  room: string | null
+  value: number | string | boolean | null
+  unit: string
+}
+
+export interface EnvironmentDeviceSnapshot {
+  device_id: string
+  name: string
+  type: string
+  room: string | null
+  online: boolean
+  sensors: Record<string, { value: number | string | boolean | null; unit: string }>
+}
+
+export interface EnvironmentSnapshot {
+  timestamp?: string
+  current_device_id?: string | null
+  current_device_type?: string | null
+  devices: EnvironmentDeviceSnapshot[]
+  signals: Record<string, EnvironmentSignalReading[]>
+}
+
+export interface RefreshEnvironmentResult {
+  refreshed: number
+  failed: number
+  environment: EnvironmentSnapshot
 }
 
 export interface ScanResult {
@@ -50,6 +99,16 @@ const api = {
     return res.json()
   },
 
+  async getEnvironment(): Promise<EnvironmentSnapshot> {
+    const res = await fetch('/api/environment')
+    return res.json()
+  },
+
+  async refreshEnvironment(): Promise<RefreshEnvironmentResult> {
+    const res = await fetch('/api/environment/refresh', { method: 'POST' })
+    return res.json()
+  },
+
   async scan(): Promise<ScanResult> {
     const res = await fetch('/api/scan', { method: 'POST' })
     return res.json()
@@ -70,7 +129,23 @@ const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),
     })
-    return res.json()
+    const text = await res.text()
+    let data: ChatResponse | null = null
+    try {
+      data = JSON.parse(text) as ChatResponse
+    } catch {
+      /* non-json response */
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.reply || data?.error || `HTTP ${res.status}`)
+    }
+
+    if (!data) {
+      throw new Error('后端返回了无效响应')
+    }
+
+    return data
   },
 
   async getHealth(): Promise<{ status: string; version: string }> {
@@ -122,6 +197,39 @@ export function useDecisions(pollInterval = 3000) {
   }, [refresh, pollInterval])
 
   return { decisions, refresh }
+}
+
+export function useEnvironment(pollInterval = 3000) {
+  const [environment, setEnvironment] = useState<EnvironmentSnapshot | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await api.getEnvironment()
+      setEnvironment(data)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const refreshNow = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      const data = await api.refreshEnvironment()
+      setEnvironment(data.environment)
+      return data
+    } finally {
+      setRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refresh()
+    const id = setInterval(refresh, pollInterval)
+    return () => clearInterval(id)
+  }, [refresh, pollInterval])
+
+  return { environment, refresh, refreshNow, refreshing }
 }
 
 export { api }
