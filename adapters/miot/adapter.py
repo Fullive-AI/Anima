@@ -47,10 +47,11 @@ MODEL_TYPE_MAP = {
 class MIoTAdapter(BaseAdapter):
     name = "miot"
 
-    def __init__(self, settings_store=None) -> None:
+    def __init__(self, settings_store=None, speaker_player=None) -> None:
         self._known_devices: dict[str, miio.Device] = {}
         self._device_infos: dict[str, dict] = {}
         self._settings = settings_store
+        self._speaker_player = speaker_player
         self._cloud_logged_in = False
 
     def _guess_device_type(self, model: str) -> str:
@@ -129,6 +130,48 @@ class MIoTAdapter(BaseAdapter):
             self._cloud_logged_in = False
             logger.exception("Xiaomi Cloud discovery failed: %s", exc)
 
+        return devices
+
+    async def _load_cached_cloud_devices(self) -> list[Device]:
+        if not self._settings:
+            return []
+
+        cached_devices = self._settings.get("xiaomi_cloud_devices", []) or []
+        devices: list[Device] = []
+        for cd in cached_devices:
+            did = str(cd.get("did", "")).strip()
+            if not did:
+                continue
+
+            ip = cd.get("localip", "")
+            token = cd.get("token", "")
+            model = cd.get("model", "unknown")
+            name = cd.get("name", model)
+            is_online = bool(cd.get("isOnline", False))
+
+            device_id = self._build_device_id_from_did(did)
+            device_type = self._guess_device_type(model)
+            devices.append(
+                Device(
+                    device_id=device_id,
+                    name=name,
+                    adapter=self.name,
+                    type=device_type,
+                    online=is_online,
+                    capabilities=self._build_capabilities(model, has_token=bool(token and token != "0" * 32)),
+                    sensors=self._default_sensors(device_type),
+                )
+            )
+
+            self._device_infos[device_id] = {
+                "ip": ip,
+                "token": token,
+                "model": model,
+                "did": did,
+            }
+
+        if devices:
+            logger.info("Loaded %d cached Xiaomi cloud devices from config", len(devices))
         return devices
 
     async def _discover_local(self) -> list[Device]:
@@ -232,6 +275,7 @@ class MIoTAdapter(BaseAdapter):
 
     async def discover(self) -> list[Device]:
         seen_ips: set[str] = set()
+        seen_ids: set[str] = set()
         devices: list[Device] = []
 
         manual = await self._load_manual_devices()
@@ -239,29 +283,51 @@ class MIoTAdapter(BaseAdapter):
             info = self._device_infos.get(device.device_id, {})
             if info.get("ip"):
                 seen_ips.add(info["ip"])
+            seen_ids.add(device.device_id)
         devices.extend(manual)
+
+        cached_cloud = await self._load_cached_cloud_devices()
+        for device in cached_cloud:
+            info = self._device_infos.get(device.device_id, {})
+            ip = info.get("ip", "")
+            if device.device_id in seen_ids:
+                continue
+            if ip and ip not in seen_ips:
+                seen_ips.add(ip)
+            seen_ids.add(device.device_id)
+            devices.append(device)
 
         cloud = await self._discover_cloud()
         for device in cloud:
             info = self._device_infos.get(device.device_id, {})
             ip = info.get("ip", "")
-            if ip and ip not in seen_ips:
+            if device.device_id in seen_ids:
+                continue
+            if ip and ip in seen_ips:
+                continue
+            if ip:
                 seen_ips.add(ip)
-                devices.append(device)
+            seen_ids.add(device.device_id)
+            devices.append(device)
 
         local = await self._discover_local()
         for device in local:
             info = self._device_infos.get(device.device_id, {})
             ip = info.get("ip", "")
-            if ip and ip not in seen_ips:
+            if device.device_id in seen_ids:
+                continue
+            if ip and ip in seen_ips:
+                continue
+            if ip:
                 seen_ips.add(ip)
-                devices.append(device)
+            seen_ids.add(device.device_id)
+            devices.append(device)
 
         logger.info(
             "MIoT discovered %d devices total (%d manual, %d cloud, %d local)",
             len(devices),
             len(manual),
-            len(cloud),
+            len(cached_cloud) + len(cloud),
             len(local),
         )
         return devices
@@ -303,6 +369,9 @@ class MIoTAdapter(BaseAdapter):
                 sensor.value = snapshot[sensor.name]
 
     async def execute(self, device_id: str, action: str, params: dict[str, Any]) -> ActionResult:
+        if action in {"play_audio_file", "play_audio_url", "play_random_audio", "stop_audio"}:
+            return await self._execute_speaker_action(device_id, action, params)
+
         dev = self._get_miio_device(device_id)
         if not dev:
             return ActionResult(
@@ -321,7 +390,86 @@ class MIoTAdapter(BaseAdapter):
             return ActionResult(device_id=device_id, action=action, success=False, message=str(exc))
 
     def _build_capabilities(self, model: str, has_token: bool = True) -> list[Capability]:
+        if model.startswith("xiaomi.wifispeaker") and has_token:
+            return [
+                Capability(
+                    name="play_audio_file",
+                    params={
+                        "label": "播放本地音频",
+                        "help": "输入 Anima 运行机器上的绝对路径，例如 /Users/name/test.wav",
+                        "inputs": [{"name": "path", "required": True, "type": "string"}],
+                    },
+                ),
+                Capability(
+                    name="play_audio_url",
+                    params={
+                        "label": "播放音频 URL",
+                        "help": "输入音箱可直接访问的 HTTP 音频地址。",
+                        "inputs": [{"name": "url", "required": True, "type": "string"}],
+                    },
+                ),
+                Capability(
+                    name="play_random_audio",
+                    params={
+                        "label": "随机播放一首",
+                        "help": "从本地音频库目录随机挑选一首播放。",
+                        "inputs": [],
+                    },
+                ),
+                Capability(name="stop_audio", params={"label": "停止播放", "help": "停止当前音频播放。", "inputs": []}),
+            ]
         return build_capabilities(model, has_token=has_token, mp5_factory=self._build_mp5_capabilities)
+
+    async def _execute_speaker_action(self, device_id: str, action: str, params: dict[str, Any]) -> ActionResult:
+        info = self._device_infos.get(device_id)
+        if not info:
+            return ActionResult(
+                device_id=device_id,
+                action=action,
+                success=False,
+                message=f"Speaker info for {device_id} not found",
+            )
+
+        if not self._speaker_player:
+            return ActionResult(
+                device_id=device_id,
+                action=action,
+                success=False,
+                message="Speaker playback service is not configured",
+            )
+
+        try:
+            if action == "play_audio_file":
+                path = str(params.get("path", "")).strip()
+                if not path:
+                    raise ValueError("Missing required parameter: path")
+                result = await self._speaker_player.play_file(info, path)
+                return ActionResult(device_id=device_id, action=action, success=True, message=str(result.get("url", "")))
+
+            if action == "play_audio_url":
+                url = str(params.get("url", "")).strip()
+                if not url:
+                    raise ValueError("Missing required parameter: url")
+                result = await self._speaker_player.play_url(info, url)
+                return ActionResult(device_id=device_id, action=action, success=True, message=url)
+
+            if action == "play_random_audio":
+                result = await self._speaker_player.play_random_file(info)
+                return ActionResult(
+                    device_id=device_id,
+                    action=action,
+                    success=True,
+                    message=str(result.get("path", result.get("url", ""))),
+                )
+
+            if action == "stop_audio":
+                await self._speaker_player.stop(info)
+                return ActionResult(device_id=device_id, action=action, success=True)
+        except Exception as exc:
+            logger.exception("Speaker action failed: %s.%s", device_id, action)
+            return ActionResult(device_id=device_id, action=action, success=False, message=str(exc))
+
+        return ActionResult(device_id=device_id, action=action, success=False, message="Unsupported speaker action")
 
     @staticmethod
     def _build_mp5_capabilities() -> list[Capability]:

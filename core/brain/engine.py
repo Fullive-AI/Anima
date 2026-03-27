@@ -13,7 +13,6 @@ from langgraph.graph import END, StateGraph
 from openai import AsyncOpenAI
 
 from core.brain.skill_loader import LoadedSkill, SkillLoader
-from core.config import settings
 from core.events.bus import EventBus
 from core.memory.store import MemoryStore
 from core.models import (
@@ -27,6 +26,7 @@ from core.models import (
     SkillPlanItem,
     SkillSummary,
 )
+from core.runtime.config import settings
 
 logger = logging.getLogger(__name__)
 PLANNER_HINTS_PATH = Path(__file__).with_name("prompts") / "planner_hints.md"
@@ -303,6 +303,10 @@ class Brain:
 
         result["execution_results"] = [item.model_dump() for item in execution_results]
         result["executed"] = True
+        failure_message = self._summarize_chat_execution_failure(execution_results)
+        if failure_message:
+            result["reply"] = failure_message
+            result["executed"] = False
         return {"result": result}
 
     async def _execute_skill_plan_item(
@@ -348,6 +352,8 @@ class Brain:
                 action_spec.params,
             )
             last_message = result.message
+            if not getattr(result, "success", False):
+                continue
             verification = await self._verify_action(action_spec, discovery, attempts)
             last_observed = verification.observed_state
             if verification.verified:
@@ -430,6 +436,22 @@ class Brain:
                 "observed_state": verification.observed_state,
             },
         )
+
+    @staticmethod
+    def _summarize_chat_execution_failure(execution_results: list[SkillExecutionResult]) -> str:
+        if not execution_results:
+            return "我理解了你的请求，但这次没有生成可执行动作。"
+
+        if all(not item.actions for item in execution_results):
+            return "我理解了你的请求，但当前没有生成可执行动作。"
+
+        for item in execution_results:
+            for verification in item.verifications:
+                if not verification.verified:
+                    detail = verification.message or verification.status or "执行失败"
+                    return f"我尝试执行了，但没有成功：{detail}"
+
+        return ""
 
     def _build_discovery_proxy(self) -> Any:
         provider = self._environment_provider
@@ -538,6 +560,9 @@ class Brain:
             "Rules:\n"
             "- If this is a system operation such as Xiaomi QR onboarding, LAN scan, or creating a custom skill, use system_action.\n"
             "- If this is device control or home intelligence, use skill_plan_items.\n"
+            "- If the user asks to play music or audio on a speaker, use the `speaker` skill.\n"
+            "- If the user asks to play something without giving a specific path or URL, set the speaker goal to random local playback.\n"
+            "- If the user asks to stop speaker playback, use the `speaker` skill with a stop-oriented goal.\n"
             "- For general Q&A, set should_execute to false.\n"
             "- Do not use regex or heuristics; infer intent from the message and context.\n"
         )

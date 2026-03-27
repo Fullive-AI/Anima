@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Paths
     data_dir: str = "data"
     skills_dir: str = "skills"
+    audio_library_dir: str = ""
 
 
 settings = Settings()

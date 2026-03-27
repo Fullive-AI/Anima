@@ -370,6 +370,7 @@ function getVisibleCapabilities(device: Device) {
     humidifier: ['on', 'off', 'set_target_humidity', 'set_mode'],
     dehumidifier: ['on', 'off', 'set_target_humidity', 'set_mode'],
     air_purifier: ['on', 'off', 'set_mode', 'set_fan_level'],
+    speaker: ['play_random_audio', 'play_audio_file', 'play_audio_url', 'stop_audio'],
   }
 
   const preferred = preferredByType[device.type]
@@ -393,6 +394,10 @@ function prettifyName(name: string) {
   const aliases: Record<string, string> = {
     on: '开启',
     off: '关闭',
+    play_random_audio: '随机播放一首',
+    play_audio_file: '播放本地音频',
+    play_audio_url: '播放音频 URL',
+    stop_audio: '停止播放',
   }
   if (aliases[name]) {
     return aliases[name]

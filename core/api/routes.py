@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from core.models import DeviceCommand
@@ -75,6 +76,18 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                 data["ip"] = info.get("ip", "")
             result.append(data)
         return result
+
+    @app.get("/api/audio/{token}")
+    async def get_audio_file(token: str):
+        registry = app_state.get("audio_registry")
+        if registry is None:
+            raise HTTPException(status_code=404, detail="Audio registry not configured")
+
+        entry = registry.get(token)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Audio file not found")
+
+        return FileResponse(entry.path, media_type=entry.media_type, filename=entry.filename)
 
     @app.get("/api/devices/{device_id}")
     async def get_device(device_id: str):
@@ -445,7 +458,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
     @app.get("/api/settings/llm/status")
     async def llm_status():
-        from core.config import settings as env_settings
+        from core.runtime.config import settings as env_settings
         store = app_state["settings"]
         api_key = store.get("llm_api_key", "") or env_settings.llm_api_key
         # Mask key for display: show first 8 chars + ***

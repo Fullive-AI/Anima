@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 if TYPE_CHECKING:
-    from core.discovery import DiscoveryOrchestrator
+    from core.devices.discovery import DiscoveryOrchestrator
     from core.brain.engine import Brain
 
 console = Console()

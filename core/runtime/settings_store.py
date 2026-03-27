@@ -10,6 +10,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from core.runtime.config import settings as env_settings
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_PATH = "data/config.json"
@@ -57,8 +59,8 @@ class SettingsStore:
     # ── Convenience accessors ──
 
     def get_xiaomi_credentials(self) -> tuple[str, str] | None:
-        user = self.get("xiaomi_cloud_user", "")
-        pwd = self.get("xiaomi_cloud_pass", "")
+        user = self.get("xiaomi_cloud_user", "") or env_settings.xiaomi_cloud_user
+        pwd = self.get("xiaomi_cloud_pass", "") or env_settings.xiaomi_cloud_pass
         if user and pwd:
             return user, pwd
         return None
@@ -68,3 +70,6 @@ class SettingsStore:
 
     def is_xiaomi_configured(self) -> bool:
         return self.get_xiaomi_credentials() is not None
+
+    def get_audio_library_dir(self) -> str:
+        return self.get("audio_library_dir", "") or env_settings.audio_library_dir

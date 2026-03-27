@@ -184,6 +184,41 @@ class TestBrain:
         assert verification.status == "verified"
         assert verification.attempts == 1
 
+    async def test_execute_action_with_retry_does_not_treat_failed_command_as_success(self):
+        brain = Brain.__new__(Brain)
+        device = Device(
+            device_id="speaker_01",
+            name="Speaker",
+            adapter="fake",
+            type="speaker",
+            sensors=[],
+        )
+
+        class FakeDiscovery:
+            async def execute_command(self, device_id, action, params):
+                return type("Result", (), {"message": "speaker rejected request", "success": False})()
+
+            async def refresh_device_states(self, device_ids=None):
+                return {"refreshed": 1, "failed": 0}
+
+            def get_device(self, device_id):
+                return device
+
+        verification = await brain._execute_action_with_retry(
+            SkillActionSpec(
+                skill_name="speaker",
+                device_id="speaker_01",
+                action="play_random_audio",
+                params={},
+                expected_state={},
+            ),
+            FakeDiscovery(),
+        )
+
+        assert verification.verified is False
+        assert verification.status == "verification_failed"
+        assert verification.message == "speaker rejected request"
+
     async def test_handle_chat_message_runs_unified_graph_for_system_action(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
@@ -228,3 +263,59 @@ class TestBrain:
 
         assert result["action"] == "scan_local_devices"
         assert result["new_devices"] == 1
+
+    async def test_handle_chat_message_runs_speaker_skill_for_random_playback(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        speaker = Device(
+            device_id="speaker_01",
+            name="Xiaomi Smart Speaker",
+            adapter="miot",
+            type="speaker",
+            capabilities=[Capability(name="play_random_audio"), Capability(name="stop_audio")],
+        )
+
+        class FakeDiscovery:
+            def __init__(self, target):
+                self.target = target
+                self.executed = []
+
+            def get_all_devices(self):
+                return [self.target]
+
+            def get_devices_by_type(self, device_type):
+                return [self.target] if device_type == "speaker" else []
+
+            async def execute_command(self, device_id, action, params):
+                self.executed.append((device_id, action, params))
+                return type("Result", (), {"message": "", "success": True})()
+
+            async def refresh_device_states(self, device_ids=None):
+                return {"refreshed": 1, "failed": 0}
+
+            def get_device(self, device_id):
+                return self.target if device_id == self.target.device_id else None
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery(speaker)
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = __import__("unittest.mock", fromlist=["AsyncMock"]).AsyncMock(
+            return_value='{"reply":"我来随机放一首。","should_execute":true,"system_action":"none","system_skill":"","params":{},"skill_plan_items":[{"skill_name":"speaker","goal":"play random music on the speaker","reason":"user asked to play music","priority":10}]}'
+        )
+
+        result = await brain.handle_chat_message(
+            "随机放一首歌",
+            {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+        )
+
+        assert result["executed"] is True
+        assert result["execution_results"][0]["actions"][0]["action"] == "play_random_audio"
+        assert discovery.executed == [("speaker_01", "play_random_audio", {})]

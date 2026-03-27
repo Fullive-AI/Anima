@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from core.config import settings as env_settings
+from core.runtime.config import settings as env_settings
 from core.llm.openai_text_client import OpenAITextClient
 
 

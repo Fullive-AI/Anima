@@ -10,8 +10,9 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 from core.api.routes import create_app
+from core.media.audio_registry import LocalAudioRegistry
 from core.events.bus import EventBus
-from core.discovery import DiscoveryOrchestrator
+from core.devices.discovery import DiscoveryOrchestrator
 from core.rules.engine import RulesEngine
 from core.memory.store import MemoryStore
 from core.brain.skill_loader import SkillLoader
@@ -91,6 +92,9 @@ class FakeHumidifierAdapter(BaseAdapter):
 class FakeSettings:
     def get(self, key, default=None):
         return default
+
+    def get_xiaomi_credentials(self):
+        return None
 
 
 class TestIntegrationPipeline:
@@ -298,3 +302,34 @@ class TestIntegrationPipeline:
         assert data["refreshed"] == 1
         assert data["failed"] == 0
         assert data["environment"]["signals"]["humidity"][0]["value"] == 42
+
+    async def test_audio_file_endpoint_serves_registered_local_audio(self, tmp_path):
+        audio_file = tmp_path / "sample.wav"
+        audio_file.write_bytes(b"RIFFdemoWAVE")
+        registry = LocalAudioRegistry(port=8080)
+        token = registry.register_file(audio_file)
+
+        app = create_app({
+            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+            "brain": Brain(bus=EventBus(), skill_loader=SkillLoader(skills_dir="skills"), memory=MemoryStore(base_dir=str(tmp_path / "memory"))),
+            "memory": MemoryStore(base_dir=str(tmp_path / "memory")),
+            "settings": FakeSettings(),
+            "audio_registry": registry,
+        })
+        client = TestClient(app)
+
+        response = client.get(f"/api/audio/{token}")
+
+        assert response.status_code == 200
+        assert response.content == b"RIFFdemoWAVE"
+
+    async def test_audio_registry_accepts_file_uri_paths(self, tmp_path):
+        audio_file = tmp_path / "sample.wav"
+        audio_file.write_bytes(b"RIFFdemoWAVE")
+        registry = LocalAudioRegistry(port=8080)
+
+        token = registry.register_file(f"file:{audio_file}")
+        entry = registry.get(token)
+
+        assert entry is not None
+        assert entry.path == audio_file.resolve()

@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock
-from core.discovery import DiscoveryOrchestrator
+from core.devices.discovery import DiscoveryOrchestrator
 from core.events.bus import EventBus
 from core.models import Device, Event, EventType
 from adapters.base import BaseAdapter

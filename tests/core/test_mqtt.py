@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from core.mqtt import MQTTClient
+from core.runtime.mqtt import MQTTClient
 
 
 class TestMQTTClient:

@@ -5,7 +5,7 @@
     Confirm {current_data}, {capabilities}, {recent_history}, and {user_preferences} are complete and unambiguous. If context is missing or ambiguous, return `none`.
 2.  **Base Knowledge Application**
     Use {knowledge} to enforce rules:
-    - Only supported actions: `turn_on` and `turn_off` (no custom parameters)
+    - Only supported actions are those present in the current device capability list
     - Prefer `none` when context is insufficient
     - Skip redundant commands if {recent_history} shows recent device adjustment
     - All actions must respect {capabilities} bounds
@@ -20,5 +20,5 @@
     Validate all proposed actions exist in `scripts/actions.py` and match {capabilities} constraints. Only use allowed actions.
 6.  **Final Output**
     Return exactly one of:
-    - Valid action: `turn_on` or `turn_off`
+    - A valid supported action such as `play_random_audio`, `stop_audio`, `play_audio_file`, `play_audio_url`, `turn_on`, or `turn_off`
     - `none` if no valid action can be determined

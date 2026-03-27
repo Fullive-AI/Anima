@@ -11,16 +11,18 @@ import uvicorn
 from core.api.routes import create_app
 from core.brain.engine import Brain
 from core.brain.skill_loader import SkillLoader
-from core.cli import interactive_cli
-from core.config import settings
-from core.discovery import DiscoveryOrchestrator
+from core.devices.discovery import DiscoveryOrchestrator
 from core.events.bus import EventBus
+from core.media.audio_registry import LocalAudioRegistry
+from core.media.xiaomi_speaker import XiaomiSpeakerPlayer
 from core.memory.store import MemoryStore
-from core.mqtt import MQTTClient
 from core.rules.engine import RulesEngine
+from core.runtime.cli import interactive_cli
+from core.runtime.config import settings
+from core.runtime.mqtt import MQTTClient
+from core.runtime.settings_store import SettingsStore
 from core.scheduler.scheduler import Scheduler
 from core.models import Event, EventType
-from core.settings_store import SettingsStore
 
 # Adapters
 from adapters.miot.adapter import MIoTAdapter
@@ -45,9 +47,15 @@ class Anima:
         self.skill_loader = SkillLoader(skills_dir=settings.skills_dir)
         self.brain = Brain(bus=self.bus, skill_loader=self.skill_loader, memory=self.memory)
         self.scheduler = Scheduler()
+        self.audio_registry = LocalAudioRegistry(port=8080)
+        self.speaker_player = XiaomiSpeakerPlayer(
+            settings_store=self.settings_store,
+            audio_registry=self.audio_registry,
+            token_store_path=f"{settings.data_dir}/xiaomi_mina_token.json",
+        )
 
         # Adapters
-        adapters = [MIoTAdapter(settings_store=self.settings_store)]
+        adapters = [MIoTAdapter(settings_store=self.settings_store, speaker_player=self.speaker_player)]
         self.discovery = DiscoveryOrchestrator(bus=self.bus, adapters=adapters)
         self.brain.set_environment_provider(self.discovery.get_all_devices)
 
@@ -67,6 +75,7 @@ class Anima:
             "memory": self.memory,
             "bus": self.bus,
             "settings": self.settings_store,
+            "audio_registry": self.audio_registry,
             "ensure_system_skills": self._ensure_system_skills_for_devices,
         }
 

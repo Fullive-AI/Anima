@@ -6,7 +6,7 @@ from typing import Any, Callable, Awaitable
 
 import aiomqtt
 
-from core.config import settings
+from core.runtime.config import settings
 
 logger = logging.getLogger(__name__)
 
