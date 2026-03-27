@@ -43,6 +43,13 @@ class TestSkillLoader:
         assert skill is not None
         assert skill.chat_prompt is not None
 
+    def test_list_system_device_skill_summaries(self):
+        summaries = self.loader.list_system_device_skill_summaries()
+        by_name = {summary.name: summary for summary in summaries}
+        assert "humidifier" in by_name
+        assert by_name["humidifier"].device_type == "humidifier"
+        assert "device_discovery" not in by_name
+
     def test_skills_use_skill_md_format(self):
         skill = self.loader.get_skill_for_device("humidifier")
         assert skill is not None

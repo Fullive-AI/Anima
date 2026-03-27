@@ -56,6 +56,7 @@ class FakeHumidifierAdapter(BaseAdapter):
 
     def __init__(self):
         self.executed_commands = []
+        self.last_action = None
 
     async def discover(self):
         return [Device(
@@ -69,15 +70,20 @@ class FakeHumidifierAdapter(BaseAdapter):
                 Capability(name="turn_off"),
             ],
             sensors=[
+                Sensor(name="power", unit="on/off", value=False),
                 Sensor(name="humidity", unit="%", value=25.0),
                 Sensor(name="water_level", unit="%", value=80.0),
             ],
         )]
 
     async def subscribe(self, device):
-        pass
+        if self.last_action in {"turn_on", "on"}:
+            device.get_sensor("power").value = True
+        elif self.last_action in {"turn_off", "off"}:
+            device.get_sensor("power").value = False
 
     async def execute(self, device_id, action, params):
+        self.last_action = action
         self.executed_commands.append({"device_id": device_id, "action": action, "params": params})
         return ActionResult(device_id=device_id, action=action, success=True)
 
@@ -88,33 +94,10 @@ class FakeSettings:
 
 
 class TestIntegrationPipeline:
-    async def test_rules_trigger_on_low_humidity(self, tmp_path):
-        """Rules engine should auto-trigger when humidity < 20%."""
-        bus = EventBus()
-        adapter = FakeHumidifierAdapter()
-        discovery = DiscoveryOrchestrator(bus=bus, adapters=[adapter])
+    async def test_rules_engine_exists_but_is_not_required_for_brain_pipeline(self, tmp_path):
         rules = RulesEngine()
         rules.load_defaults()
-
-        # Discover devices
-        await discovery.scan()
-        assert len(discovery.devices) == 1
-
-        # Simulate sensor update with emergency low humidity
-        device = discovery.get_device("fake_hum_01")
-        sensor_data = {"humidity": 15.0}
-
-        # Rules should trigger
-        commands = await rules.evaluate(device.type, sensor_data, device.device_id)
-        assert len(commands) == 1
-        assert commands[0].action == "turn_on"
-
-        # Execute command
-        result = await discovery.execute_command(
-            commands[0].device_id, commands[0].action, commands[0].params,
-        )
-        assert result.success is True
-        assert len(adapter.executed_commands) == 1
+        assert len(rules.rules) >= 2
 
     async def test_skill_loader_finds_skills(self):
         """Verify all default skills are discoverable."""
@@ -140,8 +123,8 @@ class TestIntegrationPipeline:
         history = await store.get_history("default")
         assert len(history) == 1
 
-    async def test_brain_parse_and_decide(self, tmp_path):
-        """Brain can parse LLM responses and generate commands."""
+    async def test_brain_parse_llm_response(self, tmp_path):
+        """Brain can parse LLM responses into commands."""
         bus = EventBus()
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
@@ -159,48 +142,38 @@ class TestIntegrationPipeline:
         assert cmd.params["value"] == 55
 
     async def test_full_pipeline_with_mock_llm(self, tmp_path):
-        """Full pipeline: discovery → sensor update → brain decision → execute."""
+        """Full pipeline: discovery → planner → skill execution → verification."""
         bus = EventBus()
         adapter = FakeHumidifierAdapter()
         discovery = DiscoveryOrchestrator(bus=bus, adapters=[adapter])
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
         memory = MemoryStore(base_dir=str(tmp_path / "memory"))
-        rules = RulesEngine()
-        rules.load_defaults()
-
         brain = Brain(bus=bus, skill_loader=loader, memory=memory)
+        brain.set_environment_provider(discovery.get_all_devices)
 
         # Discover
         await discovery.scan()
 
         mock_outputs = [
-            '{"should_act": true, "goal": "raise humidity", "candidate_actions": [{"action": "set_humidity", "params": {"value": 55}, "reason": "humidity 35% is below comfort zone"}], "notes": ""}',
-            '{"action": "set_humidity", "params": {"value": 55}, "reason": "humidity 35% is below comfort zone"}',
+            '[{"skill_name": "humidifier", "goal": "raise humidity", "reason": "humidity is low", "priority": 10}]',
+            '{"action": "turn_on", "params": {}, "reason": "humidity is below comfort zone"}',
         ]
         brain._invoke_llm_text = AsyncMock(side_effect=mock_outputs)
 
-        device = discovery.get_device("fake_hum_01")
-        sensor_data = {"humidity": 35.0}
+        cycle = await brain.run_cycle()
 
-        # Rules won't trigger (35% > 20% threshold)
-        rule_cmds = await rules.evaluate(device.type, sensor_data, device.device_id)
-        assert len(rule_cmds) == 0
+        assert len(cycle.plan_items) == 1
+        assert cycle.plan_items[0].skill_name == "humidifier"
+        assert len(cycle.execution_results) == 1
+        assert len(cycle.execution_results[0].actions) == 1
+        assert cycle.execution_results[0].actions[0].action == "turn_on"
+        assert cycle.execution_results[0].verifications[0].verified is True
 
-        # Brain should decide
-        cmd = await brain.decide(device, sensor_data)
-        assert cmd is not None
-        assert cmd.action == "set_humidity"
-        assert cmd.params["value"] == 55
-
-        # Execute
-        result = await discovery.execute_command(cmd.device_id, cmd.action, cmd.params)
-        assert result.success is True
-
-        # Verify history recorded
         history = await memory.get_history("default")
         assert len(history) == 1
-        assert history[0]["action"] == "set_humidity"
+        assert history[0]["action"] == "turn_on"
+        assert history[0]["skill_name"] == "humidifier"
 
     async def test_auto_generate_missing_system_skill_for_device_type(self, tmp_path: Path):
         temp_skills = tmp_path / "skills"
