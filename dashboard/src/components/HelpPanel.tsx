@@ -76,7 +76,7 @@ export default function HelpPanel({ open, onClose }: HelpPanelProps) {
             <div className="ml-8 space-y-1">
               <p>设备连接后，Anima 的 AI 大脑会自动根据传感器数据做出决策。</p>
               <p>右栏 <Brain className="w-4 h-4 inline text-slate-400" /> <strong>AI 决策流</strong> 实时展示每一条决策和原因。</p>
-              <p>紧急情况（如温度过高）由规则引擎毫秒级响应，无需等待 AI。</p>
+              <p className="text-slate-400">当前版本的主运行链路已统一交给 graph 规划与 skill 执行，不再优先走独立规则短路。</p>
             </div>
           </section>
 
@@ -87,8 +87,8 @@ export default function HelpPanel({ open, onClose }: HelpPanelProps) {
               <h3 className="font-semibold text-slate-800">对话交互</h3>
             </div>
             <div className="ml-8 space-y-1">
-              <p>底部 <MessageCircle className="w-4 h-4 inline text-slate-400" /> 聊天栏可以和 Anima 对话，直接下达指令。</p>
-              <p className="text-slate-400">完整对话功能将在后续版本中推出。</p>
+              <p>底部 <MessageCircle className="w-4 h-4 inline text-slate-400" /> 聊天栏已经统一接入 graph。</p>
+              <p>它会根据你的输入决定是只回复、执行系统操作（如扫描设备、生成米家二维码），还是调用设备 skill。</p>
             </div>
           </section>
 

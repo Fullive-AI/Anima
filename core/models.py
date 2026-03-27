@@ -78,3 +78,57 @@ class SkillMeta(BaseModel):
     description: str = ""
     device_types: list[str] = Field(default_factory=list)
     version: str = "0.1.0"
+
+
+class SkillSummary(BaseModel):
+    name: str
+    description: str = ""
+    device_type: str = ""
+
+
+class SkillPlanItem(BaseModel):
+    skill_name: str
+    device_type: str
+    goal: str = ""
+    reason: str = ""
+    priority: int = 0
+
+
+class SkillActionSpec(BaseModel):
+    skill_name: str
+    device_id: str
+    action: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    reason: str = ""
+    expected_state: dict[str, Any] = Field(default_factory=dict)
+
+
+class ActionVerificationResult(BaseModel):
+    device_id: str
+    action: str
+    verified: bool
+    attempts: int = 0
+    status: str = ""
+    expected_state: dict[str, Any] = Field(default_factory=dict)
+    observed_state: dict[str, Any] = Field(default_factory=dict)
+    message: str = ""
+
+
+class SkillExecutionResult(BaseModel):
+    plan_item: SkillPlanItem
+    actions: list[SkillActionSpec] = Field(default_factory=list)
+    verifications: list[ActionVerificationResult] = Field(default_factory=list)
+
+
+class BrainCycleResult(BaseModel):
+    plan_items: list[SkillPlanItem] = Field(default_factory=list)
+    execution_results: list[SkillExecutionResult] = Field(default_factory=list)
+
+
+class ChatPlan(BaseModel):
+    reply: str = ""
+    should_execute: bool = False
+    system_action: str = "none"
+    system_skill: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+    skill_plan_items: list[SkillPlanItem] = Field(default_factory=list)

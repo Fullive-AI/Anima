@@ -10,7 +10,7 @@ from types import ModuleType
 
 import yaml
 
-from core.models import SkillMeta
+from core.models import SkillMeta, SkillSummary
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +204,46 @@ class SkillLoader:
             return None
 
         return skill if "system" in skill.path.parts else None
+
+    def list_system_device_skill_summaries(self) -> list[SkillSummary]:
+        if not self._cache_by_name:
+            self.discover()
+
+        summaries: list[SkillSummary] = []
+        for skill in self._cache_by_name.values():
+            if "system" not in skill.path.parts:
+                continue
+            if not skill.decide_prompt:
+                continue
+            if not skill.meta.device_types:
+                continue
+            summaries.append(
+                SkillSummary(
+                    name=skill.meta.name,
+                    description=skill.meta.description,
+                    device_type=skill.meta.device_types[0],
+                )
+            )
+
+        return sorted(summaries, key=lambda item: item.name)
+
+    def list_system_skill_summaries(self) -> list[SkillSummary]:
+        if not self._cache_by_name:
+            self.discover()
+
+        summaries: list[SkillSummary] = []
+        for skill in self._cache_by_name.values():
+            if "system" not in skill.path.parts:
+                continue
+            summaries.append(
+                SkillSummary(
+                    name=skill.meta.name,
+                    description=skill.meta.description,
+                    device_type=skill.meta.device_types[0] if skill.meta.device_types else "",
+                )
+            )
+
+        return sorted(summaries, key=lambda item: item.name)
 
     def load_actions(self, skill: LoadedSkill) -> ModuleType | None:
         if not skill.actions_module_path:

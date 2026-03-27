@@ -1,4 +1,9 @@
 from core.models import DeviceCommand
+from core.models import SkillPlanItem
+
+
+async def execute(context: dict, plan_item: SkillPlanItem):
+    return await context["brain"].execute_device_skill("air_conditioner", context, plan_item)
 
 
 def set_temperature(device_id: str, value: int, reason: str = "") -> DeviceCommand:

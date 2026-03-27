@@ -7,7 +7,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from core.chat_agent import ChatAgent
 from core.models import DeviceCommand
 
 logger = logging.getLogger(__name__)
@@ -100,8 +99,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.post("/api/chat")
     async def chat(body: dict):
         message = body.get("message", "")
-        agent = ChatAgent(app_state["brain"]._skill_loader)
-        return await agent.handle_message(message, app_state)
+        return await app_state["brain"].handle_chat_message(message, app_state)
 
     @app.get("/api/onboarding/status")
     async def onboarding_status():

@@ -1,13 +1,33 @@
-from core.models import DeviceCommand
+from core.models import DeviceCommand, SkillPlanItem
 
-def on() -> DeviceCommand:
-    return DeviceCommand(action="on", params={})
 
-def off() -> DeviceCommand:
-    return DeviceCommand(action="off", params={})
+async def execute(context: dict, plan_item: SkillPlanItem):
+    return await context["brain"].execute_device_skill("air_purifier", context, plan_item)
 
-def set_mode(mode: str) -> DeviceCommand:
-    return DeviceCommand(action="set_mode", params={"mode": mode})
 
-def set_fan_level(level: int | float) -> DeviceCommand:
-    return DeviceCommand(action="set_fan_level", params={"level": level})
+def on(device_id: str, reason: str = "") -> DeviceCommand:
+    return DeviceCommand(device_id=device_id, action="on", params={}, source="brain", reason=reason)
+
+
+def off(device_id: str, reason: str = "") -> DeviceCommand:
+    return DeviceCommand(device_id=device_id, action="off", params={}, source="brain", reason=reason)
+
+
+def set_mode(device_id: str, mode: str, reason: str = "") -> DeviceCommand:
+    return DeviceCommand(
+        device_id=device_id,
+        action="set_mode",
+        params={"mode": mode},
+        source="brain",
+        reason=reason,
+    )
+
+
+def set_fan_level(device_id: str, level: int | float, reason: str = "") -> DeviceCommand:
+    return DeviceCommand(
+        device_id=device_id,
+        action="set_fan_level",
+        params={"level": level},
+        source="brain",
+        reason=reason,
+    )

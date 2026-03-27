@@ -98,7 +98,7 @@ export default function ChatBar({ onDevicesChanged }: ChatBarProps) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="和 Anima 对话..."
+          placeholder="问问题、扫描设备，或直接让 Anima 调用 skill..."
           className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 transition-colors"
         />
         <button

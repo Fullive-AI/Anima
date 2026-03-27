@@ -57,9 +57,6 @@ class Anima:
         # Load skills
         self.skill_loader.discover()
 
-        # Load default rules
-        self.rules.load_defaults()
-
         # Wire up event handlers
         self.bus.subscribe(EventType.SENSOR_UPDATED, self._on_sensor_update)
         self.bus.subscribe(EventType.DEVICE_DISCOVERED, self._on_device_discovered)
@@ -79,6 +76,11 @@ class Anima:
             "learn_preferences",
             lambda: self.brain.learn_preferences(),
             interval_seconds=86400,  # daily
+        )
+        self.scheduler.add_job(
+            "brain_tick",
+            self.brain.run_cycle,
+            interval_seconds=60,
         )
 
         if mode == "cli":
@@ -167,16 +169,9 @@ class Anima:
         # Update cached sensor values
         self.discovery.update_device_sensors(device_id, sensor_data)
 
-        # Fast path: rules engine
-        rule_commands = await self.rules.evaluate(device.type, sensor_data, device_id)
-        for cmd in rule_commands:
-            await self.discovery.execute_command(cmd.device_id, cmd.action, cmd.params)
-
-        # Slow path: LLM brain (only if rules didn't handle it)
-        if not rule_commands:
-            command = await self.brain.decide(device, sensor_data)
-            if command:
-                await self.discovery.execute_command(command.device_id, command.action, command.params)
+        # Trigger the scheduler-driven Brain graph so all sensor updates flow
+        # through model planning instead of short-circuiting via rules.
+        await self.brain.run_cycle()
 
     async def _on_device_discovered(self, event: Event) -> None:
         device_id = event.device_id

@@ -14,7 +14,7 @@
 - AI 驱动决策——LLM 大脑加载领域知识，做出智能选择
 - 技能系统——每种设备类型获得专属智能，而非简单的开/关控制
 - 学习你的偏好——根据你的习惯持续进化
-- 可视化控制面板——实时设备监控、AI 决策流、对话交互
+- 可视化控制面板——实时设备监控、AI 决策流、统一 graph 对话入口
 
 ## 60 秒跑起来
 
@@ -64,7 +64,7 @@ pnpm dev
 │                                           │
 │  发现服务 ──▶ 事件总线 ◀── 调度器           │
 │                   │                       │
-│    规则引擎 ──▶ LLM 大脑 ◀── 记忆体        │
+│  传感器 / 对话 ──▶ LLM 大脑 ◀── 记忆体      │
 │                   │                       │
 │       控制面板 · 聊天 API · MQTT 客户端     │
 └──────────────────┬────────────────────────┘
@@ -82,8 +82,8 @@ pnpm dev
 |------|------|
 | **控制面板** | React + Vite + Tailwind —— 三栏布局：设备列表、传感器卡片、AI 决策流、聊天栏 |
 | **事件总线** | 异步事件系统，支持通配符订阅和错误隔离 |
-| **规则引擎** | 快速通道安全规则（如"温度 > 35°C → 开空调"），毫秒级响应，不需要 LLM |
-| **LLM 大脑** | 技能驱动的 AI 决策——加载领域知识，组装上下文，调用 LLM，解析 JSON 动作 |
+| **规则引擎** | 代码中保留的可选确定性层，但当前主运行链路已将传感器与聊天输入统一交给 LLM Brain |
+| **LLM 大脑** | 基于 LangGraph 的技能规划/执行引擎——加载 skill 摘要、规划动作、执行 skill、校验设备状态，并统一承接 `/api/chat` |
 | **记忆系统** | `preferences.md` + `history.json` + `learned.md`——全部可读，无需数据库 |
 | **技能系统** | 4 个内置技能：加湿器、空调、灯光、协调者（跨设备编排） |
 | **发现服务** | 通过 mDNS 自动扫描局域网，注册设备，自动去重 |
@@ -127,7 +127,7 @@ ANIMA_LLM_DISABLE_THINKING=false
 | `pnpm dev:frontend` | 仅启动控制面板 |
 | `pnpm dev:backend` | 仅启动 Python 后端 |
 | `pnpm build` | 构建控制面板生产版本 |
-| `uv run pytest tests/ -v` | 运行全部 55 个测试 |
+| `uv run pytest tests/ -v` | 运行全部自动化测试 |
 
 ## REST API
 
@@ -139,12 +139,14 @@ ANIMA_LLM_DISABLE_THINKING=false
 | POST | `/api/devices/{id}/command` | 向设备发送控制命令 |
 | POST | `/api/scan` | 触发设备重新扫描 |
 | GET | `/api/decisions` | 最近的 AI 决策历史 |
-| POST | `/api/chat` | 与 Anima 对话 |
+| POST | `/api/chat` | 统一 graph 对话入口，可回复、执行系统操作或触发 skill |
 | GET | `/api/rooms` | 列出房间 |
 
 ## 技能系统
 
 每个技能教会 Anima **一种设备类型如何变得自主智能**——而非简单地开关控制。
+
+全局 planner 策略也可以在 [`core/brain/prompts/planner_hints.md`](./core/brain/prompts/planner_hints.md) 中调整；Brain 会在顶层 planner prompt 中自动加载这份文件。
 
 ```
 skills/
@@ -192,7 +194,7 @@ Anima/
 ├── skills/
 │   ├── system/                # Anima 内置 skill
 │   └── custom/                # 用户自定义 skill
-├── tests/                      # 55 个测试
+├── tests/                      # 自动化测试套件
 ├── docs/plans/                 # 设计文档 + 实施计划
 ├── package.json                # pnpm monorepo 根配置
 ├── pyproject.toml              # Python 依赖

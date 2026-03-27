@@ -14,7 +14,7 @@ An open-source Agent OS that auto-discovers your hardware devices, empowers each
 - AI-driven decisions — LLM Brain loads domain knowledge and makes smart choices
 - Skill system — each device type gets specialized intelligence, not just on/off control
 - Learns your preferences — evolves over time based on your habits
-- Visual Dashboard — real-time device monitoring, AI decision stream, and chat
+- Visual Dashboard — real-time device monitoring, AI decision stream, and a unified graph-based chat entry
 
 ## 60 Seconds Quick Start
 
@@ -64,7 +64,7 @@ Click the **? Help** button (top-right) for a step-by-step guide inside the Dash
 │                                           │
 │  Discovery ──▶ EventBus ◀── Scheduler     │
 │                   │                       │
-│        Rules ──▶ LLM Brain ◀── Memory     │
+│      Sensor / Chat ──▶ LLM Brain ◀── Memory │
 │                   │                       │
 │        Dashboard · Chat API · MQTT Client │
 └──────────────────┬────────────────────────┘
@@ -82,8 +82,8 @@ Click the **? Help** button (top-right) for a step-by-step guide inside the Dash
 |--------|-------------|
 | **Dashboard** | React + Vite + Tailwind — three-column layout with device list, sensor cards, AI decision stream, chat bar |
 | **EventBus** | Async event system with wildcard subscriptions and error isolation |
-| **Rules Engine** | Fast-path safety rules (e.g., "temp > 35°C → AC on"), millisecond response, no LLM needed |
-| **LLM Brain** | Skill-driven AI decisions — loads domain knowledge, assembles context, calls LLM, parses JSON actions |
+| **Rules Engine** | Kept in the codebase as an optional deterministic layer, but the current main runtime path routes sensor and chat input through the LLM Brain |
+| **LLM Brain** | Skill-driven LangGraph planner/executor — loads skill summaries, plans actions, executes skills, verifies device state, and also serves `/api/chat` |
 | **Memory System** | `preferences.md` + `history.json` + `learned.md` — all human-readable, no database |
 | **Skill System** | 4 built-in skills: Humidifier, Air Conditioner, Light, Coordinator (cross-device) |
 | **Discovery** | Auto-scans local network via mDNS, registers devices, deduplicates |
@@ -127,7 +127,7 @@ ANIMA_LLM_DISABLE_THINKING=false
 | `pnpm dev:frontend` | Start Dashboard only |
 | `pnpm dev:backend` | Start Python backend only |
 | `pnpm build` | Build Dashboard for production |
-| `uv run pytest tests/ -v` | Run all 55 tests |
+| `uv run pytest tests/ -v` | Run the full test suite |
 
 ## REST API
 
@@ -139,12 +139,14 @@ ANIMA_LLM_DISABLE_THINKING=false
 | POST | `/api/devices/{id}/command` | Send command to device |
 | POST | `/api/scan` | Trigger device re-scan |
 | GET | `/api/decisions` | Recent AI decision history |
-| POST | `/api/chat` | Chat with Anima |
+| POST | `/api/chat` | Unified graph-based chat entry for reply, system operations, and skill execution |
 | GET | `/api/rooms` | List rooms |
 
 ## Skill System
 
 Each Skill teaches Anima **how a device type becomes autonomously intelligent** — not just how to toggle it on/off.
+
+Global planner policy can also be adjusted in [`core/brain/prompts/planner_hints.md`](./core/brain/prompts/planner_hints.md), which is loaded into the Brain's top-level planner prompt.
 
 ```
 skills/
@@ -192,7 +194,7 @@ Anima/
 ├── skills/
 │   ├── system/                # Built-in skills shipped with Anima
 │   └── custom/                # User-created skills loaded from the same runtime
-├── tests/                      # 55 tests
+├── tests/                      # automated test suite
 ├── docs/plans/                 # Design doc + implementation plan
 ├── package.json                # pnpm monorepo root
 ├── pyproject.toml              # Python dependencies
