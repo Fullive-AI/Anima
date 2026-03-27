@@ -8,6 +8,7 @@ from core.models import (
     SkillActionSpec,
     SkillSummary,
 )
+from skills.system.air_purifier.scripts.actions import execute as execute_air_purifier_skill
 
 
 class TestBrain:
@@ -218,6 +219,37 @@ class TestBrain:
         assert verification.verified is False
         assert verification.status == "verification_failed"
         assert verification.message == "speaker rejected request"
+
+    async def test_air_purifier_execute_maps_turn_off_intent_to_off_action(self):
+        purifier = Device(
+            device_id="purifier_01",
+            name="Purifier",
+            adapter="fake",
+            type="air_purifier",
+            online=True,
+            capabilities=[Capability(name="on"), Capability(name="off")],
+        )
+
+        class FakeDiscovery:
+            def get_devices_by_type(self, device_type):
+                assert device_type == "air_purifier"
+                return [purifier]
+
+        actions = await execute_air_purifier_skill(
+            context={"discovery": FakeDiscovery(), "brain": object()},
+            plan_item=type(
+                "PlanItem",
+                (),
+                {
+                    "goal": "turn off the air purifier",
+                    "reason": "用户要求关闭空气净化器",
+                },
+            )(),
+        )
+
+        assert len(actions) == 1
+        assert actions[0]["action"] == "off"
+        assert actions[0]["expected_state"] == {"power": False}
 
     async def test_handle_chat_message_runs_unified_graph_for_system_action(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")

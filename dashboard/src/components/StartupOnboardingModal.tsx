@@ -12,10 +12,19 @@ interface OnboardingState {
   error?: string
 }
 
+const DISMISSED_QR_KEY = 'anima.startup_onboarding.dismissed_qr'
+
 export default function StartupOnboardingModal({ onDevicesChanged }: StartupOnboardingModalProps) {
   const [state, setState] = useState<OnboardingState>({ status: 'idle' })
   const [visible, setVisible] = useState(false)
   const [polling, setPolling] = useState(false)
+
+  const dismissModal = () => {
+    if (state.qr_image_b64) {
+      window.sessionStorage.setItem(DISMISSED_QR_KEY, state.qr_image_b64)
+    }
+    setVisible(false)
+  }
 
   useEffect(() => {
     let active = true
@@ -29,7 +38,8 @@ export default function StartupOnboardingModal({ onDevicesChanged }: StartupOnbo
 
         setState(data)
         if (data.status === 'qr_required') {
-          setVisible(true)
+          const dismissedQr = window.sessionStorage.getItem(DISMISSED_QR_KEY)
+          setVisible(dismissedQr !== data.qr_image_b64)
           return
         }
 
@@ -75,6 +85,7 @@ export default function StartupOnboardingModal({ onDevicesChanged }: StartupOnbo
         setPolling(false)
 
         if (data.status === 'ok') {
+          window.sessionStorage.removeItem(DISMISSED_QR_KEY)
           setVisible(false)
           setState({ status: 'connected' })
           onDevicesChanged()
@@ -117,7 +128,7 @@ export default function StartupOnboardingModal({ onDevicesChanged }: StartupOnbo
             </div>
           </div>
           <button
-            onClick={() => setVisible(false)}
+            onClick={dismissModal}
             className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             title="关闭"
           >
@@ -139,6 +150,15 @@ export default function StartupOnboardingModal({ onDevicesChanged }: StartupOnbo
         <p className="mt-2 text-center text-xs text-slate-500">
           登录成功后，Anima 会自动拉取屋内设备并刷新列表。
         </p>
+
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={dismissModal}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+          >
+            暂时关闭
+          </button>
+        </div>
       </div>
     </div>
   )
