@@ -25,6 +25,7 @@ from core.models import (
     SkillExecutionResult,
     SkillPlanItem,
     SkillSummary,
+    TaskPlanItem,
 )
 from core.runtime.config import settings
 
@@ -40,6 +41,7 @@ class BrainCycleState(TypedDict, total=False):
     planner_prompt: str
     planner_output: str
     plan_items: list[SkillPlanItem]
+    task_plan_items: list[TaskPlanItem]
     execution_results: list[SkillExecutionResult]
 
 
@@ -94,6 +96,7 @@ class Brain:
         )
         return BrainCycleResult(
             plan_items=result.get("plan_items", []),
+            task_plan_items=result.get("task_plan_items", []),
             execution_results=result.get("execution_results", []),
         )
 
@@ -223,17 +226,20 @@ class Brain:
             lightweight_skills=state.get("lightweight_skills", []),
         )
         content = await self._invoke_llm_text(prompt, temperature=0.1, max_tokens=900)
-        plan_items = self._parse_planner_response(content, state.get("lightweight_skills", []))
+        task_plan_items, plan_items = self._parse_cycle_plan(content, state.get("lightweight_skills", []))
         return {
             "planner_prompt": prompt,
             "planner_output": content,
             "plan_items": plan_items,
+            "task_plan_items": task_plan_items,
         }
 
     async def _graph_executor(self, state: dict[str, Any]) -> dict[str, Any]:
-        plan_items: list[SkillPlanItem] = state.get("plan_items", [])
-        if not plan_items:
+        task_plan_items: list[TaskPlanItem] = state.get("task_plan_items", [])
+        if not task_plan_items:
             return {"execution_results": []}
+
+        await self._record_task_plan_history(task_plan_items, source="scheduler")
 
         context = {
             "brain": self,
@@ -244,8 +250,10 @@ class Brain:
         }
 
         execution_results: list[SkillExecutionResult] = []
-        for plan_item in sorted(plan_items, key=lambda item: item.priority):
-            execution_results.append(await self._execute_skill_plan_item(plan_item, context))
+        for task in sorted(task_plan_items, key=lambda item: item.priority):
+            execution_result = await self._execute_cycle_task(task, context)
+            if execution_result is not None:
+                execution_results.append(execution_result)
 
         return {"execution_results": execution_results}
 
@@ -273,21 +281,22 @@ class Brain:
     async def _graph_chat_executor(self, state: dict[str, Any]) -> dict[str, Any]:
         plan: ChatPlan = state.get("plan", ChatPlan())
         app_state = state["app_state"]
+        task_plan_items = self._normalize_chat_tasks(plan)
 
         result: dict[str, Any] = {"reply": plan.reply or "我暂时没有需要执行的操作。"}
+        if task_plan_items:
+            result["task_plan_items"] = [item.model_dump() for item in task_plan_items]
         if not plan.should_execute:
             return {"result": result}
 
-        if plan.system_action != "none":
-            if plan.system_action == "create_custom_skill":
-                plan.params.setdefault("request", state.get("message", ""))
-            system_result = await self._execute_system_chat_action(plan, app_state)
-            if plan.reply and "reply" not in system_result:
-                system_result["reply"] = plan.reply
-            return {"result": system_result}
-
-        if not plan.skill_plan_items:
+        if not task_plan_items:
             return {"result": result}
+
+        await self._record_task_plan_history(
+            task_plan_items,
+            source="chat",
+            message=state.get("message", ""),
+        )
 
         context = {
             "brain": self,
@@ -298,15 +307,39 @@ class Brain:
             "settings": app_state["settings"],
         }
         execution_results: list[SkillExecutionResult] = []
-        for plan_item in sorted(plan.skill_plan_items, key=lambda item: item.priority):
-            execution_results.append(await self._execute_skill_plan_item(plan_item, context))
+        task_results: list[dict[str, Any]] = []
+        result["executed"] = False
 
-        result["execution_results"] = [item.model_dump() for item in execution_results]
-        result["executed"] = True
-        failure_message = self._summarize_chat_execution_failure(execution_results)
-        if failure_message:
-            result["reply"] = failure_message
-            result["executed"] = False
+        for task in sorted(task_plan_items, key=lambda item: item.priority):
+            task_result = await self._execute_chat_task(task, context, state.get("message", ""))
+            task_results.append(task_result)
+
+            reply = str(task_result.get("reply", "")).strip()
+            if reply:
+                result["reply"] = reply
+
+            for key, value in task_result.items():
+                if key in {"execution_result", "stop", "kind", "reason"}:
+                    continue
+                result[key] = value
+
+            if task_result.get("execution_result") is not None:
+                execution_result = task_result["execution_result"]
+                if isinstance(execution_result, SkillExecutionResult):
+                    execution_results.append(execution_result)
+                    result["executed"] = True
+
+            if task_result.get("stop"):
+                break
+
+        if task_results:
+            result["task_results"] = task_results
+        if execution_results:
+            result["execution_results"] = [item.model_dump() for item in execution_results]
+            failure_message = self._summarize_chat_execution_failure(execution_results)
+            if failure_message:
+                result["reply"] = failure_message
+                result["executed"] = False
         return {"result": result}
 
     async def _execute_skill_plan_item(
@@ -437,6 +470,32 @@ class Brain:
             },
         )
 
+    async def _record_task_plan_history(
+        self,
+        task_plan_items: list[TaskPlanItem],
+        *,
+        source: str,
+        message: str = "",
+    ) -> None:
+        for task in sorted(task_plan_items, key=lambda item: item.priority):
+            entry = {
+                "record_type": "planner_task",
+                "source": source,
+                "task_kind": task.kind,
+                "action": f"plan.{task.kind}",
+                "reason": task.reason or task.goal or task.question,
+                "priority": task.priority,
+                "skill_name": task.skill_name,
+                "system_skill": task.system_skill,
+                "system_action": task.system_action,
+                "goal": task.goal,
+                "question": task.question,
+                "params": task.params,
+            }
+            if message:
+                entry["message"] = message
+            await self._memory.append_history("default", entry)
+
     @staticmethod
     def _summarize_chat_execution_failure(execution_results: list[SkillExecutionResult]) -> str:
         if not execution_results:
@@ -490,7 +549,7 @@ class Brain:
         return (
             "You are Anima's scheduler-driven planner.\n"
             "Inspect the current device state, environment, user memory, and available skills.\n"
-            "Select zero or more skills that should run in this cycle.\n\n"
+            "Break the cycle into small tasks. Tasks may refresh environment state, execute a device skill, or reply with no-op reasoning.\n\n"
             "Available skill summaries:\n"
             f"{json.dumps(skill_summaries, ensure_ascii=False, indent=2)}\n\n"
             "Planner hints:\n"
@@ -501,11 +560,20 @@ class Brain:
             f"{json.dumps(environment_state, ensure_ascii=False, indent=2)}\n\n"
             "User memory:\n"
             f"{json.dumps(user_memory, ensure_ascii=False, indent=2)}\n\n"
-            "Return JSON only. Use this schema:\n"
+            "Return JSON only. Preferred schema:\n"
+            "{\n"
+            '  "task_plan_items": [\n'
+            '    {"kind": "refresh_environment", "reason": "need latest sensor state", "priority": 5},\n'
+            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "raise humidity", "reason": "why now", "priority": 10},\n'
+            '    {"kind": "reply", "reply": "No action needed because the environment is already comfortable.", "priority": 20}\n'
+            "  ]\n"
+            "}\n"
+            "Legacy schema is still accepted:\n"
             "[\n"
             '  {"skill_name": "humidifier", "goal": "raise humidity", "reason": "why now", "priority": 10}\n'
             "]\n"
             "Rules:\n"
+            "- Allowed task kinds for scheduler are refresh_environment, execute_skill, and reply.\n"
             "- Only choose skill_name values from the available skill summaries.\n"
             "- Prefer no output over redundant actions.\n"
             "- Keep the list short and conservative.\n"
@@ -536,7 +604,8 @@ class Brain:
         ]
         return (
             "You are Anima's unified chat planner running inside LangGraph.\n"
-            "Decide whether to reply only, execute a system skill, or execute one or more device skills.\n\n"
+            "Break the user's request into small actionable tasks.\n"
+            "A task may ask the user for clarification, refresh the environment, execute a system action, execute one or more device skills, or reply only.\n\n"
             f"User message:\n{message}\n\n"
             "Available system skills:\n"
             f"{json.dumps(skills, ensure_ascii=False, indent=2)}\n\n"
@@ -550,16 +619,20 @@ class Brain:
             "{\n"
             '  "reply": "string",\n'
             '  "should_execute": true,\n'
-            '  "system_action": "none | scan_local_devices | start_xiaomi_qr_scan | create_custom_skill",\n'
-            '  "system_skill": "device_discovery | skill_creator |",\n'
-            '  "params": {},\n'
-            '  "skill_plan_items": [\n'
-            '    {"skill_name": "humidifier", "goal": "raise humidity", "reason": "why", "priority": 10}\n'
+            '  "task_plan_items": [\n'
+            '    {"kind": "ask_user", "question": "你想调节哪个房间？", "reason": "scope ambiguous", "priority": 5},\n'
+            '    {"kind": "refresh_environment", "reason": "need latest state before acting", "priority": 8},\n'
+            '    {"kind": "system_action", "system_skill": "device_discovery", "system_action": "scan_local_devices", "params": {}, "reason": "user asked to scan", "priority": 10},\n'
+            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "raise humidity", "reason": "why", "priority": 20},\n'
+            '    {"kind": "reply", "reply": "我已经处理完成。", "priority": 30}\n'
             "  ]\n"
             "}\n"
             "Rules:\n"
-            "- If this is a system operation such as Xiaomi QR onboarding, LAN scan, or creating a custom skill, use system_action.\n"
-            "- If this is device control or home intelligence, use skill_plan_items.\n"
+            "- Use task_plan_items for multi-step planning.\n"
+            "- Use ask_user when the request is ambiguous or missing critical information.\n"
+            "- Use refresh_environment before acting when current state may be stale or must be confirmed.\n"
+            "- Use system_action for Xiaomi QR onboarding, LAN scan, or creating a custom skill.\n"
+            "- Use execute_skill for device control or home intelligence actions.\n"
             "- If the user asks to play music or audio on a speaker, use the `speaker` skill.\n"
             "- If the user asks to play something without giving a specific path or URL, set the speaker goal to random local playback.\n"
             "- If the user asks to stop speaker playback, use the `speaker` skill with a stop-oriented goal.\n"
@@ -652,6 +725,100 @@ class Brain:
             )
         return items
 
+    def _parse_cycle_plan(
+        self,
+        content: str,
+        lightweight_skills: list[SkillSummary],
+    ) -> tuple[list[TaskPlanItem], list[SkillPlanItem]]:
+        json_str = self._extract_json(content)
+        if not json_str:
+            return [], []
+
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            return [], []
+
+        if isinstance(data, list):
+            plan_items = self._parse_planner_response(content, lightweight_skills)
+            return self._skill_plan_items_to_cycle_tasks(plan_items), plan_items
+
+        if not isinstance(data, dict):
+            return [], []
+
+        task_items: list[TaskPlanItem] = []
+        skill_map = {skill.name: skill for skill in lightweight_skills}
+        raw_tasks = data.get("task_plan_items", [])
+        if isinstance(raw_tasks, list):
+            for item in raw_tasks:
+                if not isinstance(item, dict):
+                    continue
+
+                kind = str(item.get("kind", "")).strip()
+                if kind not in {"refresh_environment", "execute_skill", "reply"}:
+                    continue
+
+                skill_name = str(item.get("skill_name", "")).strip()
+                if kind == "execute_skill":
+                    summary = skill_map.get(skill_name)
+                    if not summary or not summary.device_type:
+                        continue
+
+                params = item.get("params", {})
+                if not isinstance(params, dict):
+                    params = {}
+
+                reply_text = str(item.get("reply", "")).strip()
+                if kind == "reply" and reply_text:
+                    params = {**params, "reply": reply_text}
+
+                task_items.append(
+                    TaskPlanItem(
+                        kind=kind,
+                        goal=str(item.get("goal", "")),
+                        reason=str(item.get("reason", "")),
+                        priority=self._coerce_priority(item.get("priority")),
+                        skill_name=skill_name,
+                        params=params,
+                    )
+                )
+
+        if not task_items:
+            return [], []
+
+        plan_items = self._cycle_tasks_to_skill_plan_items(task_items, lightweight_skills)
+        return task_items, plan_items
+
+    def _skill_plan_items_to_cycle_tasks(self, plan_items: list[SkillPlanItem]) -> list[TaskPlanItem]:
+        return [
+            TaskPlanItem(
+                kind="execute_skill",
+                skill_name=item.skill_name,
+                goal=item.goal,
+                reason=item.reason,
+                priority=item.priority,
+            )
+            for item in plan_items
+        ]
+
+    def _cycle_tasks_to_skill_plan_items(
+        self,
+        task_items: list[TaskPlanItem],
+        lightweight_skills: list[SkillSummary],
+    ) -> list[SkillPlanItem]:
+        skill_map = {skill.name: skill for skill in lightweight_skills}
+        return [
+            SkillPlanItem(
+                skill_name=item.skill_name,
+                device_type=skill_map[item.skill_name].device_type,
+                goal=item.goal,
+                reason=item.reason,
+                priority=item.priority,
+            )
+            for item in task_items
+            if item.kind == "execute_skill" and item.skill_name in skill_map and skill_map[item.skill_name].device_type
+        ]
+
     def _normalize_action_specs(self, raw_actions: Any) -> list[SkillActionSpec]:
         if raw_actions is None:
             return []
@@ -701,6 +868,161 @@ class Brain:
         result["action"] = plan.system_action
         return result
 
+    def _normalize_chat_tasks(self, plan: ChatPlan) -> list[TaskPlanItem]:
+        if plan.task_plan_items:
+            return plan.task_plan_items
+
+        tasks: list[TaskPlanItem] = []
+        if plan.system_action != "none":
+            tasks.append(
+                TaskPlanItem(
+                    kind="system_action",
+                    system_skill=plan.system_skill,
+                    system_action=plan.system_action,
+                    params=plan.params,
+                    reason=plan.reply,
+                    priority=10,
+                )
+            )
+
+        for item in plan.skill_plan_items:
+            tasks.append(
+                TaskPlanItem(
+                    kind="execute_skill",
+                    skill_name=item.skill_name,
+                    goal=item.goal,
+                    reason=item.reason,
+                    priority=item.priority,
+                )
+            )
+
+        return tasks
+
+    async def _execute_chat_task(
+        self,
+        task: TaskPlanItem,
+        context: dict[str, Any],
+        user_message: str,
+    ) -> dict[str, Any]:
+        if task.kind == "ask_user":
+            question = task.question.strip() or "我需要先确认一些信息。"
+            return {
+                "kind": task.kind,
+                "question": question,
+                "reason": task.reason,
+                "reply": question,
+                "stop": True,
+            }
+
+        if task.kind == "refresh_environment":
+            discovery = context["discovery"]
+            refresh_result = await discovery.refresh_device_states(task.target_device_ids or None)
+            context["environment_state"] = self.get_environment_state()
+            return {
+                "kind": task.kind,
+                "reason": task.reason,
+                "refresh_result": {
+                    **refresh_result,
+                    "environment": context["environment_state"],
+                },
+            }
+
+        if task.kind == "system_action":
+            plan = ChatPlan(
+                reply="",
+                should_execute=True,
+                system_action=task.system_action or "none",
+                system_skill=task.system_skill,
+                params=dict(task.params),
+            )
+            if plan.system_action == "create_custom_skill":
+                plan.params.setdefault("request", user_message)
+            system_result = await self._execute_system_chat_action(plan, context)
+            system_result["kind"] = task.kind
+            system_result["stop"] = True
+            return system_result
+
+        if task.kind == "execute_skill":
+            summary = next(
+                (
+                    item for item in self._skill_loader.list_system_skill_summaries()
+                    if item.name == task.skill_name
+                ),
+                None,
+            )
+            if not summary or not summary.device_type:
+                return {
+                    "kind": task.kind,
+                    "reason": task.reason,
+                    "reply": f"我理解了你的请求，但没有找到可执行的 skill: {task.skill_name or '(unknown)'}",
+                    "stop": True,
+                }
+
+            plan_item = SkillPlanItem(
+                skill_name=task.skill_name,
+                device_type=summary.device_type,
+                goal=task.goal,
+                reason=task.reason,
+                priority=task.priority,
+            )
+            execution_result = await self._execute_skill_plan_item(plan_item, context)
+            return {
+                "kind": task.kind,
+                "reason": task.reason,
+                "execution_result": execution_result,
+            }
+
+        if task.kind == "reply":
+            reply = str(task.params.get("reply", "")).strip()
+            return {
+                "kind": task.kind,
+                "reply": reply or "我已经处理完当前步骤。",
+                "stop": True,
+            }
+
+        return {
+            "kind": task.kind,
+            "reason": task.reason,
+            "reply": f"我规划了一个暂不支持的任务类型: {task.kind}",
+            "stop": True,
+        }
+
+    async def _execute_cycle_task(
+        self,
+        task: TaskPlanItem,
+        context: dict[str, Any],
+    ) -> SkillExecutionResult | None:
+        if task.kind == "refresh_environment":
+            discovery = context["discovery"]
+            await discovery.refresh_device_states(task.target_device_ids or None)
+            context["environment_state"] = self.get_environment_state()
+            return None
+
+        if task.kind == "execute_skill":
+            summary = next(
+                (
+                    item for item in self._skill_loader.list_system_device_skill_summaries()
+                    if item.name == task.skill_name
+                ),
+                None,
+            )
+            if not summary or not summary.device_type:
+                return None
+
+            plan_item = SkillPlanItem(
+                skill_name=task.skill_name,
+                device_type=summary.device_type,
+                goal=task.goal,
+                reason=task.reason,
+                priority=task.priority,
+            )
+            return await self._execute_skill_plan_item(plan_item, context)
+
+        if task.kind == "reply":
+            return None
+
+        return None
+
     def _parse_chat_plan(self, content: str, skill_summaries: list[SkillSummary]) -> ChatPlan:
         json_str = self._extract_json(content)
         if not json_str:
@@ -716,6 +1038,7 @@ class Brain:
 
         skill_map = {skill.name: skill for skill in skill_summaries}
         plan_items: list[SkillPlanItem] = []
+        task_items: list[TaskPlanItem] = []
         raw_items = data.get("skill_plan_items", [])
         if isinstance(raw_items, list):
             for item in raw_items:
@@ -735,6 +1058,51 @@ class Brain:
                     )
                 )
 
+        raw_tasks = data.get("task_plan_items", [])
+        if isinstance(raw_tasks, list):
+            for item in raw_tasks:
+                if not isinstance(item, dict):
+                    continue
+
+                kind = str(item.get("kind", "")).strip()
+                if kind not in {"execute_skill", "system_action", "ask_user", "refresh_environment", "reply"}:
+                    continue
+
+                skill_name = str(item.get("skill_name", "")).strip()
+                if kind == "execute_skill":
+                    summary = skill_map.get(skill_name)
+                    if not summary or not summary.device_type:
+                        continue
+
+                params = item.get("params", {})
+                if not isinstance(params, dict):
+                    params = {}
+
+                target_device_ids = item.get("target_device_ids", [])
+                if not isinstance(target_device_ids, list):
+                    target_device_ids = []
+
+                reply_text = str(item.get("reply", "")).strip()
+                question = str(item.get("question", "")).strip()
+                if kind == "reply" and reply_text:
+                    params = {**params, "reply": reply_text}
+
+                task_items.append(
+                    TaskPlanItem(
+                        kind=kind,
+                        goal=str(item.get("goal", "")),
+                        reason=str(item.get("reason", "")),
+                        priority=self._coerce_priority(item.get("priority")),
+                        skill_name=skill_name,
+                        system_skill=str(item.get("system_skill", "")),
+                        system_action=str(item.get("system_action", "")),
+                        question=question,
+                        params=params,
+                        target_device_ids=[str(device_id) for device_id in target_device_ids if isinstance(device_id, str)],
+                        expected_state=item.get("expected_state", {}) if isinstance(item.get("expected_state"), dict) else {},
+                    )
+                )
+
         return ChatPlan(
             reply=str(data.get("reply", "")),
             should_execute=bool(data.get("should_execute")),
@@ -742,6 +1110,7 @@ class Brain:
             system_skill=str(data.get("system_skill", "")),
             params=data.get("params", {}) if isinstance(data.get("params"), dict) else {},
             skill_plan_items=plan_items,
+            task_plan_items=task_items,
         )
 
     def _build_environment_state(self, current_device: Device) -> dict[str, Any]:

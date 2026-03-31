@@ -38,6 +38,56 @@ export interface Decision {
   action?: string
   params?: Record<string, unknown>
   reason?: string
+  goal?: string
+  message?: string
+  task_kind?: string
+  source?: string
+}
+
+export interface ChatTaskPlanItem {
+  kind: string
+  goal?: string
+  reason?: string
+  priority?: number
+  skill_name?: string
+  system_skill?: string
+  system_action?: string
+  question?: string
+  params?: Record<string, unknown>
+}
+
+export interface ChatTaskResult {
+  kind: string
+  reason?: string
+  reply?: string
+  question?: string
+  action?: string
+  new_devices?: number
+  total?: number
+  refresh_result?: {
+    refreshed: number
+    failed: number
+    environment?: EnvironmentSnapshot
+  }
+}
+
+export interface ChatExecutionAction {
+  skill_name: string
+  device_id: string
+  action: string
+  params: Record<string, unknown>
+  reason?: string
+}
+
+export interface ChatExecutionResult {
+  plan_item: {
+    skill_name: string
+    device_type: string
+    goal: string
+    reason: string
+    priority: number
+  }
+  actions: ChatExecutionAction[]
 }
 
 export interface EnvironmentSignalReading {
@@ -86,6 +136,10 @@ export interface ChatResponse {
   new_devices?: number
   total?: number
   refresh_devices?: boolean
+  executed?: boolean
+  task_plan_items?: ChatTaskPlanItem[]
+  task_results?: ChatTaskResult[]
+  execution_results?: ChatExecutionResult[]
 }
 
 const api = {

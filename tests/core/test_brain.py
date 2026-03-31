@@ -7,6 +7,7 @@ from core.models import (
     Sensor,
     SkillActionSpec,
     SkillSummary,
+    TaskPlanItem,
 )
 from skills.system.air_purifier.scripts.actions import execute as execute_air_purifier_skill
 
@@ -93,6 +94,31 @@ class TestBrain:
         assert result[0].device_type == "humidifier"
         assert result[0].priority == 5
 
+    def test_parse_cycle_plan_supports_task_plan_items(self):
+        brain = Brain.__new__(Brain)
+        tasks, plan_items = brain._parse_cycle_plan(
+            '{"task_plan_items":[{"kind":"refresh_environment","reason":"need latest state","priority":5},{"kind":"execute_skill","skill_name":"humidifier","goal":"raise humidity","reason":"dry","priority":10}]}',
+            [SkillSummary(name="humidifier", description="skill", device_type="humidifier")],
+        )
+
+        assert len(tasks) == 2
+        assert tasks[0].kind == "refresh_environment"
+        assert tasks[1].kind == "execute_skill"
+        assert len(plan_items) == 1
+        assert plan_items[0].skill_name == "humidifier"
+
+    def test_parse_cycle_plan_legacy_list_remains_compatible(self):
+        brain = Brain.__new__(Brain)
+        tasks, plan_items = brain._parse_cycle_plan(
+            '[{"skill_name":"humidifier","goal":"raise humidity","reason":"dry","priority":5}]',
+            [SkillSummary(name="humidifier", description="skill", device_type="humidifier")],
+        )
+
+        assert len(tasks) == 1
+        assert tasks[0].kind == "execute_skill"
+        assert len(plan_items) == 1
+        assert plan_items[0].skill_name == "humidifier"
+
     def test_build_planner_prompt_includes_humidifier_threshold_hint(self):
         brain = Brain.__new__(Brain)
         prompt = brain._build_planner_prompt(
@@ -119,8 +145,29 @@ class TestBrain:
             user_memory={},
             skill_summaries=[SkillSummary(name="device_discovery", description="scan devices", device_type="")],
         )
-        assert "system_action" in prompt
+        assert "task_plan_items" in prompt
         assert "scan_local_devices" in prompt
+        assert "ask_user" in prompt
+
+    def test_parse_chat_plan_supports_task_plan_items(self):
+        brain = Brain.__new__(Brain)
+        plan = brain._parse_chat_plan(
+            '{"reply":"我先确认一下。","should_execute":true,"task_plan_items":[{"kind":"ask_user","question":"你想调节哪个房间？","reason":"scope ambiguous","priority":5},{"kind":"execute_skill","skill_name":"humidifier","goal":"raise humidity","reason":"room is dry","priority":10}]}',
+            [SkillSummary(name="humidifier", description="skill", device_type="humidifier")],
+        )
+
+        assert plan.should_execute is True
+        assert len(plan.task_plan_items) == 2
+        assert plan.task_plan_items[0].kind == "ask_user"
+        assert plan.task_plan_items[0].question == "你想调节哪个房间？"
+        assert plan.task_plan_items[1].kind == "execute_skill"
+        assert plan.task_plan_items[1].skill_name == "humidifier"
+
+    def test_normalize_chat_tasks_preserves_new_task_items(self):
+        brain = Brain.__new__(Brain)
+        task = TaskPlanItem(kind="ask_user", question="请确认目标房间", priority=5)
+        tasks = brain._normalize_chat_tasks(type("Plan", (), {"task_plan_items": [task], "system_action": "none", "system_skill": "", "params": {}, "skill_plan_items": []})())
+        assert tasks == [task]
 
     def test_sanitize_command_with_capability_limits(self):
         brain = Brain.__new__(Brain)
@@ -351,3 +398,93 @@ class TestBrain:
         assert result["executed"] is True
         assert result["execution_results"][0]["actions"][0]["action"] == "play_random_audio"
         assert discovery.executed == [("speaker_01", "play_random_audio", {})]
+
+    async def test_handle_chat_message_returns_question_for_ask_user_task(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        class FakeDiscovery:
+            def get_all_devices(self):
+                return []
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery()
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = __import__("unittest.mock", fromlist=["AsyncMock"]).AsyncMock(
+            return_value='{"reply":"我先确认一下房间。","should_execute":true,"task_plan_items":[{"kind":"ask_user","question":"你想调节哪个房间？","reason":"scope ambiguous","priority":5}]}'
+        )
+
+        result = await brain.handle_chat_message(
+            "帮我调节一下湿度",
+            {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+        )
+
+        assert result["executed"] is False
+        assert result["reply"] == "你想调节哪个房间？"
+        assert result["task_results"][0]["kind"] == "ask_user"
+
+    async def test_handle_chat_message_refreshes_environment_before_running_skill(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        speaker = Device(
+            device_id="speaker_01",
+            name="Xiaomi Smart Speaker",
+            adapter="miot",
+            type="speaker",
+            capabilities=[Capability(name="play_random_audio"), Capability(name="stop_audio")],
+        )
+
+        class FakeDiscovery:
+            def __init__(self, target):
+                self.target = target
+                self.executed = []
+                self.refreshed = 0
+
+            def get_all_devices(self):
+                return [self.target]
+
+            def get_devices_by_type(self, device_type):
+                return [self.target] if device_type == "speaker" else []
+
+            async def execute_command(self, device_id, action, params):
+                self.executed.append((device_id, action, params))
+                return type("Result", (), {"message": "", "success": True})()
+
+            async def refresh_device_states(self, device_ids=None):
+                self.refreshed += 1
+                return {"refreshed": 1, "failed": 0}
+
+            def get_device(self, device_id):
+                return self.target if device_id == self.target.device_id else None
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery(speaker)
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = __import__("unittest.mock", fromlist=["AsyncMock"]).AsyncMock(
+            return_value='{"reply":"我先确认环境再播放。","should_execute":true,"task_plan_items":[{"kind":"refresh_environment","reason":"need latest state","priority":5},{"kind":"execute_skill","skill_name":"speaker","goal":"play random music on the speaker","reason":"user asked to play music","priority":10}]}'
+        )
+
+        result = await brain.handle_chat_message(
+            "随机放一首歌",
+            {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+        )
+
+        assert result["executed"] is True
+        assert result["execution_results"][0]["actions"][0]["action"] == "play_random_audio"
+        assert result["task_results"][0]["kind"] == "refresh_environment"
+        assert discovery.refreshed >= 2

@@ -122,6 +122,7 @@ class SkillExecutionResult(BaseModel):
 
 class BrainCycleResult(BaseModel):
     plan_items: list[SkillPlanItem] = Field(default_factory=list)
+    task_plan_items: list["TaskPlanItem"] = Field(default_factory=list)
     execution_results: list[SkillExecutionResult] = Field(default_factory=list)
 
 
@@ -132,3 +133,18 @@ class ChatPlan(BaseModel):
     system_skill: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
     skill_plan_items: list[SkillPlanItem] = Field(default_factory=list)
+    task_plan_items: list["TaskPlanItem"] = Field(default_factory=list)
+
+
+class TaskPlanItem(BaseModel):
+    kind: str
+    goal: str = ""
+    reason: str = ""
+    priority: int = 0
+    skill_name: str = ""
+    system_skill: str = ""
+    system_action: str = ""
+    question: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+    target_device_ids: list[str] = Field(default_factory=list)
+    expected_state: dict[str, Any] = Field(default_factory=dict)

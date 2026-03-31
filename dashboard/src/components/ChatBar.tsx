@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Send, MessageCircle, Loader2 } from 'lucide-react'
 import { api } from '../hooks/useApi'
+import type { ChatResponse } from '../hooks/useApi'
 
 interface ChatBarProps {
   onDevicesChanged: () => void
+  onChatResult?: (message: string, result: ChatResponse) => void
 }
 
-export default function ChatBar({ onDevicesChanged }: ChatBarProps) {
+export default function ChatBar({ onDevicesChanged, onChatResult }: ChatBarProps) {
   const [message, setMessage] = useState('')
   const [reply, setReply] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,6 +25,7 @@ export default function ChatBar({ onDevicesChanged }: ChatBarProps) {
       const res = await api.chat(text)
       setReply(res.reply)
       setQrImage(res.qr_image_b64 || '')
+      onChatResult?.(text, res)
       setMessage('')
 
       if (res.refresh_devices) {

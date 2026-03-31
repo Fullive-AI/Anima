@@ -194,9 +194,41 @@ class TestIntegrationPipeline:
         assert cycle.execution_results[0].verifications[0].verified is True
 
         history = await memory.get_history("default")
-        assert len(history) == 1
-        assert history[0]["action"] == "turn_on"
-        assert history[0]["skill_name"] == "humidifier"
+        assert any(item["action"] == "plan.execute_skill" for item in history)
+        assert any(item["action"] == "turn_on" for item in history)
+        execution_entry = next(item for item in history if item["action"] == "turn_on")
+        assert execution_entry["skill_name"] == "humidifier"
+
+    async def test_full_pipeline_with_task_plan_cycle(self, tmp_path):
+        bus = EventBus()
+        adapter = FakeHumidifierAdapter()
+        discovery = DiscoveryOrchestrator(bus=bus, adapters=[adapter])
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=bus, skill_loader=loader, memory=memory)
+        brain.set_environment_provider(discovery.get_all_devices)
+
+        await discovery.scan()
+
+        mock_outputs = [
+            '{"task_plan_items":[{"kind":"refresh_environment","reason":"confirm stale state","priority":5},{"kind":"execute_skill","skill_name":"humidifier","goal":"raise humidity","reason":"humidity is low","priority":10}]}',
+            '{"action": "turn_on", "params": {}, "reason": "humidity is below comfort zone"}',
+        ]
+        brain._invoke_llm_text = AsyncMock(side_effect=mock_outputs)
+
+        cycle = await brain.run_cycle()
+
+        assert len(cycle.task_plan_items) == 2
+        assert cycle.task_plan_items[0].kind == "refresh_environment"
+        assert cycle.task_plan_items[1].kind == "execute_skill"
+        assert len(cycle.plan_items) == 1
+        assert cycle.plan_items[0].skill_name == "humidifier"
+        assert len(cycle.execution_results) == 1
+        assert cycle.execution_results[0].actions[0].action == "turn_on"
+        history = await memory.get_history("default")
+        assert any(item["action"] == "plan.refresh_environment" for item in history)
+        assert any(item["action"] == "plan.execute_skill" for item in history)
 
     async def test_auto_generate_missing_system_skill_for_device_type(self, tmp_path: Path):
         temp_skills = tmp_path / "skills"

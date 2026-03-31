@@ -2,13 +2,14 @@ import { useState } from 'react'
 import Header from './components/Header'
 import DeviceList from './components/DeviceList'
 import DeviceCard from './components/DeviceCard'
-import DecisionLog from './components/DecisionLog'
+import DecisionLog, { type LiveTrace } from './components/DecisionLog'
 import EnvironmentPanel from './components/EnvironmentPanel'
 import ChatBar from './components/ChatBar'
 import SettingsPanel from './components/SettingsPanel'
 import HelpPanel from './components/HelpPanel'
 import StartupOnboardingModal from './components/StartupOnboardingModal'
 import { useDevices, useDecisions, useEnvironment } from './hooks/useApi'
+import type { ChatResponse } from './hooks/useApi'
 
 export default function App() {
   const { devices, refresh } = useDevices()
@@ -17,10 +18,19 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [liveTrace, setLiveTrace] = useState<LiveTrace | null>(null)
 
   const handleRefreshEnvironment = async () => {
     await refreshEnvironmentNow()
     await refresh()
+  }
+
+  const handleChatResult = (message: string, result: ChatResponse) => {
+    setLiveTrace({
+      timestamp: new Date().toISOString(),
+      message,
+      result,
+    })
   }
 
   return (
@@ -48,10 +58,10 @@ export default function App() {
             <DeviceCard devices={devices} selectedId={selectedId} onDevicesChanged={refresh} />
           </div>
         </main>
-        <DecisionLog decisions={decisions} />
+        <DecisionLog decisions={decisions} liveTrace={liveTrace} />
       </div>
 
-      <ChatBar onDevicesChanged={refresh} />
+      <ChatBar onDevicesChanged={refresh} onChatResult={handleChatResult} />
       <StartupOnboardingModal onDevicesChanged={refresh} />
 
       <SettingsPanel
