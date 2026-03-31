@@ -127,6 +127,25 @@ class TestIntegrationPipeline:
         history = await store.get_history("default")
         assert len(history) == 1
 
+    async def test_memory_cold_start_bootstrap_generates_context_from_devices(self, tmp_path):
+        store = MemoryStore(base_dir=str(tmp_path / "memory"))
+
+        result = await store.ensure_cold_start_profiles(
+            device_types=["humidifier", "speaker"],
+            user_id="default",
+            style="comfort_first",
+        )
+
+        prefs = await store.get_preferences("default")
+        profiles = await store.get_learned_profiles("default")
+
+        assert result["preferences_created"] is True
+        assert result["profiles_created"] == ["humidifier", "speaker"]
+        assert "45-55%" in prefs
+        assert "voice interactions low-noise" in prefs
+        assert "humidifier" in profiles
+        assert "speaker" in profiles
+
     async def test_brain_parse_llm_response(self, tmp_path):
         """Brain can parse LLM responses into commands."""
         bus = EventBus()

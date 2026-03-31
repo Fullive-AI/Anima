@@ -123,6 +123,7 @@ class Anima:
         await self.discovery.scan()
         logger.info("Found %d device(s)", len(self.discovery.devices))
         await self._ensure_system_skills_for_devices(app_state)
+        await self._ensure_cold_start_profiles()
         await self._maybe_start_onboarding(app_state)
 
     async def _maybe_start_onboarding(self, app_state: dict[str, object]) -> None:
@@ -198,6 +199,7 @@ class Anima:
             "bus": self.bus,
             "settings": self.settings_store,
         }, devices=[device])
+        await self._ensure_cold_start_profiles()
 
     async def _ensure_system_skills_for_devices(
         self,
@@ -225,6 +227,30 @@ class Anima:
                 logger.info("Auto-generated system skills: %s", ", ".join(created))
         except Exception:
             logger.exception("Failed to auto-generate missing system skills")
+
+    async def _ensure_cold_start_profiles(self) -> None:
+        device_types = [
+            device.type
+            for device in self.discovery.get_all_devices()
+            if getattr(device, "type", "") and device.type != "unknown"
+        ]
+        if not device_types:
+            return
+
+        try:
+            result = await self.memory.ensure_cold_start_profiles(
+                device_types=device_types,
+                user_id="default",
+                style="comfort_first",
+            )
+            if result["preferences_created"] or result["profiles_created"]:
+                logger.info(
+                    "Cold-start context prepared: preferences_created=%s profiles_created=%s",
+                    result["preferences_created"],
+                    ", ".join(result["profiles_created"]) or "(none)",
+                )
+        except Exception:
+            logger.exception("Failed to generate cold-start profiles")
 
 
 def cli_entry():
