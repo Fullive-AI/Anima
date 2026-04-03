@@ -1,0 +1,11 @@
+{
+  "room_id": "household",
+  "name": "household",
+  "preferred_temperature_range": "",
+  "preferred_humidity_range": "",
+  "lighting_style": "",
+  "occupancy_pattern": "",
+  "quiet_hours": "",
+  "notes": [],
+  "updated_at": "2026-04-03T09:56:30.813496Z"
+}

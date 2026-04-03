@@ -15,6 +15,8 @@ from core.devices.discovery import DiscoveryOrchestrator
 from core.events.bus import EventBus
 from core.media.audio_registry import LocalAudioRegistry
 from core.media.xiaomi_speaker import XiaomiSpeakerPlayer
+from core.memory.extractor import MemoryExtractionService
+from core.memory.learning import PreferenceLearningService
 from core.memory.store import MemoryStore
 from core.rules.engine import RulesEngine
 from core.runtime.cli import interactive_cli
@@ -43,9 +45,18 @@ class Anima:
         self.bus = EventBus()
         self.mqtt = MQTTClient()
         self.memory = MemoryStore(base_dir=f"{settings.data_dir}/memory")
+        self.memory_extractor = MemoryExtractionService(self.memory)
         self.rules = RulesEngine()
         self.skill_loader = SkillLoader(skills_dir=settings.skills_dir)
         self.brain = Brain(bus=self.bus, skill_loader=self.skill_loader, memory=self.memory)
+        self.brain.set_memory_extractor(self.memory_extractor)
+        self.preference_learner = PreferenceLearningService(
+            self.memory,
+            extractor=self.memory_extractor,
+            skill_loader=self.skill_loader,
+            invoke_llm_text=self.brain._invoke_llm_text,
+        )
+        self.brain.set_preference_learner(self.preference_learner)
         self.scheduler = Scheduler()
         self.audio_registry = LocalAudioRegistry(port=8080)
         self.speaker_player = XiaomiSpeakerPlayer(
@@ -83,8 +94,8 @@ class Anima:
         self.scheduler.add_job("device_scan", self.discovery.scan, interval_seconds=300)
         self.scheduler.add_job(
             "learn_preferences",
-            lambda: self.brain.learn_preferences(),
-            interval_seconds=86400,  # daily
+            lambda: self.preference_learner.run_now(),
+            interval_seconds=300,
         )
         self.scheduler.add_job(
             "brain_tick",

@@ -1,10 +1,34 @@
-# Air Purifier Skill Learning Reference
-## Learning Context
-Uses interaction history `{history}` and user profile `{current_profile}` to derive usage patterns for `air_purifier` devices.
+Analyze the user's air purifier history and update the learned profile.
 
-## Structured Learning Metrics
+## History
+{history}
+
+## Current Learned Profile
+{current_profile}
+
+## Instructions
+
+- Separate stable preferences from weak signals.
+- Ignore one-off behavior unless it repeats.
+- Mention uncertainty when the data is sparse or inconsistent.
+- Keep the output compact and machine-readable.
+
+Respond with a JSON object:
+
 ```json
-{
-  "stable_preferences": "Consistently repeated user actions, preferred modes, and fan levels pulled from {history} and aligned with supported air_purifier actions: on, off, set_mode, set_fan_level. Excludes ambiguous or one-off commands.",
-  "time_based_patterns": "Temporal usage trends identified from timestamped {history} entries, correlated with {current_profile} occupancy and daily routines (e.g., auto-mode activation at morning commute start, power off at bedtime).",
-  "seasonal_patterns": "Seasonal shifts in device usage tied to {current_profile} environmental context and {history} data (e.g., high-f
+{{
+  "stable_preferences": [
+    "clear preference statements backed by repeated history"
+  ],
+  "time_based_patterns": [
+    "patterns tied to occupancy, sleep, or other time windows"
+  ],
+  "seasonal_patterns": [
+    "patterns tied to allergy season, dust, weather, or ventilation changes"
+  ],
+  "weak_signals": [
+    "possible preferences that need more evidence"
+  ],
+  "confidence_notes": "short note about certainty and data quality"
+}}
+```

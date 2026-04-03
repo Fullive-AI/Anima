@@ -28,7 +28,10 @@ def fake_generated_package(name: str, device_type: str) -> dict:
         "files": {
             "SKILL.md": (
                 f"---\nname: {name}\ndescription: generated test skill\n"
-                f"metadata:\n  device_types:\n    - {device_type}\n  version: 0.1.0\n---\n\n# {name}\n"
+                f"metadata:\n  device_types:\n    - {device_type}\n  version: 0.1.0\n---\n\n# {name}\n\n"
+                "## Goal\nGenerate a safe test skill.\n\n"
+                "## Load These Resources\n- `references/knowledge.md`\n- `references/decide.md`\n- `references/learn.md`\n- `scripts/actions.py`\n\n"
+                "## Working Rules\n- Keep the skill narrow.\n- Return `none` when context is unclear.\n"
             ),
             "references/knowledge.md": "# Knowledge\n",
             "references/decide.md": "Return `none` when no action is needed.\n## Current Data\n{current_data}\n## Device Capabilities\n{capabilities}\n## User Preferences\n{user_preferences}\n## Learned Profile\n{learned_profile}\n## Recent Decision History\n{recent_history}\n## Domain Knowledge\n{knowledge}\n",
@@ -95,6 +98,21 @@ class FakeSettings:
 
     def get_xiaomi_credentials(self):
         return None
+
+
+def fake_request_analysis(*, clarification: bool = False) -> dict:
+    return {
+        "summary": "Generate a reusable automation skill.",
+        "goal": "Create a narrow skill package.",
+        "trigger_description": "Use when the described automation should run.",
+        "primary_steps": ["Read context", "Choose action", "Return safe no-op when needed"],
+        "success_criteria": ["The skill is specific", "The package stays consistent"],
+        "constraints": ["Keep the scope narrow"],
+        "needed_inputs": ["device state"],
+        "assumptions": [],
+        "should_ask_clarification": clarification,
+        "clarification_questions": ["What exact trigger should start this automation?"] if clarification else [],
+    }
 
 
 class TestIntegrationPipeline:
@@ -281,6 +299,36 @@ class TestIntegrationPipeline:
         assert (temp_skills / "system" / "fan" / "SKILL.md").exists()
         assert loader.get_system_skill_for_device("fan") is not None
 
+    async def test_create_custom_skill_requests_clarification_before_generating(self, tmp_path: Path):
+        temp_skills = tmp_path / "skills"
+        shutil.copytree("skills", temp_skills)
+
+        loader = SkillLoader(skills_dir=str(temp_skills))
+        loader.discover()
+        skill_creator = loader.get_skill("skill_creator")
+        assert skill_creator is not None
+        actions_module = loader.load_actions(skill_creator)
+        assert actions_module is not None
+
+        brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
+
+        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
+            "anima_skill_skill_creator._analyze_request_with_llm",
+            return_value=(fake_request_analysis(clarification=True), []),
+        ), patch(
+            "anima_skill_skill_creator._generate_package_with_llm",
+            new_callable=AsyncMock,
+        ) as generate_package_mock:
+            result = await actions_module.create_custom_skill(
+                context={"brain": brain, "settings": {}},
+                params={"request": "做个自动化 skill"},
+                reply="",
+            )
+
+        assert result["status"] == "needs_clarification"
+        assert result["questions"] == ["What exact trigger should start this automation?"]
+        generate_package_mock.assert_not_awaited()
+
     async def test_environment_endpoint_returns_snapshot(self, tmp_path):
         bus = EventBus()
         adapter = FakeHumidifierAdapter()
@@ -318,6 +366,56 @@ class TestIntegrationPipeline:
         assert "signals" in data
         assert "humidity" in data["signals"]
         assert "temperature" in data["signals"]
+
+    async def test_memory_endpoint_returns_normalized_profiles_and_memories(self, tmp_path):
+        bus = EventBus()
+        adapter = FakeHumidifierAdapter()
+        discovery = DiscoveryOrchestrator(bus=bus, adapters=[adapter])
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=bus, skill_loader=loader, memory=memory)
+        brain.set_environment_provider(discovery.get_all_devices)
+
+        await memory.update_preferences("default", "comfort.temperature", "23°C")
+        await memory.update_learned_for_skill(
+            "default",
+            "light",
+            '{"stable_preferences":["Prefer warm dim lights"],"time_based_patterns":[],"seasonal_patterns":[],"weak_signals":[],"confidence_notes":"Consistent evening pattern."}',
+        )
+        await memory.upsert_extracted_memory(
+            "default",
+            "evening_lighting_preference",
+            {
+                "title": "Evening lighting preference",
+                "category": "preference",
+                "summary": "Warm dim lights are preferred in the evening.",
+                "details": ["Observed in repeated light adjustments."],
+                "device_types": ["light"],
+                "confidence": "high",
+                "source_actions": ["set_brightness"],
+            },
+        )
+        await memory.update_memory_extraction_state("default", history_cursor=3, last_batch_size=3)
+        await memory.append_history("default", {"action": "set_brightness", "device_type": "light"})
+
+        app = create_app({
+            "discovery": discovery,
+            "brain": brain,
+            "memory": memory,
+            "settings": FakeSettings(),
+        })
+        client = TestClient(app)
+
+        response = client.get("/api/memory")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "23°C" in data["preferences"]
+        assert data["learned_profiles"]["light"]["stable_preferences"] == ["Prefer warm dim lights"]
+        assert data["extracted_memories"]["evening_lighting_preference"]["category"] == "preference"
+        assert data["extraction_state"]["history_cursor"] == 3
+        assert len(data["recent_history"]) == 1
 
     async def test_refresh_environment_endpoint_refreshes_existing_devices(self, tmp_path):
         bus = EventBus()

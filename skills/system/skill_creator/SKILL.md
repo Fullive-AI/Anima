@@ -10,6 +10,7 @@ metadata:
 # Skill Creator
 
 Use this skill for turning a user request into a new custom skill package under `skills/custom/`.
+Work analysis-first: extract the repeatable workflow, trigger, inputs, constraints, and success criteria before generating any files.
 
 ## Load These Resources
 
@@ -22,3 +23,5 @@ Use this skill for turning a user request into a new custom skill package under 
 - Generate skills only inside `skills/custom/`.
 - Preserve the same package shape as built-in skills: `SKILL.md`, `references/`, and optional `scripts/`.
 - Prefer clear, conservative skills over overly broad generic automations.
+- If the request is ambiguous, ask for clarification instead of generating a vague skill.
+- Keep the generated skill aligned across all files: the trigger, supported actions, no-op boundary, and learned preferences must describe the same workflow.

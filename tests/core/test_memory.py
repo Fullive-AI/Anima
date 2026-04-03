@@ -2,6 +2,11 @@ import pytest
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import AsyncMock
+
+from core.brain.skill_loader import SkillLoader
+from core.memory.extractor import MemoryExtractionService
+from core.memory.learning import PreferenceLearningService
 from core.memory.store import MemoryStore
 
 
@@ -52,6 +57,29 @@ class TestMemoryStore:
         assert "55% humidity" in learned
         assert "humidifier" in profiles
 
+    async def test_update_learned_for_skill_normalizes_legacy_shape(self):
+        await self.store.update_learned_for_skill(
+            "default",
+            "speaker",
+            json.dumps(
+                {
+                    "stable_preferences": {
+                        "preferred_actions": ["turn_on"],
+                        "consistent_device_targets": ["speaker_01"],
+                    },
+                    "time_based_patterns": {"peak_usage_windows": ["evening"]},
+                    "seasonal_patterns": {},
+                    "weak_signals": ["Limited history"],
+                    "confidence_notes": "Sparse but consistent.",
+                }
+            ),
+        )
+
+        profile = json.loads(await self.store.get_learned_for_skill("default", "speaker"))
+        assert "preferred_actions" in profile["stable_preferences"][0]
+        assert "peak_usage_windows" in profile["time_based_patterns"][0]
+        assert profile["confidence_notes"] == "Sparse but consistent."
+
     async def test_get_full_context(self):
         await self.store.update_preferences("default", "comfort.temperature", "23°C")
         await self.store.append_history("default", {"action": "turn_on"})
@@ -60,6 +88,110 @@ class TestMemoryStore:
         assert "history" in ctx
         assert "learned" in ctx
         assert "learned_profiles" in ctx
+        assert "memory_manifest" in ctx
+        assert "extracted_memories" in ctx
+
+    async def test_extracted_memories_round_trip(self):
+        await self.store.upsert_extracted_memory(
+            "default",
+            "sleep_lighting_preference",
+            {
+                "title": "Sleep lighting preference",
+                "category": "preference",
+                "summary": "User prefers warm dim lights before sleep.",
+                "details": ["Use warmer light late at night."],
+                "device_types": ["light"],
+                "confidence": "high",
+                "source_actions": ["set_brightness"],
+            },
+        )
+
+        manifest = await self.store.get_memory_manifest("default")
+        memories = await self.store.get_extracted_memories("default")
+
+        assert manifest[0]["topic"] == "sleep_lighting_preference"
+        assert memories["sleep_lighting_preference"]["category"] == "preference"
+
+    async def test_memory_extractor_writes_topic_files_and_advances_cursor(self, monkeypatch):
+        await self.store.append_history("default", {"action": "turn_on", "device_type": "light", "reason": "evening routine"})
+        await self.store.append_history("default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}})
+
+        monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
+        extractor = MemoryExtractionService(self.store)
+        extractor._invoke_llm_text = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "memories": [
+                        {
+                            "topic": "evening_lighting_routine",
+                            "title": "Evening lighting routine",
+                            "category": "routine",
+                            "summary": "Lights are typically turned on at low brightness in the evening.",
+                            "details": ["Favor low brightness during evening hours."],
+                            "device_types": ["light"],
+                            "confidence": "high",
+                            "source_actions": ["turn_on", "set_brightness"],
+                        }
+                    ],
+                    "forget_topics": [],
+                }
+            )
+        )
+
+        changed = await extractor.run_now("default")
+        state = await self.store.get_memory_extraction_state("default")
+        memories = await self.store.get_extracted_memories("default")
+
+        assert changed is True
+        assert state["history_cursor"] == 2
+        assert "evening_lighting_routine" in memories
+        assert memories["evening_lighting_routine"]["summary"].startswith("Lights are typically")
+
+    async def test_preference_learner_updates_skill_profile_from_history_and_memories(self, monkeypatch):
+        await self.store.append_history("default", {"action": "turn_on", "device_type": "light", "reason": "evening routine"})
+        await self.store.append_history("default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}})
+        await self.store.append_history("default", {"action": "set_color_temp", "device_type": "light", "params": {"value": 2700}})
+
+        monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
+        extractor = MemoryExtractionService(self.store)
+        extractor._invoke_llm_text = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "memories": [
+                        {
+                            "topic": "evening_lighting_preference",
+                            "title": "Evening lighting preference",
+                            "category": "preference",
+                            "summary": "The user prefers warm dim lighting in the evening.",
+                            "details": ["Warm and dim lighting repeats in recent history."],
+                            "device_types": ["light"],
+                            "confidence": "high",
+                            "source_actions": ["set_brightness", "set_color_temp"],
+                        }
+                    ],
+                    "forget_topics": [],
+                }
+            )
+        )
+
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        learner = PreferenceLearningService(
+            self.store,
+            extractor=extractor,
+            skill_loader=loader,
+            invoke_llm_text=AsyncMock(return_value='{"stable_preferences":["Prefer warm dim lights in the evening."]}'),
+        )
+
+        changed = await learner.run_now("default")
+        profile = await self.store.get_learned_for_skill("default", "light")
+
+        assert changed is True
+        assert "warm dim lights" in profile
+        parsed = json.loads(profile)
+        assert parsed["metadata"]["device_type"] == "light"
+        assert parsed["metadata"]["history_samples"] == 3
+        assert parsed["metadata"]["memory_topics"] == ["evening_lighting_preference"]
 
     async def test_ensure_cold_start_profiles_generates_device_aware_defaults(self):
         result = await self.store.ensure_cold_start_profiles(
@@ -82,8 +214,8 @@ class TestMemoryStore:
         assert "air_conditioner" not in profiles
 
         humidifier = json.loads(profiles["humidifier"])
-        assert humidifier["bootstrap_style"] == "comfort_first"
-        assert humidifier["bootstrap_source"] == "current_device_types"
+        assert humidifier["metadata"]["bootstrap_style"] == "comfort_first"
+        assert humidifier["metadata"]["bootstrap_source"] == "current_device_types"
         assert "45-55%" in " ".join(humidifier["stable_preferences"])
 
     async def test_ensure_cold_start_profiles_does_not_overwrite_existing_preferences(self):

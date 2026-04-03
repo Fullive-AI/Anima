@@ -175,7 +175,8 @@ FILE_REQUIREMENTS = {
         "Return raw markdown only. Do not wrap it in JSON or code fences.",
         "Start with valid YAML frontmatter delimited by ---.",
         "Frontmatter must include `name`, `description`, and metadata.device_types.",
-        "The body should briefly explain when to use this skill and what files matter.",
+        "The body should include a short Goal section, a Load These Resources section, and concise Working Rules.",
+        "Mention when the skill should trigger and what success looks like.",
     ],
     "references/knowledge.md": [
         "Return raw markdown only.",
@@ -200,6 +201,175 @@ FILE_REQUIREMENTS = {
         "Each helper must return a DeviceCommand.",
     ],
 }
+
+ANALYSIS_REQUIRED_LIST_FIELDS = (
+    "primary_steps",
+    "success_criteria",
+    "constraints",
+    "needed_inputs",
+    "assumptions",
+    "clarification_questions",
+)
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _default_request_analysis(request: str, *, mode: str, device_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    device_context = device_context or {}
+    device_types = _string_list(device_context.get("device_types"))
+    target_name = device_types[0] if device_types else "device"
+    supported_actions = _normalize_supported_actions(device_context.get("supported_actions"))
+    action_names = [item["name"] for item in supported_actions] or ["turn_on", "turn_off"]
+    summary = request.strip() or f"Generate a {mode} skill."
+
+    if mode == "system":
+        primary_steps = [
+            f"Read the current `{target_name}` device state and relevant sensors.",
+            f"Choose one of the supported actions: {', '.join(action_names)}.",
+            "Return a safe no-op when the context is insufficient or the current state is already appropriate.",
+        ]
+        success_criteria = [
+            "The generated skill only references supported actions and parameters.",
+            "The decision prompt makes `none` an explicit valid outcome.",
+            "The generated package matches the repository skill layout.",
+        ]
+    else:
+        primary_steps = [
+            "Infer the trigger condition and target device types from the request.",
+            "Define the smallest safe action set needed to satisfy the request.",
+            "Generate a skill package that keeps decisions conservative and explicit.",
+        ]
+        success_criteria = [
+            "The generated skill is specific enough to trigger from a clear user or environment signal.",
+            "The package defines safe no-op behavior instead of over-automating.",
+            "All generated files stay consistent with the same scope and action set.",
+        ]
+
+    constraints = _string_list(device_context.get("hard_rules")) or [
+        "Keep the generated skill narrow and filesystem-safe.",
+        "Do not invent actions outside scripts/actions.py.",
+    ]
+    assumptions = _string_list(device_context.get("knowledge_points"))
+    needed_inputs = device_types or [target_name]
+
+    return {
+        "summary": summary,
+        "goal": device_context.get("domain_summary", "") or f"Create a reusable {mode} skill from the user's request.",
+        "trigger_description": f"Use when the user or runtime needs this {target_name}-related workflow." if target_name else "Use when this workflow is needed.",
+        "primary_steps": primary_steps,
+        "success_criteria": success_criteria,
+        "constraints": constraints,
+        "needed_inputs": needed_inputs,
+        "assumptions": assumptions,
+        "should_ask_clarification": False,
+        "clarification_questions": [],
+    }
+
+
+def _validate_request_analysis(data: dict[str, Any], *, request: str, mode: str) -> tuple[dict[str, Any] | None, list[str]]:
+    errors: list[str] = []
+    summary = str(data.get("summary", "")).strip() or request.strip()
+    goal = str(data.get("goal", "")).strip()
+    trigger_description = str(data.get("trigger_description", "")).strip()
+    should_ask_clarification = bool(data.get("should_ask_clarification", False))
+
+    normalized = {
+        "summary": summary,
+        "goal": goal,
+        "trigger_description": trigger_description,
+        "should_ask_clarification": should_ask_clarification,
+    }
+
+    for field in ANALYSIS_REQUIRED_LIST_FIELDS:
+        normalized[field] = _string_list(data.get(field))
+
+    if not normalized["summary"]:
+        errors.append("Analysis must include a non-empty `summary`.")
+    if not normalized["goal"]:
+        errors.append("Analysis must include a non-empty `goal`.")
+    if not normalized["trigger_description"]:
+        errors.append("Analysis must include a non-empty `trigger_description`.")
+    if not normalized["primary_steps"]:
+        errors.append("Analysis must include at least one `primary_steps` item.")
+    if not normalized["success_criteria"]:
+        errors.append("Analysis must include at least one `success_criteria` item.")
+    if should_ask_clarification and not normalized["clarification_questions"]:
+        errors.append("Analysis marked clarification as required but provided no `clarification_questions`.")
+    if mode == "custom" and len(request.strip()) < 8 and not should_ask_clarification:
+        errors.append("Very short custom requests must ask for clarification.")
+
+    if errors:
+        return None, errors
+    return normalized, []
+
+
+async def _analyze_request_with_llm(
+    llm: OpenAITextClient,
+    *,
+    mode: str,
+    request: str,
+    device_context: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    device_context_json = json.dumps(device_context or {}, ensure_ascii=False, indent=2)
+    base_prompt = f"""
+You are planning an Anima skill before any files are generated.
+
+Mode: {mode}
+User request:
+{request}
+
+Device context:
+{device_context_json}
+
+Return exactly one compact JSON object with this schema:
+{{
+  "summary": "one sentence summary of the reusable workflow",
+  "goal": "what the skill should accomplish",
+  "trigger_description": "when this skill should be used",
+  "primary_steps": ["ordered step", "ordered step"],
+  "success_criteria": ["observable outcome", "observable outcome"],
+  "constraints": ["hard rule", "hard rule"],
+  "needed_inputs": ["input or signal", "input or signal"],
+  "assumptions": ["assumption", "assumption"],
+  "should_ask_clarification": true,
+  "clarification_questions": ["question", "question"]
+}}
+
+Hard constraints:
+- Return JSON only. No markdown fences. No explanation.
+- Think like a skill designer: extract repeatable triggers, steps, and success criteria before generation.
+- Set should_ask_clarification to true when the request is too vague to generate a narrow safe skill.
+- When clarification is not required, return an empty clarification_questions list.
+- Keep the skill narrow. Prefer concrete triggers over generic "smart automation" wording.
+"""
+
+    prompt = base_prompt
+    last_errors: list[str] = []
+    for _attempt in range(3):
+        response = await llm.ainvoke(prompt)
+        data = _extract_json(_extract_text(response.content))
+        if not data:
+            last_errors = ["The model response was not valid JSON."]
+            prompt = base_prompt + "\nYour previous response was not valid JSON. Return one JSON object only."
+            continue
+
+        analysis, errors = _validate_request_analysis(data, request=request, mode=mode)
+        if analysis:
+            return analysis, []
+
+        last_errors = errors
+        prompt = (
+            base_prompt
+            + "\nThe previous response was invalid. Fix these issues:\n- "
+            + "\n- ".join(errors)
+            + "\nReturn one corrected JSON object only."
+        )
+
+    return None, last_errors
 
 
 def _normalize_supported_actions(raw_actions: Any) -> list[dict[str, Any]]:
@@ -238,6 +408,7 @@ def _validate_generated_spec(
     data: dict[str, Any],
     *,
     request: str,
+    analysis: dict[str, Any],
     skill_name_hint: str,
     existing_names: list[str],
     device_context: dict[str, Any] | None = None,
@@ -297,6 +468,14 @@ def _validate_generated_spec(
         "skill_name": skill_name,
         "description": description,
         "device_types": device_types,
+        "goal": str(data.get("goal", "")).strip() or str(analysis.get("goal", "")).strip(),
+        "trigger_description": str(data.get("trigger_description", "")).strip()
+        or str(analysis.get("trigger_description", "")).strip(),
+        "primary_steps": _string_list(data.get("primary_steps")) or list(analysis.get("primary_steps", [])),
+        "success_criteria": _string_list(data.get("success_criteria")) or list(analysis.get("success_criteria", [])),
+        "constraints": _string_list(data.get("constraints")) or list(analysis.get("constraints", [])),
+        "needed_inputs": _string_list(data.get("needed_inputs")) or list(analysis.get("needed_inputs", [])),
+        "assumptions": _string_list(data.get("assumptions")) or list(analysis.get("assumptions", [])),
         "domain_summary": domain_summary,
         "knowledge_points": knowledge_points,
         "hard_rules": hard_rules,
@@ -310,17 +489,22 @@ async def _generate_skill_spec_with_llm(
     *,
     mode: str,
     request: str,
+    analysis: dict[str, Any],
     skill_name_hint: str,
     existing_names: list[str],
     device_context: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     device_context_json = json.dumps(device_context or {}, ensure_ascii=False, indent=2)
+    analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)
     base_prompt = f"""
 You are designing an Anima skill package.
 
 Mode: {mode}
 User request:
 {request}
+
+Request analysis:
+{analysis_json}
 
 Skill name hint:
 {skill_name_hint}
@@ -337,6 +521,13 @@ Return exactly one compact JSON object with this schema:
   "skill_name": "stable skill id",
   "description": "one sentence summary",
   "device_types": ["device_type"],
+  "goal": "what success looks like",
+  "trigger_description": "when this skill should trigger",
+  "primary_steps": ["ordered step", "ordered step"],
+  "success_criteria": ["observable outcome", "observable outcome"],
+  "constraints": ["hard rule", "hard rule"],
+  "needed_inputs": ["signal", "signal"],
+  "assumptions": ["assumption", "assumption"],
   "domain_summary": "brief domain summary",
   "knowledge_points": ["bullet", "bullet"],
   "hard_rules": ["rule", "rule"],
@@ -352,6 +543,7 @@ Hard constraints:
 - Do not reuse an existing skill folder name.
 - Keep the skill specific to the request or device type.
 - supported_actions must stay compatible with the device context when provided.
+- Use the request analysis to keep the generated skill trigger, scope, and success criteria coherent.
 """
 
     prompt = base_prompt
@@ -367,6 +559,7 @@ Hard constraints:
         spec, errors = _validate_generated_spec(
             data,
             request=request,
+            analysis=analysis,
             skill_name_hint=skill_name_hint,
             existing_names=existing_names,
             device_context=device_context,
@@ -394,6 +587,9 @@ def _validate_generated_file(file_path: str, content: str) -> list[str]:
     if file_path == "SKILL.md":
         if not re.match(r"^---\n.*?\n---\n", stripped, re.DOTALL):
             errors.append("`SKILL.md` must start with valid YAML frontmatter delimited by `---`.")
+        for heading in ("## Goal", "## Load These Resources", "## Working Rules"):
+            if heading not in stripped:
+                errors.append(f"`SKILL.md` must include a `{heading}` section.")
     elif file_path == "references/decide.md":
         lowered = stripped.lower()
         if "`none`" not in stripped and '"none"' not in lowered and " none" not in lowered:
@@ -511,11 +707,25 @@ async def _generate_package_with_llm(
     skill_name_hint: str,
     existing_names: list[str],
     device_context: dict[str, Any] | None = None,
+    analysis: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, list[str]]:
+    normalized_analysis = analysis or _default_request_analysis(request, mode=mode, device_context=device_context)
+    if analysis is None and mode == "custom":
+        analyzed, analysis_errors = await _analyze_request_with_llm(
+            llm,
+            mode=mode,
+            request=request,
+            device_context=device_context,
+        )
+        if not analyzed:
+            return None, analysis_errors
+        normalized_analysis = analyzed
+
     spec, spec_errors = await _generate_skill_spec_with_llm(
         llm,
         mode=mode,
         request=request,
+        analysis=normalized_analysis,
         skill_name_hint=skill_name_hint,
         existing_names=existing_names,
         device_context=device_context,
@@ -580,12 +790,35 @@ async def create_custom_skill(
             "error": "llm_required",
         }
 
+    analysis, analysis_errors = await _analyze_request_with_llm(
+        llm,
+        mode="custom",
+        request=request,
+    )
+    if not analysis:
+        detail = f" 失败原因：{'；'.join(analysis_errors[:3])}" if analysis_errors else ""
+        return {
+            "reply": f"我没能完成需求分析，请把要自动化的触发条件和目标动作说得更具体一些。{detail}",
+            "error": "skill_analysis_failed",
+            "details": analysis_errors,
+        }
+    if analysis.get("should_ask_clarification"):
+        questions = _string_list(analysis.get("clarification_questions"))[:3]
+        question_block = "\n".join(f"{idx}. {item}" for idx, item in enumerate(questions, start=1))
+        return {
+            "reply": "我需要先确认几件事，避免生成一个过于宽泛的 skill：\n" + question_block,
+            "action": "create_custom_skill",
+            "status": "needs_clarification",
+            "questions": questions,
+        }
+
     package, errors = await _generate_package_with_llm(
         llm,
         mode="custom",
         request=request,
         skill_name_hint=_normalize_slug("", request),
         existing_names=existing_custom_skills,
+        analysis=analysis,
     )
     if not package:
         detail = f" 失败原因：{'；'.join(errors[:3])}" if errors else ""

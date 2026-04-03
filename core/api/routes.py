@@ -137,6 +137,27 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         history = await memory.get_history("default", limit=50)
         return history
 
+    @app.get("/api/memory")
+    async def get_memory_debug():
+        memory = app_state["memory"]
+        preferences = await memory.get_preferences("default")
+        learned_profiles_raw = await memory.get_learned_profiles("default")
+        learned_profiles = {
+            skill_type: memory.parse_learned_profile(content)
+            for skill_type, content in learned_profiles_raw.items()
+        }
+        extracted_memories = await memory.get_extracted_memories("default")
+        extraction_state = await memory.get_memory_extraction_state("default")
+        history = await memory.get_history("default", limit=20)
+        return {
+            "preferences": preferences,
+            "learned_profiles": learned_profiles,
+            "memory_manifest": await memory.get_memory_manifest("default"),
+            "extracted_memories": extracted_memories,
+            "extraction_state": extraction_state,
+            "recent_history": history,
+        }
+
     @app.get("/api/environment")
     async def get_environment():
         brain = app_state["brain"]

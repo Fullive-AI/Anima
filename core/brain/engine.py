@@ -14,6 +14,8 @@ from openai import AsyncOpenAI
 
 from core.brain.skill_loader import LoadedSkill, SkillLoader
 from core.events.bus import EventBus
+from core.memory.extractor import MemoryExtractionService
+from core.memory.learning import PreferenceLearningService
 from core.memory.store import MemoryStore
 from core.models import (
     ActionVerificationResult,
@@ -65,6 +67,8 @@ class Brain:
         self._skill_loader = skill_loader
         self._memory = memory
         self._environment_provider: Callable[[], list[Device]] | None = None
+        self._memory_extractor: MemoryExtractionService | None = None
+        self._preference_learner: PreferenceLearningService | None = None
         self._llm = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url or None,
@@ -76,6 +80,20 @@ class Brain:
 
     def set_environment_provider(self, provider: Callable[[], list[Device]]) -> None:
         self._environment_provider = provider
+
+    def set_memory_extractor(self, extractor: MemoryExtractionService) -> None:
+        self._memory_extractor = extractor
+
+    def set_preference_learner(self, learner: PreferenceLearningService) -> None:
+        self._preference_learner = learner
+
+    def schedule_preference_learning(self, user_id: str = "default") -> None:
+        if self._preference_learner is not None:
+            self._preference_learner.schedule(user_id)
+            return
+        if self._memory_extractor is None:
+            return
+        self._memory_extractor.schedule(user_id)
 
     async def run_cycle(self) -> BrainCycleResult:
         user_memory = await self._memory.get_full_context()
@@ -165,6 +183,10 @@ class Brain:
         return actions
 
     async def learn_preferences(self, user_id: str = "default") -> None:
+        if self._preference_learner is not None:
+            await self._preference_learner.run_now(user_id)
+            return
+
         skill_types = ["humidifier", "air_conditioner", "light", "air_purifier", "speaker"]
 
         for skill_type in skill_types:
@@ -469,6 +491,7 @@ class Brain:
                 "observed_state": verification.observed_state,
             },
         )
+        self.schedule_preference_learning("default")
 
     async def _record_task_plan_history(
         self,
@@ -495,6 +518,8 @@ class Brain:
             if message:
                 entry["message"] = message
             await self._memory.append_history("default", entry)
+        if task_plan_items:
+            self.schedule_preference_learning("default")
 
     @staticmethod
     def _summarize_chat_execution_failure(execution_results: list[SkillExecutionResult]) -> str:

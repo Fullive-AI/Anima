@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,14 @@ COLD_START_COMFORT_DEFAULTS = {
     "brightness": "daytime moderate, evening warm and dim",
 }
 
+LEARNED_PROFILE_KEYS = (
+    "stable_preferences",
+    "time_based_patterns",
+    "seasonal_patterns",
+    "weak_signals",
+    "confidence_notes",
+)
+
 
 def _device_type_sort_key(device_type: str) -> tuple[int, str]:
     preferred = ["air_conditioner", "humidifier", "air_purifier", "light", "speaker"]
@@ -49,6 +58,22 @@ class MemoryStore:
 
     def _preferences_path(self, user_id: str) -> Path:
         return self._user_dir(user_id) / "preferences.md"
+
+    def _history_path(self, user_id: str) -> Path:
+        return self._user_dir(user_id) / "history.json"
+
+    def _memory_state_path(self, user_id: str) -> Path:
+        return self._user_dir(user_id) / "memory_state.json"
+
+    def _memories_dir(self, user_id: str) -> Path:
+        path = self._user_dir(user_id) / "memories"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @staticmethod
+    def _slugify_topic(topic: str) -> str:
+        slug = re.sub(r"[^a-z0-9_]+", "_", topic.lower()).strip("_")
+        return slug[:64] or "memory"
 
     # ── Preferences (Markdown) ──
 
@@ -312,14 +337,41 @@ class MemoryStore:
     # ── History (JSON) ──
 
     async def get_history(self, user_id: str = "default", limit: int = 50) -> list[dict]:
-        path = self._user_dir(user_id) / "history.json"
+        path = self._history_path(user_id)
         if not path.exists():
             return []
         data = json.loads(path.read_text(encoding="utf-8"))
         return data[-limit:]
 
+    async def get_history_slice(
+        self,
+        user_id: str = "default",
+        *,
+        start_index: int = 0,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        path = self._history_path(user_id)
+        if not path.exists():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return []
+        sliced = data[max(start_index, 0):]
+        if limit is not None:
+            sliced = sliced[:limit]
+        return [item for item in sliced if isinstance(item, dict)]
+
+    async def get_history_count(self, user_id: str = "default") -> int:
+        path = self._history_path(user_id)
+        if not path.exists():
+            return 0
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return 0
+        return len(data)
+
     async def append_history(self, user_id: str, entry: dict[str, Any]) -> None:
-        path = self._user_dir(user_id) / "history.json"
+        path = self._history_path(user_id)
         data = []
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -340,7 +392,11 @@ class MemoryStore:
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                return {str(k): str(v) for k, v in data.items()}
+                normalized: dict[str, str] = {}
+                for key, value in data.items():
+                    parsed = self.parse_learned_profile(value)
+                    normalized[str(key)] = json.dumps(parsed, ensure_ascii=False, indent=2)
+                return normalized
 
         legacy_path = self._user_dir(user_id) / "learned.md"
         if legacy_path.exists():
@@ -369,9 +425,147 @@ class MemoryStore:
 
     async def update_learned_for_skill(self, user_id: str, skill_type: str, content: str) -> None:
         profiles = self._load_learned_profiles(user_id)
-        profiles[skill_type] = content
+        profiles[skill_type] = json.dumps(self.parse_learned_profile(content), ensure_ascii=False, indent=2)
         path = self._learned_json_path(user_id)
         path.write_text(json.dumps(profiles, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _normalize_learned_list(value: Any) -> list[str]:
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, dict):
+            parts: list[str] = []
+            for key, item in value.items():
+                key_text = str(key).strip()
+                item_text = str(item).strip()
+                if key_text and item_text:
+                    parts.append(f"{key_text}: {item_text}")
+            return parts
+        text = str(value).strip()
+        return [text] if text and text not in {"{}", "[]", "null"} else []
+
+    @classmethod
+    def parse_learned_profile(cls, raw: Any) -> dict[str, Any]:
+        data: Any = raw
+        if isinstance(raw, str):
+            stripped = raw.strip()
+            if stripped:
+                try:
+                    data = json.loads(stripped)
+                except json.JSONDecodeError:
+                    data = {"confidence_notes": stripped}
+            else:
+                data = {}
+
+        if not isinstance(data, dict):
+            data = {}
+
+        profile = {
+            "stable_preferences": cls._normalize_learned_list(data.get("stable_preferences")),
+            "time_based_patterns": cls._normalize_learned_list(data.get("time_based_patterns")),
+            "seasonal_patterns": cls._normalize_learned_list(data.get("seasonal_patterns")),
+            "weak_signals": cls._normalize_learned_list(data.get("weak_signals")),
+            "confidence_notes": str(data.get("confidence_notes", "")).strip(),
+        }
+
+        metadata = data.get("metadata", {})
+        if isinstance(metadata, dict):
+            normalized_metadata = {
+                str(key): value
+                for key, value in metadata.items()
+                if str(key).strip()
+            }
+        else:
+            normalized_metadata = {}
+
+        for legacy_key in ("bootstrap_style", "bootstrap_source"):
+            if legacy_key in data and legacy_key not in normalized_metadata:
+                normalized_metadata[legacy_key] = data[legacy_key]
+
+        if normalized_metadata:
+            profile["metadata"] = normalized_metadata
+
+        return profile
+
+    # ── Extracted Memories (per-topic JSON) ──
+
+    async def get_memory_extraction_state(self, user_id: str = "default") -> dict[str, Any]:
+        path = self._memory_state_path(user_id)
+        if not path.exists():
+            return {"history_cursor": 0}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {"history_cursor": 0}
+        if not isinstance(data, dict):
+            return {"history_cursor": 0}
+        history_cursor = data.get("history_cursor", 0)
+        return {
+            "history_cursor": history_cursor if isinstance(history_cursor, int) and history_cursor >= 0 else 0,
+            "last_extracted_at": data.get("last_extracted_at", ""),
+            "last_batch_size": data.get("last_batch_size", 0),
+        }
+
+    async def update_memory_extraction_state(
+        self,
+        user_id: str,
+        *,
+        history_cursor: int,
+        last_batch_size: int,
+    ) -> None:
+        path = self._memory_state_path(user_id)
+        payload = {
+            "history_cursor": max(history_cursor, 0),
+            "last_batch_size": max(last_batch_size, 0),
+            "last_extracted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    async def get_extracted_memories(self, user_id: str = "default") -> dict[str, dict[str, Any]]:
+        memories: dict[str, dict[str, Any]] = {}
+        for path in sorted(self._memories_dir(user_id).glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if isinstance(data, dict):
+                memories[path.stem] = data
+        return memories
+
+    async def get_memory_manifest(self, user_id: str = "default") -> list[dict[str, Any]]:
+        memories = await self.get_extracted_memories(user_id)
+        manifest: list[dict[str, Any]] = []
+        for topic, data in memories.items():
+            manifest.append(
+                {
+                    "topic": topic,
+                    "title": str(data.get("title", topic)),
+                    "category": str(data.get("category", "context")),
+                    "summary": str(data.get("summary", "")),
+                    "updated_at": str(data.get("updated_at", "")),
+                }
+            )
+        return sorted(manifest, key=lambda item: (item["category"], item["topic"]))
+
+    async def upsert_extracted_memory(
+        self,
+        user_id: str,
+        topic: str,
+        content: dict[str, Any],
+    ) -> str:
+        slug = self._slugify_topic(topic)
+        path = self._memories_dir(user_id) / f"{slug}.json"
+        payload = dict(content)
+        payload.setdefault("topic", slug)
+        payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return slug
+
+    async def delete_extracted_memory(self, user_id: str, topic: str) -> None:
+        slug = self._slugify_topic(topic)
+        path = self._memories_dir(user_id) / f"{slug}.json"
+        if path.exists():
+            path.unlink()
 
     # ── Full Context (for LLM) ──
 
@@ -381,4 +575,6 @@ class MemoryStore:
             "history": await self.get_history(user_id, limit=20),
             "learned": await self.get_learned(user_id),
             "learned_profiles": await self.get_learned_profiles(user_id),
+            "memory_manifest": await self.get_memory_manifest(user_id),
+            "extracted_memories": await self.get_extracted_memories(user_id),
         }
