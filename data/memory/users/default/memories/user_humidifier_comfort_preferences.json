@@ -2,15 +2,17 @@
   "topic": "user_humidifier_comfort_preferences",
   "title": "User humidifier comfort preferences and device status",
   "category": "preference",
-  "summary": "The user prefers 40%-55% ambient humidity for comfort, with 45% as the default optimal target, prefers auto mode for quiet humidification during sleep/early morning periods, requires activating the humidifier whenever ambient humidity drops below 40%, uses 60% target humidity when ambient humidity is below 25% or when experiencing dry air; the user's Mijia Smart Anti-bacterial Humidifier 2 (device ID: miot_cloud_922570899) has persistent unresolvable activation failure, with multiple additional repeated activation attempts (including setting 45% and 60% target humidity when ambient humidity was far below threshold) still failing consistently despite the device showing online with full water supply, no further automatic adjustments can be made and the user has been repeatedly notified to check the device.",
+  "summary": "The user prefers 40%-55% ambient humidity for comfort, with 45% as the default optimal target, prefers auto mode for quiet humidification during sleep/early morning periods, requires activating the humidifier whenever ambient humidity drops below 40%, uses 60% target humidity when ambient humidity is below 25% or when experiencing dry air; the user's Mijia Smart Anti-bacterial Humidifier 2 (device ID: miot_cloud_922570899) has persistent unresolvable activation failure, multiple repeated activation attempts including setting 45% and 60% target humidity when ambient humidity was far below threshold still failed consistently despite the device showing online with full water supply, no further automatic adjustments can be made and the user has been repeatedly notified to check the device.",
   "details": [
-    "User prefers 40%-55% ambient humidity, default optimal target is 45%",
-    "User uses 60% target humidity when ambient humidity is below 25% or when experiencing dry air",
-    "User requires activating humidifier whenever ambient humidity drops below 40%",
-    "User prefers auto mode for quiet humidification during sleep and early morning periods",
-    "User's Mijia Smart Anti-bacterial Humidifier 2 (device ID: miot_cloud_922570899) has persistent unresolvable activation failure",
-    "Device shows online with full water but all activation attempts consistently fail",
-    "No further automatic adjustments can be made, user has been repeatedly notified"
+    "Preferred ambient humidity range: 40%-55%",
+    "Default optimal target humidity: 45%",
+    "Use 60% target humidity when ambient humidity <25% or user experiences dry air",
+    "Activate humidifier when ambient humidity drops below 40%",
+    "Prefer auto mode for quiet humidification during sleep/early morning",
+    "Mijia Smart Anti-bacterial Humidifier 2 (ID: miot_cloud_922570899) has persistent unresolvable activation failure",
+    "Multiple activation attempts failed despite device showing online with full water",
+    "User has been repeatedly notified to check the device",
+    "No further automatic adjustments can be made"
   ],
   "device_types": [
     "humidifier"
@@ -18,7 +20,8 @@
   "confidence": "high",
   "source_actions": [
     "turn_on",
-    "execute_skill"
+    "execute_skill",
+    "plan.reply"
   ],
-  "updated_at": "2026-04-03T10:27:07.716564+00:00"
+  "updated_at": "2026-04-03T10:28:48.212832+00:00"
 }

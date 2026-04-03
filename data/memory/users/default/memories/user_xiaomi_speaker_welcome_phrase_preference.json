@@ -4,12 +4,12 @@
   "category": "preference",
   "summary": "The user has repeatedly requested the Xiaomi Smart Speaker to announce the phrase '你好，欢迎回家' as a welcome message.",
   "details": [
-    "User requested '你好，欢迎回家' as the welcome phrase for Xiaomi Smart Speaker"
+    "Requested welcome phrase: '你好，欢迎回家'"
   ],
   "device_types": [
     "smart_speaker"
   ],
   "confidence": "high",
   "source_actions": [],
-  "updated_at": "2026-04-03T10:27:07.717302+00:00"
+  "updated_at": "2026-04-03T10:28:48.214179+00:00"
 }
