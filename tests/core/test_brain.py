@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, patch
+
 from core.brain.engine import Brain
 from core.brain.skill_loader import SkillLoader
 from core.models import (
@@ -429,6 +431,142 @@ class TestBrain:
         assert result["executed"] is False
         assert result["reply"] == "你想调节哪个房间？"
         assert result["task_results"][0]["kind"] == "ask_user"
+
+    async def test_handle_chat_message_can_execute_custom_skill(self, tmp_path):
+        skills_dir = tmp_path / "skills"
+        custom_skill_dir = skills_dir / "custom" / "night_curtain"
+        references_dir = custom_skill_dir / "references"
+        scripts_dir = custom_skill_dir / "scripts"
+        references_dir.mkdir(parents=True)
+        scripts_dir.mkdir()
+
+        (custom_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: night_curtain\n"
+                "description: open curtains when the user asks\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - curtain\n"
+                "---\n\n"
+                "# Night Curtain\n"
+            ),
+            encoding="utf-8",
+        )
+        (references_dir / "knowledge.md").write_text("Curtains support open and close actions.", encoding="utf-8")
+        (references_dir / "decide.md").write_text(
+            (
+                "Use {current_data}, {capabilities}, {user_preferences}, {learned_profile}, "
+                "{recent_history}, and {knowledge} to decide whether to return `none` or an action."
+            ),
+            encoding="utf-8",
+        )
+        (scripts_dir / "actions.py").write_text(
+            (
+                "from core.models import DeviceCommand\n\n"
+                "def open(device_id: str, reason: str = \"\") -> DeviceCommand:\n"
+                "    return DeviceCommand(device_id=device_id, action=\"open\", source=\"brain\", reason=reason)\n"
+            ),
+            encoding="utf-8",
+        )
+
+        loader = SkillLoader(skills_dir=str(skills_dir))
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        curtain = Device(
+            device_id="curtain_01",
+            name="Bedroom Curtain",
+            adapter="fake",
+            type="curtain",
+            capabilities=[Capability(name="open"), Capability(name="close")],
+        )
+
+        class FakeDiscovery:
+            def __init__(self, target):
+                self.target = target
+                self.executed = []
+
+            def get_all_devices(self):
+                return [self.target]
+
+            def get_devices_by_type(self, device_type):
+                return [self.target] if device_type == "curtain" else []
+
+            async def execute_command(self, device_id, action, params):
+                self.executed.append((device_id, action, params))
+                return type("Result", (), {"message": "", "success": True})()
+
+            async def refresh_device_states(self, device_ids=None):
+                return {"refreshed": 1, "failed": 0}
+
+            def get_device(self, device_id):
+                return self.target if device_id == self.target.device_id else None
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery(curtain)
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = AsyncMock(
+            side_effect=[
+                '{"reply":"我来开窗帘。","should_execute":true,"task_plan_items":[{"kind":"execute_skill","skill_name":"night_curtain","goal":"open the curtain","reason":"user asked to open the curtain","priority":10}]}',
+                '{"action":"open","params":{},"reason":"user asked to open the curtain"}',
+            ]
+        )
+
+        result = await brain.handle_chat_message(
+            "打开窗帘",
+            {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+        )
+
+        assert result["executed"] is True
+        assert result["execution_results"][0]["plan_item"]["skill_name"] == "night_curtain"
+        assert result["execution_results"][0]["actions"][0]["action"] == "open"
+        assert discovery.executed == [("curtain_01", "open", {})]
+
+    async def test_handle_chat_message_maps_legacy_skill_creator_action_alias(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        class FakeDiscovery:
+            def get_all_devices(self):
+                return []
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery()
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = AsyncMock(
+            return_value='{"reply":"我来创建一个新技能。","should_execute":true,"task_plan_items":[{"kind":"system_action","system_skill":"skill_creator","system_action":"generate_new_skill_package","params":{"request":"新增一个控制窗帘的技能"},"reason":"user asked to create a new skill","priority":10}]}'
+        )
+        skill = loader.get_skill("skill_creator")
+        assert skill is not None
+        actions_module = loader.load_actions(skill)
+        assert actions_module is not None
+
+        with patch.object(
+            actions_module,
+            "create_custom_skill",
+            AsyncMock(return_value={"reply": "已创建", "action": "create_custom_skill", "status": "created"}),
+        ):
+            result = await brain.handle_chat_message(
+                "帮我新增一个控制窗帘的技能",
+                {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+            )
+
+        assert result["action"] == "create_custom_skill"
+        assert result["requested_action"] == "generate_new_skill_package"
 
     async def test_handle_chat_message_refreshes_environment_before_running_skill(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")

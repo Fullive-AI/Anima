@@ -142,6 +142,48 @@ export interface ChatResponse {
   execution_results?: ChatExecutionResult[]
 }
 
+export interface LearnedProfile {
+  stable_preferences: string[]
+  time_based_patterns: string[]
+  seasonal_patterns: string[]
+  weak_signals: string[]
+  confidence_notes: string
+  metadata?: Record<string, unknown>
+}
+
+export interface ExtractedMemory {
+  topic: string
+  title: string
+  category: string
+  summary: string
+  details: string[]
+  device_types: string[]
+  confidence: 'low' | 'medium' | 'high'
+  source_actions: string[]
+  updated_at?: string
+}
+
+export interface MemoryManifestItem {
+  topic: string
+  title: string
+  category: string
+  summary: string
+  updated_at?: string
+}
+
+export interface MemoryDebugSnapshot {
+  preferences: string
+  learned_profiles: Record<string, LearnedProfile>
+  memory_manifest: MemoryManifestItem[]
+  extracted_memories: Record<string, ExtractedMemory>
+  extraction_state: {
+    history_cursor: number
+    last_extracted_at?: string
+    last_batch_size?: number
+  }
+  recent_history: Decision[]
+}
+
 const api = {
   async getDevices(): Promise<Device[]> {
     const res = await fetch('/api/devices')
@@ -204,6 +246,11 @@ const api = {
 
   async getHealth(): Promise<{ status: string; version: string }> {
     const res = await fetch('/health')
+    return res.json()
+  },
+
+  async getMemory(): Promise<MemoryDebugSnapshot> {
+    const res = await fetch('/api/memory')
     return res.json()
   },
 }
@@ -284,6 +331,30 @@ export function useEnvironment(pollInterval = 3000) {
   }, [refresh, pollInterval])
 
   return { environment, refresh, refreshNow, refreshing }
+}
+
+export function useMemoryDebug(pollInterval = 10000) {
+  const [memory, setMemory] = useState<MemoryDebugSnapshot | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await api.getMemory()
+      setMemory(data)
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refresh()
+    const id = setInterval(refresh, pollInterval)
+    return () => clearInterval(id)
+  }, [refresh, pollInterval])
+
+  return { memory, loading, refresh }
 }
 
 export { api }

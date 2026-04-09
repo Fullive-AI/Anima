@@ -2,17 +2,15 @@
   "topic": "user_bedside_light_sleep_preferences",
   "title": "User bedside light lighting preferences",
   "category": "preference",
-  "summary": "The user prefers 2700K warm color temperature, 20% brightness, and a smooth 1000ms power-on transition for the bedside light for early morning pre-wake up and nighttime illumination needs.",
+  "summary": "The user has specific lighting preferences for the bedside light for pre-wake up and nighttime use.",
   "details": [
-    "Preferred color temperature: 2700K warm",
-    "Preferred brightness: 20%",
-    "Preferred power-on transition: 1000ms smooth",
-    "Used for early morning pre-wake up and nighttime illumination"
+    "Specific lighting preferences for pre-wake up use of bedside light",
+    "Specific lighting preferences for nighttime use of bedside light"
   ],
   "device_types": [
-    "light"
+    "bedside_light"
   ],
-  "confidence": "high",
+  "confidence": "medium",
   "source_actions": [],
-  "updated_at": "2026-04-03T10:28:48.212609+00:00"
+  "updated_at": "2026-04-09T08:04:35.249548+00:00"
 }

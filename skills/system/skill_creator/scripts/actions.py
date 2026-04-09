@@ -170,6 +170,35 @@ REQUIRED_FILES = [
     "scripts/actions.py",
 ]
 
+SIMPLE_DEVICE_SKILL_KEYWORDS = {
+    "窗帘": {
+        "device_type": "curtain",
+        "folder_name": "curtain",
+        "skill_name": "curtain",
+        "title": "Curtain",
+        "description": "Use when reasoning about smart curtains in Anima. Covers open, close, stop, and position control.",
+        "supported_actions": [
+            {"name": "open", "params": []},
+            {"name": "close", "params": []},
+            {"name": "stop", "params": []},
+            {"name": "set_position", "params": [{"name": "value", "type": "number"}]},
+        ],
+    },
+    "curtain": {
+        "device_type": "curtain",
+        "folder_name": "curtain",
+        "skill_name": "curtain",
+        "title": "Curtain",
+        "description": "Use when reasoning about smart curtains in Anima. Covers open, close, stop, and position control.",
+        "supported_actions": [
+            {"name": "open", "params": []},
+            {"name": "close", "params": []},
+            {"name": "stop", "params": []},
+            {"name": "set_position", "params": [{"name": "value", "type": "number"}]},
+        ],
+    },
+}
+
 FILE_REQUIREMENTS = {
     "SKILL.md": [
         "Return raw markdown only. Do not wrap it in JSON or code fences.",
@@ -402,6 +431,148 @@ def _normalize_supported_actions(raw_actions: Any) -> list[dict[str, Any]]:
 
 def _default_supported_actions() -> list[dict[str, Any]]:
     return [{"name": "turn_on", "params": []}, {"name": "turn_off", "params": []}]
+
+
+def _guess_simple_device_skill(request: str) -> dict[str, Any] | None:
+    lowered = request.lower()
+    for keyword, spec in SIMPLE_DEVICE_SKILL_KEYWORDS.items():
+        if keyword in request or keyword in lowered:
+            return spec
+    return None
+
+
+def _render_simple_skill_package(request: str, *, spec: dict[str, Any]) -> dict[str, Any]:
+    skill_name = spec["skill_name"]
+    folder_name = spec["folder_name"]
+    device_type = spec["device_type"]
+    title = spec["title"]
+    description = spec["description"]
+    supported_actions = spec["supported_actions"]
+    action_names = [item["name"] for item in supported_actions]
+
+    def action_union() -> str:
+        return " | ".join(action_names + ["none"])
+
+    def helper_code() -> str:
+        chunks = [
+            "from core.models import DeviceCommand",
+            "from core.models import SkillPlanItem",
+            "",
+            "",
+            "async def execute(context: dict, plan_item: SkillPlanItem):",
+            f'    return await context["brain"].execute_device_skill("{skill_name}", context, plan_item)',
+            "",
+        ]
+        for action in supported_actions:
+            name = action["name"]
+            params = action.get("params", [])
+            if name == "set_position":
+                chunks.extend(
+                    [
+                        "",
+                        f"def {name}(device_id: str, value: float, reason: str = \"\") -> DeviceCommand:",
+                        "    return DeviceCommand(",
+                        "        device_id=device_id,",
+                        f'        action="{name}",',
+                        '        params={"value": value},',
+                        '        source="brain",',
+                        "        reason=reason,",
+                        "    )",
+                    ]
+                )
+            else:
+                chunks.extend(
+                    [
+                        "",
+                        f"def {name}(device_id: str, reason: str = \"\") -> DeviceCommand:",
+                        f'    return DeviceCommand(device_id=device_id, action="{name}", source="brain", reason=reason)',
+                    ]
+                )
+        return "\n".join(chunks) + "\n"
+
+    skill_md = (
+        f"---\nname: {skill_name}\ndescription: {description}\nmetadata:\n  device_types:\n    - {device_type}\n  version: 0.1.0\n---\n\n"
+        f"# {title}\n\n"
+        "## Goal\n"
+        f"Provide conservative single-device control decisions for {device_type} devices based on user intent and current state.\n\n"
+        "## Load These Resources\n"
+        "- `references/knowledge.md` for device behavior, constraints, and action boundaries.\n"
+        "- `references/decide.md` when generating a single-device action.\n"
+        "- `references/learn.md` when updating the learned profile from usage history.\n"
+        "- `scripts/actions.py` for the runtime action helpers exposed to Anima.\n\n"
+        "## Working Rules\n"
+        f"- Only use supported actions for `{device_type}`: {', '.join(action_names)}.\n"
+        "- Return `none` if the request is ambiguous or the current state is already acceptable.\n"
+        "- Prefer narrow, explicit control over broad automation.\n"
+    )
+
+    knowledge_md = (
+        f"# {title} Skill Knowledge\n\n"
+        f"- This skill handles `{device_type}` devices.\n"
+        f"- Supported actions: {', '.join(action_names)}.\n"
+        "- Avoid repeated or contradictory commands.\n"
+        "- If the target position or intent is unclear, prefer `none`.\n"
+        f"- This scaffold was generated from the request: {request}\n"
+    )
+
+    decide_md = (
+        f"You are Anima's `{device_type}` decision module. Produce one conservative, structured control decision for a single device.\n\n"
+        "## Current Data\n{current_data}\n\n"
+        "## Device Capabilities\n{capabilities}\n\n"
+        "## Current Environment State\n{environment_state}\n\n"
+        "## User Preferences\n{user_preferences}\n\n"
+        "## Learned Profile\n{learned_profile}\n\n"
+        "## Recent Decision History\n{recent_history}\n\n"
+        "## Domain Knowledge\n{knowledge}\n\n"
+        "## Hard Rules\n\n"
+        "- If key context is missing, return `none`.\n"
+        "- Only use actions that exist in the capability list and scripts/actions.py.\n"
+        "- Do not repeat a materially identical command if recent history shows the device was just adjusted.\n\n"
+        "Respond with a JSON object:\n\n"
+        "```json\n"
+        "{\n"
+        f'  "action": "{action_union()}",\n'
+        '  "params": {},\n'
+        '  "reason": "brief explanation",\n'
+        '  "confidence": 0.0,\n'
+        '  "expected_outcome": "what should improve",\n'
+        '  "should_wait_seconds": 0\n'
+        "}\n"
+        "```\n"
+    )
+
+    learn_md = (
+        f"Analyze the user's {device_type} history and update the learned profile.\n\n"
+        "## History\n{history}\n\n"
+        "## Current Learned Profile\n{current_profile}\n\n"
+        "## Instructions\n\n"
+        "- Separate stable preferences from weak signals.\n"
+        "- Ignore one-off behavior unless it repeats.\n"
+        "- Mention uncertainty when the data is sparse or inconsistent.\n"
+        "- Keep the output compact and machine-readable.\n\n"
+        "Respond with a JSON object:\n\n"
+        "```json\n"
+        "{\n"
+        '  "stable_preferences": ["clear preference statements backed by repeated history"],\n'
+        '  "time_based_patterns": ["patterns tied to time of day or routines"],\n'
+        '  "seasonal_patterns": ["patterns tied to season or weather if evidence exists"],\n'
+        '  "weak_signals": ["possible preferences that need more evidence"],\n'
+        '  "confidence_notes": "short note about certainty and data quality"\n'
+        "}\n"
+        "```\n"
+    )
+
+    return {
+        "folder_name": folder_name,
+        "skill_name": skill_name,
+        "files": {
+            "SKILL.md": skill_md,
+            "references/knowledge.md": knowledge_md,
+            "references/decide.md": decide_md,
+            "references/learn.md": learn_md,
+            "scripts/actions.py": helper_code(),
+        },
+    }
 
 
 def _validate_generated_spec(
@@ -783,6 +954,24 @@ async def create_custom_skill(
     base_dir.mkdir(parents=True, exist_ok=True)
 
     existing_custom_skills = [path.name for path in base_dir.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))]
+    simple_skill_spec = _guess_simple_device_skill(request)
+    if simple_skill_spec is not None:
+        package = _render_simple_skill_package(request, spec=simple_skill_spec)
+        target_dir = _unique_dir(base_dir, package["folder_name"])
+        _write_generated_package(target_dir, package)
+        skill_loader.discover()
+        created_name = target_dir.name
+        return {
+            "reply": reply or f"已创建自定义 skill：{created_name}",
+            "action": "create_custom_skill",
+            "status": "created",
+            "skill_name": package["skill_name"],
+            "folder_name": created_name,
+            "path": str(target_dir),
+            "creation_mode": "simple_scaffold",
+            "refresh_skills": True,
+        }
+
     llm = _build_llm(context)
     if not llm:
         return {

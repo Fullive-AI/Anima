@@ -205,6 +205,42 @@ class SkillLoader:
 
         return skill if "system" in skill.path.parts else None
 
+    @staticmethod
+    def _to_summary(skill: LoadedSkill) -> SkillSummary:
+        return SkillSummary(
+            name=skill.meta.name,
+            description=skill.meta.description,
+            device_type=skill.meta.device_types[0] if skill.meta.device_types else "",
+        )
+
+    def list_executable_skill_summaries(self) -> list[SkillSummary]:
+        if not self._cache_by_name:
+            self.discover()
+
+        summaries: list[SkillSummary] = []
+        for skill in self._cache_by_name.values():
+            if not skill.decide_prompt:
+                continue
+            if not skill.meta.device_types:
+                continue
+            summaries.append(self._to_summary(skill))
+
+        return sorted(summaries, key=lambda item: item.name)
+
+    def list_chat_skill_summaries(self) -> list[SkillSummary]:
+        if not self._cache_by_name:
+            self.discover()
+
+        summaries: list[SkillSummary] = []
+        for skill in self._cache_by_name.values():
+            is_system_skill = "system" in skill.path.parts
+            is_executable_custom_skill = bool(skill.decide_prompt and skill.meta.device_types)
+            if not is_system_skill and not is_executable_custom_skill:
+                continue
+            summaries.append(self._to_summary(skill))
+
+        return sorted(summaries, key=lambda item: item.name)
+
     def list_system_device_skill_summaries(self) -> list[SkillSummary]:
         if not self._cache_by_name:
             self.discover()
@@ -217,13 +253,7 @@ class SkillLoader:
                 continue
             if not skill.meta.device_types:
                 continue
-            summaries.append(
-                SkillSummary(
-                    name=skill.meta.name,
-                    description=skill.meta.description,
-                    device_type=skill.meta.device_types[0],
-                )
-            )
+            summaries.append(self._to_summary(skill))
 
         return sorted(summaries, key=lambda item: item.name)
 
@@ -235,13 +265,7 @@ class SkillLoader:
         for skill in self._cache_by_name.values():
             if "system" not in skill.path.parts:
                 continue
-            summaries.append(
-                SkillSummary(
-                    name=skill.meta.name,
-                    description=skill.meta.description,
-                    device_type=skill.meta.device_types[0] if skill.meta.device_types else "",
-                )
-            )
+            summaries.append(self._to_summary(skill))
 
         return sorted(summaries, key=lambda item: item.name)
 

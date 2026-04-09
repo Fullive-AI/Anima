@@ -14,7 +14,7 @@
 - AI 驱动决策——LLM 大脑加载领域知识，做出智能选择
 - 技能系统——每种设备类型获得专属智能，而非简单的开/关控制
 - 学习你的偏好——根据你的习惯持续进化
-- 可视化控制面板——实时设备监控、AI 决策流、统一 graph 对话入口
+- 可视化控制面板——实时设备监控、AI 决策流、统一 graph 对话入口，以及记忆调试面板
 
 ## 60 秒跑起来
 
@@ -80,17 +80,17 @@ pnpm dev
 
 | 模块 | 说明 |
 |------|------|
-| **控制面板** | React + Vite + Tailwind —— 三栏布局：设备列表、传感器卡片、AI 决策流、聊天栏 |
+| **控制面板** | React + Vite + Tailwind —— 设备列表、环境视图、AI 决策流、聊天栏、设置/帮助与记忆调试面板 |
 | **事件总线** | 异步事件系统，支持通配符订阅和错误隔离 |
 | **规则引擎** | 代码中保留的可选确定性层，但当前主运行链路已将传感器与聊天输入统一交给 LLM Brain |
 | **LLM 大脑** | 基于 LangGraph 的技能规划/执行引擎——加载 skill 摘要、规划动作、执行 skill、校验设备状态，并统一承接 `/api/chat` |
-| **记忆系统** | `preferences.md` + `history.json` + `learned.md`——全部可读，无需数据库 |
-| **技能系统** | 4 个内置技能：加湿器、空调、灯光、协调者（跨设备编排） |
+| **记忆系统** | `preferences.md` + `history.json` + topic memories + 规范化 `learned.json`，并带增量提取与统一偏好学习 |
+| **技能系统** | 设备技能 + system skill（如设备发现、skill 创建） |
 | **发现服务** | 通过 mDNS 自动扫描局域网，注册设备，自动去重 |
 | **MIoT 适配器** | 小米/米家设备发现和控制（基于 python-miio） |
-| **调度器** | 周期性设备扫描（5 分钟）、偏好学习（每天） |
+| **调度器** | 周期性设备扫描、统一偏好学习/记忆提取、brain tick |
 | **CLI** | Rich 交互式终端：`devices`、`scan`、`status <id>`、`history` |
-| **REST API** | FastAPI 服务，端口 8080，8 个接口 |
+| **REST API** | FastAPI 服务，端口 8080，包含设备、聊天、设置、环境、 onboarding 和记忆调试接口 |
 
 ## 配置说明 (.env)
 
@@ -129,18 +129,32 @@ ANIMA_LLM_DISABLE_THINKING=false
 | `pnpm build` | 构建控制面板生产版本 |
 | `uv run pytest tests/ -v` | 运行全部自动化测试 |
 
+后端以 full 模式运行时，可在 `http://localhost:8080/docs` 查看 FastAPI Swagger 文档。
+
 ## REST API
 
 | 方法 | 端点 | 说明 |
 |------|------|------|
 | GET | `/health` | 健康检查 |
 | GET | `/api/devices` | 列出所有已发现的设备 |
-| GET | `/api/devices/{id}` | 获取设备详情 |
-| POST | `/api/devices/{id}/command` | 向设备发送控制命令 |
-| POST | `/api/scan` | 触发设备重新扫描 |
-| GET | `/api/decisions` | 最近的 AI 决策历史 |
-| POST | `/api/chat` | 统一 graph 对话入口，可回复、执行系统操作或触发 skill |
+| GET | `/api/devices/{device_id}` | 获取设备详情 |
+| POST | `/api/devices/{device_id}/command` | 向设备发送控制命令 |
+| POST | `/api/devices/add` | 用 IP + Token 手动添加 MIoT 设备 |
+| POST | `/api/devices/{device_id}/activate` | 为已发现设备补充 Token 激活 |
 | GET | `/api/rooms` | 列出房间 |
+| POST | `/api/chat` | 统一 graph 对话入口，可回复、执行系统操作或触发 skill |
+| GET | `/api/decisions` | 最近的 AI 决策历史 |
+| GET | `/api/environment` | 聚合环境快照 |
+| POST | `/api/environment/refresh` | 刷新设备状态并返回最新环境 |
+| POST | `/api/scan` | 触发设备重新扫描 |
+| GET | `/api/memory` | 查看规范化 learned profile、topic memories、提取状态与最近历史 |
+| GET | `/api/settings` | 读取控制面板配置 |
+| GET | `/api/settings/xiaomi/status` | 小米云连接状态 |
+| POST | `/api/settings/xiaomi/qr/start` | 启动小米扫码登录 |
+| POST | `/api/settings/xiaomi/qr/poll` | 轮询扫码登录状态 |
+| POST | `/api/settings/xiaomi/disconnect` | 断开小米云连接状态 |
+| GET | `/api/settings/llm/status` | 读取当前 LLM 配置状态 |
+| POST | `/api/settings/llm/configure` | 保存 LLM 配置 |
 
 ## 技能系统
 
@@ -173,7 +187,23 @@ skills/
 | **加湿器** | 舒适湿度范围（40-60%）、季节调整、空调联动、水位预警 |
 | **空调** | 能耗优化、昼夜温度节律、湿度协调 |
 | **灯光** | 昼夜节律照明（2200K-5000K）、分时亮度、渐变过渡 |
+| **空气净化器** | 基于占用/睡眠时段的净化策略、空气质量启发式 |
+| **音箱** | 显式播放优先、静音时段保护、安全 no-op |
 | **协调者** | 跨设备编排——防止冲突、创造协同 |
+| **设备发现** | 小米扫码引导、局域网扫描、设备激活流程 |
+| **Skill Creator** | 先分析 workflow 再生成 skill，并可自动补齐 system skill |
+
+## 记忆调试器
+
+控制面板里现在有一个 Memory Debugger 面板，可以直接查看：
+
+- `preferences.md`
+- 各设备类型的规范化 learned profile
+- 抽取出的长期 topic memories
+- memory extraction 的游标与状态
+- 最近用于学习的 history
+
+同一份数据也可以通过 `GET /api/memory` 获取。
 
 ## 项目结构
 
@@ -206,7 +236,7 @@ Anima/
 
 | 版本 | 里程碑 | 主要功能 |
 |------|--------|---------|
-| **v0.1** | "它活了"（当前） | 核心框架、MIoT 适配器、4 个技能、控制面板、CLI + API、Docker |
+| **v0.1** | "它活了"（当前） | 核心框架、MIoT 适配器、控制面板、LangGraph Brain、记忆学习、内置/system skills、CLI + API、Docker |
 | v0.2 | "越来越聪明" | Matter 适配器、实时 WebSocket、偏好学习、房间管理 |
 | v0.3 | "社区来了" | 技能商店、适配器插件、Telegram Bot、HA 桥接 |
 | v0.4 | "越来越强" | 多用户、树莓派镜像、安全加固 |

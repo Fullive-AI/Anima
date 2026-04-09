@@ -33,6 +33,9 @@ from core.runtime.config import settings
 
 logger = logging.getLogger(__name__)
 PLANNER_HINTS_PATH = Path(__file__).with_name("prompts") / "planner_hints.md"
+SYSTEM_ACTION_ALIASES = {
+    "generate_new_skill_package": "create_custom_skill",
+}
 
 
 class BrainCycleState(TypedDict, total=False):
@@ -99,7 +102,7 @@ class Brain:
         user_memory = await self._memory.get_full_context()
         devices = self._get_environment_devices(None)
         environment_state = self.get_environment_state()
-        lightweight_skills = self._skill_loader.list_system_device_skill_summaries()
+        lightweight_skills = self._skill_loader.list_executable_skill_summaries()
 
         if not devices or not lightweight_skills:
             return BrainCycleResult()
@@ -284,7 +287,7 @@ class Brain:
         discovery = app_state["discovery"]
         user_memory = await self._memory.get_full_context()
         environment_state = self.get_environment_state()
-        skills = self._skill_loader.list_system_skill_summaries()
+        skills = self._skill_loader.list_chat_skill_summaries()
         prompt = self._build_chat_planner_prompt(
             message=state["message"],
             devices=discovery.get_all_devices(),
@@ -375,12 +378,16 @@ class Brain:
 
         actions_module = self._skill_loader.load_actions(skill)
         handler = getattr(actions_module, "execute", None) if actions_module else None
-        if not handler:
-            return SkillExecutionResult(plan_item=plan_item)
-
         skill_context = dict(context)
         skill_context["_loaded_skill"] = skill
-        raw_actions = await handler(context=skill_context, plan_item=plan_item)
+        if handler:
+            raw_actions = await handler(context=skill_context, plan_item=plan_item)
+        elif skill.decide_prompt:
+            # Older custom skills may only provide DeviceCommand helpers and rely on
+            # the shared Brain decision path instead of defining execute().
+            raw_actions = await self.execute_device_skill(plan_item.skill_name, skill_context, plan_item)
+        else:
+            return SkillExecutionResult(plan_item=plan_item)
         actions = self._normalize_action_specs(raw_actions)
 
         result = SkillExecutionResult(plan_item=plan_item, actions=actions)
@@ -632,7 +639,7 @@ class Brain:
             "Break the user's request into small actionable tasks.\n"
             "A task may ask the user for clarification, refresh the environment, execute a system action, execute one or more device skills, or reply only.\n\n"
             f"User message:\n{message}\n\n"
-            "Available system skills:\n"
+            "Available skills:\n"
             f"{json.dumps(skills, ensure_ascii=False, indent=2)}\n\n"
             "Current devices:\n"
             f"{json.dumps(device_summaries, ensure_ascii=False, indent=2)}\n\n"
@@ -657,6 +664,8 @@ class Brain:
             "- Use ask_user when the request is ambiguous or missing critical information.\n"
             "- Use refresh_environment before acting when current state may be stale or must be confirmed.\n"
             "- Use system_action for Xiaomi QR onboarding, LAN scan, or creating a custom skill.\n"
+            "- For `system_skill: \"skill_creator\"`, the only valid creation action is `create_custom_skill`.\n"
+            "- Never invent action names such as `generate_new_skill_package`.\n"
             "- Use execute_skill for device control or home intelligence actions.\n"
             "- If the user asks to play music or audio on a speaker, use the `speaker` skill.\n"
             "- If the user asks to play something without giving a specific path or URL, set the speaker goal to random local playback.\n"
@@ -882,7 +891,8 @@ class Brain:
             return {"reply": plan.reply or f"{plan.system_skill} skill 尚未加载。"}
 
         actions_module = self._skill_loader.load_actions(skill)
-        handler = getattr(actions_module, plan.system_action, None) if actions_module else None
+        normalized_action = SYSTEM_ACTION_ALIASES.get(plan.system_action, plan.system_action)
+        handler = getattr(actions_module, normalized_action, None) if actions_module else None
         if not handler:
             return {"reply": plan.reply or f"{plan.system_skill} skill 不支持动作: {plan.system_action}"}
 
@@ -890,7 +900,9 @@ class Brain:
         result = await handler(context=app_state, params=params, reply=plan.reply)
         if "reply" not in result and plan.reply:
             result["reply"] = plan.reply
-        result["action"] = plan.system_action
+        result["action"] = normalized_action
+        if normalized_action != plan.system_action:
+            result["requested_action"] = plan.system_action
         return result
 
     def _normalize_chat_tasks(self, plan: ChatPlan) -> list[TaskPlanItem]:
@@ -970,7 +982,7 @@ class Brain:
         if task.kind == "execute_skill":
             summary = next(
                 (
-                    item for item in self._skill_loader.list_system_skill_summaries()
+                    item for item in self._skill_loader.list_executable_skill_summaries()
                     if item.name == task.skill_name
                 ),
                 None,
@@ -1026,7 +1038,7 @@ class Brain:
         if task.kind == "execute_skill":
             summary = next(
                 (
-                    item for item in self._skill_loader.list_system_device_skill_summaries()
+                    item for item in self._skill_loader.list_executable_skill_summaries()
                     if item.name == task.skill_name
                 ),
                 None,

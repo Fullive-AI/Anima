@@ -2,20 +2,15 @@
   "topic": "user_air_purifier_preference",
   "title": "User air purifier preference and device status",
   "category": "preference",
-  "summary": "The user prefers activating the air purifier when indoor air quality is perceived as poor, dislikes noise from higher air purifier fan speeds, and all user-requested operations on the user's Mijia Smart Air Purifier 5 including the recent executed fan speed increase request completed successfully.",
+  "summary": "The user has clear preferences for air purifier usage, and all operations on the user's Mijia Smart Air Purifier 5 complete successfully.",
   "details": [
-    "User prefers activating air purifier when indoor air quality is poor",
-    "User dislikes noise from higher air purifier fan speeds",
-    "All operations on Mijia Smart Air Purifier 5 complete successfully",
-    "Recent requested fan speed increase was executed and completed successfully"
+    "User has clear air purifier usage preferences",
+    "All operations on user's Mijia Smart Air Purifier 5 complete successfully"
   ],
   "device_types": [
     "air_purifier"
   ],
   "confidence": "high",
-  "source_actions": [
-    "set_fan_level",
-    "plan.reply"
-  ],
-  "updated_at": "2026-04-03T10:28:48.212180+00:00"
+  "source_actions": [],
+  "updated_at": "2026-04-09T08:04:35.249283+00:00"
 }

@@ -14,7 +14,7 @@ An open-source Agent OS that auto-discovers your hardware devices, empowers each
 - AI-driven decisions — LLM Brain loads domain knowledge and makes smart choices
 - Skill system — each device type gets specialized intelligence, not just on/off control
 - Learns your preferences — evolves over time based on your habits
-- Visual Dashboard — real-time device monitoring, AI decision stream, and a unified graph-based chat entry
+- Visual Dashboard — real-time device monitoring, AI decision stream, unified graph-based chat, and a memory debugger
 
 ## 60 Seconds Quick Start
 
@@ -80,17 +80,17 @@ Click the **? Help** button (top-right) for a step-by-step guide inside the Dash
 
 | Module | Description |
 |--------|-------------|
-| **Dashboard** | React + Vite + Tailwind — three-column layout with device list, sensor cards, AI decision stream, chat bar |
+| **Dashboard** | React + Vite + Tailwind — device list, environment view, AI decision stream, chat bar, settings/help, and memory debugger |
 | **EventBus** | Async event system with wildcard subscriptions and error isolation |
 | **Rules Engine** | Kept in the codebase as an optional deterministic layer, but the current main runtime path routes sensor and chat input through the LLM Brain |
 | **LLM Brain** | Skill-driven LangGraph planner/executor — loads skill summaries, plans actions, executes skills, verifies device state, and also serves `/api/chat` |
-| **Memory System** | `preferences.md` + `history.json` + `learned.md` — all human-readable, no database |
-| **Skill System** | 4 built-in skills: Humidifier, Air Conditioner, Light, Coordinator (cross-device) |
+| **Memory System** | `preferences.md` + `history.json` + topic memories + normalized `learned.json` profiles, with incremental extraction and unified preference learning |
+| **Skill System** | Built-in device skills plus system skills such as device discovery and skill creation |
 | **Discovery** | Auto-scans local network via mDNS, registers devices, deduplicates |
 | **MIoT Adapter** | Xiaomi/Mi Home device discovery and control via python-miio |
-| **Scheduler** | Periodic device scanning (5 min), preference learning (daily) |
+| **Scheduler** | Periodic device scanning, unified preference learning/memory extraction, and brain ticks |
 | **CLI** | Interactive Rich terminal: `devices`, `scan`, `status <id>`, `history` |
-| **REST API** | FastAPI server on port 8080 with 8 endpoints |
+| **REST API** | FastAPI server on port 8080 with device, chat, settings, environment, onboarding, and memory-debug endpoints |
 
 ## Configuration (.env)
 
@@ -129,18 +129,32 @@ ANIMA_LLM_DISABLE_THINKING=false
 | `pnpm build` | Build Dashboard for production |
 | `uv run pytest tests/ -v` | Run the full test suite |
 
+FastAPI Swagger docs are available at `http://localhost:8080/docs` when the backend is running in full mode.
+
 ## REST API
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/api/devices` | List all discovered devices |
-| GET | `/api/devices/{id}` | Get device details |
-| POST | `/api/devices/{id}/command` | Send command to device |
-| POST | `/api/scan` | Trigger device re-scan |
-| GET | `/api/decisions` | Recent AI decision history |
-| POST | `/api/chat` | Unified graph-based chat entry for reply, system operations, and skill execution |
+| GET | `/api/devices/{device_id}` | Get device details |
+| POST | `/api/devices/{device_id}/command` | Send command to a device |
+| POST | `/api/devices/add` | Add a manual MIoT device by IP + token |
+| POST | `/api/devices/{device_id}/activate` | Activate a discovered device with a token |
 | GET | `/api/rooms` | List rooms |
+| POST | `/api/chat` | Unified graph-based chat entry for reply, system operations, and skill execution |
+| GET | `/api/decisions` | Recent AI decision history |
+| GET | `/api/environment` | Aggregated environment snapshot |
+| POST | `/api/environment/refresh` | Refresh device states and return updated environment |
+| POST | `/api/scan` | Trigger device re-scan |
+| GET | `/api/memory` | View normalized learned profiles, topic memories, extraction state, and recent history |
+| GET | `/api/settings` | Read persisted dashboard settings |
+| GET | `/api/settings/xiaomi/status` | Xiaomi cloud connection status |
+| POST | `/api/settings/xiaomi/qr/start` | Start Xiaomi QR login flow |
+| POST | `/api/settings/xiaomi/qr/poll` | Poll Xiaomi QR login flow |
+| POST | `/api/settings/xiaomi/disconnect` | Clear Xiaomi cloud connection state |
+| GET | `/api/settings/llm/status` | Read current LLM configuration status |
+| POST | `/api/settings/llm/configure` | Save LLM configuration |
 
 ## Skill System
 
@@ -173,7 +187,23 @@ skills/
 | **Humidifier** | Comfort ranges (40-60%), seasonal adjustments, AC interaction, water level alerts |
 | **Air Conditioner** | Energy optimization, circadian temperature, humidity coordination |
 | **Light** | Circadian lighting (2200K-5000K), time-of-day brightness, transition smoothness |
+| **Air Purifier** | Occupancy-aware purification, sleep-time quietness, air quality heuristics |
+| **Speaker** | Explicit playback-oriented behavior, quiet-hour protection, safe no-op defaults |
 | **Coordinator** | Cross-device orchestration — prevents conflicts, creates synergies |
+| **Device Discovery** | Xiaomi QR onboarding, local scan helpers, activation flows |
+| **Skill Creator** | Analysis-first custom skill creation and auto-generated system skills |
+
+## Memory Debugger
+
+The Dashboard now includes a Memory Debugger panel. It surfaces:
+
+- `preferences.md`
+- normalized learned profiles per device type
+- extracted topic memories
+- memory extraction cursor/state
+- recent decision history used for learning
+
+The same data is also available via `GET /api/memory`.
 
 ## Project Structure
 
@@ -206,7 +236,7 @@ Anima/
 
 | Version | Milestone | Key Features |
 |---------|-----------|-------------|
-| **v0.1** | "It's Alive" (current) | Core framework, MIoT adapter, 4 Skills, Dashboard, CLI + API, Docker |
+| **v0.1** | "It's Alive" (current) | Core framework, MIoT adapter, Dashboard, LangGraph brain, memory learning, built-in/system skills, CLI + API, Docker |
 | v0.2 | "Getting Smarter" | Matter adapter, real-time WebSocket, preference learning, room management |
 | v0.3 | "Community Arrives" | Skill Store, adapter plugins, Telegram Bot, HA bridge |
 | v0.4 | "Getting Stronger" | Multi-user, Raspberry Pi image, security hardening |

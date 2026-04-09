@@ -1,0 +1,19 @@
+{
+  "topic": "user_custom_wake_up_reminder_skill",
+  "title": "User's custom wake up reminder skill",
+  "category": "routine",
+  "summary": "A custom workday-only wake up reminder that triggers at 8 AM every workday has been successfully created, which triggers reminders via the user's connected Xiaomi Smart Speaker",
+  "details": [
+    "Wake up reminder triggers at 8 AM only on workdays",
+    "Reminder is delivered via connected Xiaomi Smart Speaker",
+    "Skill creation has been completed successfully"
+  ],
+  "device_types": [
+    "smart_speaker"
+  ],
+  "confidence": "high",
+  "source_actions": [
+    "plan.reply"
+  ],
+  "updated_at": "2026-04-09T08:22:29.236801+00:00"
+}

@@ -329,6 +329,34 @@ class TestIntegrationPipeline:
         assert result["questions"] == ["What exact trigger should start this automation?"]
         generate_package_mock.assert_not_awaited()
 
+    async def test_create_custom_skill_simple_scaffold_creates_curtain_skill_without_llm(self, tmp_path: Path):
+        temp_skills = tmp_path / "skills"
+        shutil.copytree("skills", temp_skills)
+
+        loader = SkillLoader(skills_dir=str(temp_skills))
+        loader.discover()
+        skill_creator = loader.get_skill("skill_creator")
+        assert skill_creator is not None
+        actions_module = loader.load_actions(skill_creator)
+        assert actions_module is not None
+
+        brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
+
+        result = await actions_module.create_custom_skill(
+            context={"brain": brain, "settings": {}},
+            params={"request": "帮我新增一个控制窗帘的技能"},
+            reply="",
+        )
+
+        created_dir = temp_skills / "custom" / "curtain"
+        assert result["status"] == "created"
+        assert result["creation_mode"] == "simple_scaffold"
+        assert result["folder_name"] == "curtain"
+        assert created_dir.exists()
+        assert (created_dir / "SKILL.md").exists()
+        assert (created_dir / "references" / "decide.md").exists()
+        assert (created_dir / "scripts" / "actions.py").exists()
+
     async def test_environment_endpoint_returns_snapshot(self, tmp_path):
         bus = EventBus()
         adapter = FakeHumidifierAdapter()

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Activity, RefreshCw, Wifi, WifiOff, Settings, HelpCircle } from 'lucide-react'
+import { Activity, RefreshCw, Wifi, WifiOff, Settings, HelpCircle, BrainCircuit } from 'lucide-react'
 import { api } from '../hooks/useApi'
 
 interface HeaderProps {
@@ -7,9 +7,10 @@ interface HeaderProps {
   onScan: () => void
   onOpenSettings: () => void
   onOpenHelp: () => void
+  onOpenMemory: () => void
 }
 
-export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp }: HeaderProps) {
+export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp, onOpenMemory }: HeaderProps) {
   const [connected, setConnected] = useState(false)
   const [scanning, setScanning] = useState(false)
 
@@ -75,6 +76,14 @@ export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp
           title="使用帮助"
         >
           <HelpCircle className="w-5 h-5 text-slate-500" />
+        </button>
+
+        <button
+          onClick={onOpenMemory}
+          className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          title="记忆调试"
+        >
+          <BrainCircuit className="w-5 h-5 text-slate-500" />
         </button>
       </div>
     </header>

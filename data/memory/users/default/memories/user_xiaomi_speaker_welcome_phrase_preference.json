@@ -2,14 +2,15 @@
   "topic": "user_xiaomi_speaker_welcome_phrase_preference",
   "title": "User Xiaomi Smart Speaker welcome phrase preference",
   "category": "preference",
-  "summary": "The user has repeatedly requested the Xiaomi Smart Speaker to announce the phrase '你好，欢迎回家' as a welcome message.",
+  "summary": "The user repeatedly requests the Xiaomi Smart Speaker to use a specific welcome phrase.",
   "details": [
-    "Requested welcome phrase: '你好，欢迎回家'"
+    "User requests Xiaomi Smart Speaker to use a specific custom welcome phrase",
+    "User has repeated this request"
   ],
   "device_types": [
     "smart_speaker"
   ],
-  "confidence": "high",
+  "confidence": "medium",
   "source_actions": [],
-  "updated_at": "2026-04-03T10:28:48.214179+00:00"
+  "updated_at": "2026-04-09T08:04:35.250110+00:00"
 }

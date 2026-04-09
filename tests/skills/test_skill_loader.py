@@ -50,6 +50,70 @@ class TestSkillLoader:
         assert by_name["humidifier"].device_type == "humidifier"
         assert "device_discovery" not in by_name
 
+    def test_executable_and_chat_skill_summaries_include_custom_skills(self, tmp_path: Path):
+        system_skill_dir = tmp_path / "system" / "humidifier"
+        system_skill_dir.mkdir(parents=True)
+        (system_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: humidifier\n"
+                "description: system humidifier skill\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - humidifier\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+        (system_skill_dir / "references").mkdir()
+        (system_skill_dir / "references" / "decide.md").write_text(
+            "Return none or act with {current_data}.",
+            encoding="utf-8",
+        )
+
+        system_action_dir = tmp_path / "system" / "skill_creator"
+        system_action_dir.mkdir(parents=True)
+        (system_action_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: skill_creator\n"
+                "description: create custom skills\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - skill_creator\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+
+        custom_skill_dir = tmp_path / "custom" / "night_curtain"
+        custom_skill_dir.mkdir(parents=True)
+        (custom_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: night_curtain\n"
+                "description: close curtains at night\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - curtain\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+        (custom_skill_dir / "references").mkdir()
+        (custom_skill_dir / "references" / "decide.md").write_text(
+            "Return none or act with {current_data}.",
+            encoding="utf-8",
+        )
+
+        loader = SkillLoader(skills_dir=str(tmp_path))
+
+        executable = {summary.name for summary in loader.list_executable_skill_summaries()}
+        chat = {summary.name for summary in loader.list_chat_skill_summaries()}
+
+        assert executable == {"humidifier", "night_curtain"}
+        assert chat == {"humidifier", "night_curtain", "skill_creator"}
+
     def test_skills_use_skill_md_format(self):
         skill = self.loader.get_skill_for_device("humidifier")
         assert skill is not None

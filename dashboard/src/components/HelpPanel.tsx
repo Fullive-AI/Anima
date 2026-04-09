@@ -1,4 +1,4 @@
-import { X, Wifi, ScanLine, Settings, Key, MessageCircle, Brain } from 'lucide-react'
+import { X, Wifi, ScanLine, Settings, Key, MessageCircle, Brain, BrainCircuit, BookOpen } from 'lucide-react'
 
 interface HelpPanelProps {
   open: boolean
@@ -92,6 +92,18 @@ export default function HelpPanel({ open, onClose }: HelpPanelProps) {
             </div>
           </section>
 
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-6 h-6 rounded-full bg-violet-500 text-white text-xs flex items-center justify-center font-bold">6</span>
+              <h3 className="font-semibold text-slate-800">查看记忆与学习结果</h3>
+            </div>
+            <div className="ml-8 space-y-1">
+              <p>点击右上角 <BrainCircuit className="w-4 h-4 inline text-slate-400" /> 打开 Memory Debugger。</p>
+              <p>你可以查看 `preferences.md`、长期 topic memories、各设备类型 learned profile，以及最近用于学习的 history。</p>
+              <p className="text-slate-400">这对调试“系统到底学到了什么”特别有用。</p>
+            </div>
+          </section>
+
           <hr className="border-slate-200" />
 
           {/* Manual device */}
@@ -109,7 +121,7 @@ export default function HelpPanel({ open, onClose }: HelpPanelProps) {
           {/* Links */}
           <section>
             <div className="flex items-center gap-2 mb-2">
-              <Wifi className="w-4 h-4 text-violet-500" />
+              <BookOpen className="w-4 h-4 text-violet-500" />
               <h3 className="font-semibold text-slate-800">了解更多</h3>
             </div>
             <div className="ml-6 space-y-1">
@@ -120,6 +132,11 @@ export default function HelpPanel({ open, onClose }: HelpPanelProps) {
                 {' · '}
                 <a href="https://github.com/fulai-tech/Anima/blob/main/README.zh-CN.md" target="_blank" className="text-violet-500 hover:text-violet-600 underline">
                   中文文档
+                </a>
+              </p>
+              <p>
+                <a href="http://localhost:8080/docs" target="_blank" className="text-violet-500 hover:text-violet-600 underline">
+                  FastAPI Swagger /docs
                 </a>
               </p>
             </div>

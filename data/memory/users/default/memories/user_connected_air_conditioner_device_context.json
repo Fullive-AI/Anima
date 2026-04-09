@@ -1,0 +1,18 @@
+{
+  "topic": "user_connected_air_conditioner_device_context",
+  "title": "User connected air conditioner device status",
+  "category": "context",
+  "summary": "No air conditioning devices are currently connected to the user's smart home, and local network scanning for available air conditioner devices remains ongoing",
+  "details": [
+    "No air conditioning devices connected to user's smart home",
+    "Local network scanning for available air conditioner devices is ongoing"
+  ],
+  "device_types": [
+    "air_conditioner"
+  ],
+  "confidence": "high",
+  "source_actions": [
+    "plan.reply"
+  ],
+  "updated_at": "2026-04-09T08:22:29.234826+00:00"
+}
