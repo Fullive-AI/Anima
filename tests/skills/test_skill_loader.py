@@ -148,3 +148,61 @@ class TestSkillLoader:
         assert skill.meta.name == "legacy_skill"
         assert skill.knowledge == "legacy knowledge"
         assert skill.decide_prompt == "legacy decide {current_data}"
+
+    def test_list_skills_with_meta_separates_system_and_custom(self, tmp_path: Path):
+        system_skill_dir = tmp_path / "system" / "humidifier"
+        system_skill_dir.mkdir(parents=True)
+        (system_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: humidifier\n"
+                "description: system humidifier skill\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - humidifier\n"
+                "  version: 1.0.0\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+        (system_skill_dir / "references").mkdir()
+        (system_skill_dir / "references" / "decide.md").write_text("Return none with {current_data}.", encoding="utf-8")
+        (system_skill_dir / "scripts").mkdir()
+        (system_skill_dir / "scripts" / "actions.py").write_text("pass\n", encoding="utf-8")
+
+        custom_skill_dir = tmp_path / "custom" / "night_curtain"
+        custom_skill_dir.mkdir(parents=True)
+        (custom_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: night_curtain\n"
+                "description: close curtains at night\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - curtain\n"
+                "  version: 2.0.0\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+        (custom_skill_dir / "references").mkdir()
+        (custom_skill_dir / "references" / "decide.md").write_text("Return none with {current_data}.", encoding="utf-8")
+
+        loader = SkillLoader(skills_dir=str(tmp_path))
+
+        system_items = loader.list_system_skills_with_meta()
+        custom_items = loader.list_custom_skills_with_meta()
+
+        assert [item.name for item in system_items] == ["humidifier"]
+        assert system_items[0].scope == "system"
+        assert system_items[0].folder_name == "humidifier"
+        assert system_items[0].version == "1.0.0"
+        assert system_items[0].has_actions is True
+        assert system_items[0].has_decide_prompt is True
+
+        assert [item.name for item in custom_items] == ["night_curtain"]
+        assert custom_items[0].scope == "custom"
+        assert custom_items[0].folder_name == "night_curtain"
+        assert custom_items[0].version == "2.0.0"
+        assert custom_items[0].has_actions is False
+        assert custom_items[0].has_decide_prompt is True

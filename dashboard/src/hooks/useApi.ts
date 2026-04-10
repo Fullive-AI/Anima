@@ -184,6 +184,24 @@ export interface MemoryDebugSnapshot {
   recent_history: Decision[]
 }
 
+export interface SkillInventoryItem {
+  name: string
+  description: string
+  scope: 'system' | 'custom' | 'unknown'
+  folder_name: string
+  device_types: string[]
+  version: string
+  path: string
+  has_actions: boolean
+  has_chat_prompt: boolean
+  has_decide_prompt: boolean
+}
+
+export interface SkillsSnapshot {
+  system_skills: SkillInventoryItem[]
+  custom_skills: SkillInventoryItem[]
+}
+
 const api = {
   async getDevices(): Promise<Device[]> {
     const res = await fetch('/api/devices')
@@ -251,6 +269,11 @@ const api = {
 
   async getMemory(): Promise<MemoryDebugSnapshot> {
     const res = await fetch('/api/memory')
+    return res.json()
+  },
+
+  async getSkills(): Promise<SkillsSnapshot> {
+    const res = await fetch('/api/skills')
     return res.json()
   },
 }
@@ -355,6 +378,30 @@ export function useMemoryDebug(pollInterval = 10000) {
   }, [refresh, pollInterval])
 
   return { memory, loading, refresh }
+}
+
+export function useSkills(pollInterval = 15000) {
+  const [skills, setSkills] = useState<SkillsSnapshot | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await api.getSkills()
+      setSkills(data)
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refresh()
+    const id = setInterval(refresh, pollInterval)
+    return () => clearInterval(id)
+  }, [refresh, pollInterval])
+
+  return { skills, loading, refresh }
 }
 
 export { api }

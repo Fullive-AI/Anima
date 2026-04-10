@@ -165,6 +165,21 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             "recent_history": history,
         }
 
+    @app.get("/api/skills")
+    async def list_skills():
+        skill_loader = app_state["brain"]._skill_loader
+        skill_loader.discover()
+        return {
+            "system_skills": [
+                item.__dict__
+                for item in skill_loader.list_system_skills_with_meta()
+            ],
+            "custom_skills": [
+                item.__dict__
+                for item in skill_loader.list_custom_skills_with_meta()
+            ],
+        }
+
     @app.get("/api/environment")
     async def get_environment():
         brain = app_state["brain"]

@@ -1,4 +1,4 @@
-import { X, Wifi, ScanLine, Settings, Key, MessageCircle, Brain, BrainCircuit, BookOpen } from 'lucide-react'
+import { X, ScanLine, Settings, Key, MessageCircle, Brain, BrainCircuit, BookOpen } from 'lucide-react'
 
 interface HelpPanelProps {
   open: boolean

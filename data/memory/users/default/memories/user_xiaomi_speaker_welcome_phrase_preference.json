@@ -9,9 +9,7 @@
   "device_types": [
     "smart_speaker"
   ],
-  "confidence": "medium",
-  "source_actions": [
-    "plan.reply"
-  ],
-  "updated_at": "2026-04-10T03:46:12.960441+00:00"
+  "confidence": "high",
+  "source_actions": [],
+  "updated_at": "2026-04-10T07:38:37.276864+00:00"
 }

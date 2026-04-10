@@ -9,6 +9,7 @@ import SettingsPanel from './components/SettingsPanel'
 import HelpPanel from './components/HelpPanel'
 import StartupOnboardingModal from './components/StartupOnboardingModal'
 import MemoryPanel from './components/MemoryPanel'
+import SkillsPanel from './components/SkillsPanel'
 import { useDevices, useDecisions, useEnvironment } from './hooks/useApi'
 import type { ChatResponse } from './hooks/useApi'
 
@@ -20,6 +21,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
+  const [skillsOpen, setSkillsOpen] = useState(false)
   const [liveTrace, setLiveTrace] = useState<LiveTrace | null>(null)
 
   const handleRefreshEnvironment = async () => {
@@ -43,6 +45,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenHelp={() => setHelpOpen(true)}
         onOpenMemory={() => setMemoryOpen(true)}
+        onOpenSkills={() => setSkillsOpen(true)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -79,6 +82,10 @@ export default function App() {
       <MemoryPanel
         open={memoryOpen}
         onClose={() => setMemoryOpen(false)}
+      />
+      <SkillsPanel
+        open={skillsOpen}
+        onClose={() => setSkillsOpen(false)}
       />
     </div>
   )

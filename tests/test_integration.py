@@ -608,6 +608,72 @@ class TestIntegrationPipeline:
         assert data["failed"] == 0
         assert data["environment"]["signals"]["humidity"][0]["value"] == 42
 
+    async def test_skills_endpoint_returns_system_and_custom_skill_inventory(self, tmp_path):
+        skills_dir = tmp_path / "skills"
+        system_skill_dir = skills_dir / "system" / "humidifier"
+        system_skill_dir.mkdir(parents=True)
+        (system_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: humidifier\n"
+                "description: system humidifier skill\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - humidifier\n"
+                "  version: 1.0.0\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+        (system_skill_dir / "references").mkdir()
+        (system_skill_dir / "references" / "decide.md").write_text("Return none with {current_data}.", encoding="utf-8")
+        (system_skill_dir / "scripts").mkdir()
+        (system_skill_dir / "scripts" / "actions.py").write_text("pass\n", encoding="utf-8")
+
+        custom_skill_dir = skills_dir / "custom" / "night_curtain"
+        custom_skill_dir.mkdir(parents=True)
+        (custom_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: night_curtain\n"
+                "description: close curtains at night\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - curtain\n"
+                "  version: 2.0.0\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+        (custom_skill_dir / "references").mkdir()
+        (custom_skill_dir / "references" / "decide.md").write_text("Return none with {current_data}.", encoding="utf-8")
+
+        loader = SkillLoader(skills_dir=str(skills_dir))
+        loader.discover()
+        memory = MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=EventBus(), skill_loader=loader, memory=memory)
+
+        app = create_app({
+            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+            "brain": brain,
+            "memory": memory,
+            "settings": FakeSettings(),
+        })
+        client = TestClient(app)
+
+        response = client.get("/api/skills")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [item["name"] for item in data["system_skills"]] == ["humidifier"]
+        assert data["system_skills"][0]["scope"] == "system"
+        assert data["system_skills"][0]["folder_name"] == "humidifier"
+        assert data["system_skills"][0]["has_actions"] is True
+        assert [item["name"] for item in data["custom_skills"]] == ["night_curtain"]
+        assert data["custom_skills"][0]["scope"] == "custom"
+        assert data["custom_skills"][0]["folder_name"] == "night_curtain"
+        assert data["custom_skills"][0]["has_decide_prompt"] is True
+
     async def test_audio_file_endpoint_serves_registered_local_audio(self, tmp_path):
         audio_file = tmp_path / "sample.wav"
         audio_file.write_bytes(b"RIFFdemoWAVE")

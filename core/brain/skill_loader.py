@@ -27,6 +27,20 @@ class LoadedSkill:
     path: Path
 
 
+@dataclass
+class SkillInventoryItem:
+    name: str
+    description: str
+    scope: str
+    folder_name: str
+    device_types: list[str]
+    version: str
+    path: str
+    has_actions: bool
+    has_chat_prompt: bool
+    has_decide_prompt: bool
+
+
 class SkillLoader:
     def __init__(self, skills_dir: str = "skills") -> None:
         self._dir = Path(skills_dir)
@@ -278,6 +292,44 @@ class SkillLoader:
             summaries.append(self._to_summary(skill))
 
         return sorted(summaries, key=lambda item: item.name)
+
+    @staticmethod
+    def _to_inventory_item(skill: LoadedSkill) -> SkillInventoryItem:
+        scope = "custom" if "custom" in skill.path.parts else "system" if "system" in skill.path.parts else "unknown"
+        return SkillInventoryItem(
+            name=skill.meta.name,
+            description=skill.meta.description,
+            scope=scope,
+            folder_name=skill.path.name,
+            device_types=list(skill.meta.device_types),
+            version=skill.meta.version,
+            path=str(skill.path),
+            has_actions=skill.actions_module_path is not None,
+            has_chat_prompt=bool(skill.chat_prompt),
+            has_decide_prompt=bool(skill.decide_prompt),
+        )
+
+    def list_system_skills_with_meta(self) -> list[SkillInventoryItem]:
+        if not self._cache_by_name:
+            self.discover()
+
+        items = [
+            self._to_inventory_item(skill)
+            for skill in self._cache_by_name.values()
+            if "system" in skill.path.parts
+        ]
+        return sorted(items, key=lambda item: item.name)
+
+    def list_custom_skills_with_meta(self) -> list[SkillInventoryItem]:
+        if not self._cache_by_name:
+            self.discover()
+
+        items = [
+            self._to_inventory_item(skill)
+            for skill in self._cache_by_name.values()
+            if "custom" in skill.path.parts
+        ]
+        return sorted(items, key=lambda item: item.name)
 
     def load_actions(self, skill: LoadedSkill) -> ModuleType | None:
         if not skill.actions_module_path:
