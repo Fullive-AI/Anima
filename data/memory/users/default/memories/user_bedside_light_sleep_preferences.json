@@ -2,17 +2,18 @@
   "topic": "user_bedside_light_sleep_preferences",
   "title": "User bedside light lighting preferences",
   "category": "preference",
-  "summary": "The user has specific lighting preferences for the bedside light for pre-wake up and nighttime use.",
+  "summary": "The user has specific lighting preferences for the bedside light for pre-wake up and nighttime use, the device is currently off and working normally.",
   "details": [
-    "User has specific lighting preferences for bedside light for pre-wake up use",
-    "User has specific lighting preferences for bedside light for nighttime use"
+    "Specific lighting preferences for pre-wake up and nighttime use",
+    "Device is currently off",
+    "Device works normally"
   ],
   "device_types": [
-    "light"
+    "bedside_light"
   ],
   "confidence": "high",
   "source_actions": [
     "plan.reply"
   ],
-  "updated_at": "2026-04-10T07:47:18.370284+00:00"
+  "updated_at": "2026-04-10T08:45:58.754052+00:00"
 }

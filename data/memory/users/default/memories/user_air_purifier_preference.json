@@ -2,10 +2,10 @@
   "topic": "user_air_purifier_preference",
   "title": "User air purifier preference and device status",
   "category": "preference",
-  "summary": "The user has clear preferences for air purifier usage, and all operations on the user's Mijia Smart Air Purifier 5 complete successfully.",
+  "summary": "All operations on the user's Mijia Smart Air Purifier 5 complete successfully, and the device is currently off.",
   "details": [
-    "User has clear preferences for air purifier usage",
-    "All operations on user's Mijia Smart Air Purifier 5 complete successfully"
+    "Mijia Smart Air Purifier 5 operates normally",
+    "Device is currently off"
   ],
   "device_types": [
     "air_purifier"
@@ -14,5 +14,5 @@
   "source_actions": [
     "plan.reply"
   ],
-  "updated_at": "2026-04-10T07:47:18.369990+00:00"
+  "updated_at": "2026-04-10T08:45:58.753687+00:00"
 }

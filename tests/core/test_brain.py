@@ -151,6 +151,16 @@ class TestBrain:
         assert "scan_local_devices" in prompt
         assert "ask_user" in prompt
 
+    def test_detects_explicit_skill_creation_intent(self):
+        brain = Brain.__new__(Brain)
+        assert brain._looks_like_skill_creation_request("帮我新增一个起床提醒技能") is True
+        assert brain._looks_like_skill_creation_request("create a custom skill to close curtains at night") is True
+
+    def test_does_not_treat_environment_query_as_skill_creation_intent(self):
+        brain = Brain.__new__(Brain)
+        assert brain._looks_like_skill_creation_request("现在屋内的状态") is False
+        assert brain._looks_like_skill_creation_request("帮我看看现在房间温度和湿度") is False
+
     def test_parse_chat_plan_supports_task_plan_items(self):
         brain = Brain.__new__(Brain)
         plan = brain._parse_chat_plan(
@@ -334,10 +344,7 @@ class TestBrain:
         discovery = FakeDiscovery()
         brain.set_environment_provider(discovery.get_all_devices)
         brain._invoke_llm_text = AsyncMock(
-            side_effect=[
-                '{"action":"none","params":{"request":""},"reply":""}',
-                '{"action":"scan_local_devices","params":{},"reply":"我先扫描一下当前设备。"}',
-            ]
+            return_value='{"action":"scan_local_devices","params":{},"reply":"我先扫描一下当前设备。"}'
         )
 
         result = await brain.handle_chat_message(
@@ -347,7 +354,7 @@ class TestBrain:
 
         assert result["action"] == "scan_local_devices"
         assert result["new_devices"] == 1
-        assert brain._invoke_llm_text.await_count == 2
+        assert brain._invoke_llm_text.await_count == 1
 
     async def test_handle_chat_message_routes_skill_creation_before_unified_planner(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
@@ -389,6 +396,50 @@ class TestBrain:
         assert result["status"] == "created"
         assert brain._invoke_llm_text.await_count == 1
         assert create_mock.await_count == 1
+
+    async def test_handle_chat_message_does_not_route_environment_query_to_skill_creator(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        class FakeDiscovery:
+            def get_all_devices(self):
+                return []
+
+            async def refresh_device_states(self, device_ids=None):
+                return {"refreshed": 0, "failed": 0}
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery()
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = AsyncMock(
+            side_effect=[
+                '{"action":"none","params":{},"reply":""}',
+                '{"reply":"当前没有可读取的室内环境数据。","should_execute":false,"task_plan_items":[]}',
+            ]
+        )
+
+        skill = loader.get_skill("skill_creator")
+        assert skill is not None
+        actions_module = loader.load_actions(skill)
+        assert actions_module is not None
+
+        with patch.object(actions_module, "create_custom_skill", AsyncMock()) as create_mock:
+            result = await brain.handle_chat_message(
+                "现在屋内的状态",
+                {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+            )
+
+        assert result["reply"] == "当前没有可读取的室内环境数据。"
+        assert "action" not in result or result.get("action") != "create_custom_skill"
+        assert brain._invoke_llm_text.await_count == 2
+        assert create_mock.await_count == 0
 
     async def test_handle_chat_message_resumes_pending_skill_creation_after_clarification(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")

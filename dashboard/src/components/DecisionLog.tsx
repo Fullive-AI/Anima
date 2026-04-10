@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Brain,
   Clock,
@@ -250,14 +250,9 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
         </div>
       </div>
 
-      <div className="mt-3 flex">
-        <div className="max-w-[92%] rounded-[22px] rounded-tl-md border border-violet-100 bg-violet-50 px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">
-          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-violet-600">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Anima · {formatTime(turn.timestamp)}</span>
-          </div>
+      <div className="mt-3 space-y-2">
+        <AssistantBubble timestamp={turn.timestamp}>
           <p>{turn.result.reply}</p>
-
           {turn.qrImage ? (
             <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
               <img
@@ -271,21 +266,61 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
               </p>
             </div>
           ) : null}
+        </AssistantBubble>
 
-          {(turn.result.task_plan_items?.length || turn.result.task_results?.length || turn.result.execution_results?.length) ? (
-            <div className="mt-4 space-y-2">
-              {(turn.result.task_plan_items || []).map((task, index) => (
-                <TaskPlanCard key={`${turn.id}-plan-${index}`} task={task} />
-              ))}
-              {(turn.result.task_results || []).map((task, index) => (
-                <TaskResultCard key={`${turn.id}-task-${index}`} task={task} />
-              ))}
-              {(turn.result.execution_results || []).map((item, index) => (
-                <ExecutionResultCard key={`${turn.id}-exec-${index}`} item={item} />
-              ))}
-            </div>
-          ) : null}
+        {(turn.result.task_plan_items || []).map((task, index) => (
+          <AssistantBubble key={`${turn.id}-plan-${index}`} timestamp={turn.timestamp} accent="violet">
+            <TaskPlanCard task={task} />
+          </AssistantBubble>
+        ))}
+
+        {(turn.result.task_results || []).map((task, index) => (
+          <AssistantBubble key={`${turn.id}-task-${index}`} timestamp={turn.timestamp} accent="slate">
+            <TaskResultCard task={task} />
+          </AssistantBubble>
+        ))}
+
+        {(turn.result.execution_results || []).map((item, index) => (
+          <AssistantBubble key={`${turn.id}-exec-${index}`} timestamp={turn.timestamp} accent="emerald">
+            <ExecutionResultCard item={item} />
+          </AssistantBubble>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AssistantBubble({
+  children,
+  timestamp,
+  accent = 'violet',
+}: {
+  children: ReactNode
+  timestamp: string
+  accent?: 'violet' | 'slate' | 'emerald'
+}) {
+  const shellClass =
+    accent === 'emerald'
+      ? 'border-emerald-100 bg-emerald-50'
+      : accent === 'slate'
+        ? 'border-slate-200 bg-slate-50'
+        : 'border-violet-100 bg-violet-50'
+
+  const textClass =
+    accent === 'emerald'
+      ? 'text-emerald-600'
+      : accent === 'slate'
+        ? 'text-slate-500'
+        : 'text-violet-600'
+
+  return (
+    <div className="flex">
+      <div className={`max-w-[92%] rounded-[22px] rounded-tl-md border px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm ${shellClass}`}>
+        <div className={`mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide ${textClass}`}>
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Anima · {formatTime(timestamp)}</span>
         </div>
+        {children}
       </div>
     </div>
   )
@@ -322,7 +357,7 @@ function TaskResultCard({ task }: { task: ChatTaskResult }) {
 
 function ExecutionResultCard({ item }: { item: ChatExecutionResult }) {
   return (
-    <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+    <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
       <div className="flex items-center gap-2">
         <Wrench className="h-4 w-4 text-emerald-600" />
         <span className="text-sm font-medium text-emerald-700">

@@ -4,7 +4,9 @@
   "category": "routine",
   "summary": "The user's custom skill that automatically turns off the connected air purifier after the user leaves home remains created, activated and working normally.",
   "details": [
-    "Automatically turns off connected air purifier immediately after the user leaves home"
+    "Skill is created and activated",
+    "Working normally",
+    "Automatically turns off connected air purifier when user leaves home"
   ],
   "device_types": [
     "air_purifier"
@@ -14,5 +16,5 @@
     "plan.reply"
   ],
   "linked_custom_skill_name": "custom_skill_f4b0b238",
-  "updated_at": "2026-04-10T07:48:12.496251+00:00"
+  "updated_at": "2026-04-10T08:45:58.755147+00:00"
 }

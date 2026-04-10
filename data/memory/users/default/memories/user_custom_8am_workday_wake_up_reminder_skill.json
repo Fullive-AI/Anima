@@ -2,9 +2,11 @@
   "topic": "user_custom_8am_workday_wake_up_reminder_skill",
   "title": "User's custom 8 AM workday wake up reminder skill",
   "category": "routine",
-  "summary": "The user's custom 8 AM workday wake up reminder skill remains created, activated and working normally.",
+  "summary": "The user's custom 8 AM workday wake up reminder skill remains created, activated and working normally, and successfully triggered the wake-up alarm via Xiaomi Smart Speaker as scheduled.",
   "details": [
-    "Triggers wake-up alarm via connected smart speaker at 8 AM local time on workdays, skips alarms on holidays"
+    "Skill is created and activated",
+    "Working normally",
+    "Successfully triggered scheduled 8AM workday wake-up alarm"
   ],
   "device_types": [
     "smart_speaker"
@@ -14,5 +16,5 @@
     "plan.reply"
   ],
   "linked_custom_skill_name": "Workday 8AM Smart Speaker Wakeup",
-  "updated_at": "2026-04-10T07:48:12.495896+00:00"
+  "updated_at": "2026-04-10T08:45:58.754944+00:00"
 }

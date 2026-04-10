@@ -2,11 +2,10 @@
   "topic": "user_xiaomi_smart_speaker_device_context",
   "title": "User's Xiaomi Smart Speaker device context",
   "category": "context",
-  "summary": "The user has a connected functional Xiaomi Smart Speaker that can accept and execute playback commands, and random local playback is executed per platform rules when sound output is requested without specified content.",
+  "summary": "The user has a connected functional Xiaomi Smart Speaker that can accept and execute playback and alarm commands, which successfully triggered the scheduled 8AM workday wake-up alarm.",
   "details": [
-    "User has a connected, functional Xiaomi Smart Speaker",
-    "Device can accept and execute playback commands",
-    "Random local playback runs per platform rules when sound output is requested without specified content"
+    "Connected and fully functional",
+    "Successfully triggered scheduled 8AM workday wake-up alarm"
   ],
   "device_types": [
     "smart_speaker"
@@ -15,5 +14,6 @@
   "source_actions": [
     "plan.reply"
   ],
-  "updated_at": "2026-04-10T07:47:18.369634+00:00"
+  "linked_custom_skill_name": "Workday 8AM Smart Speaker Wakeup",
+  "updated_at": "2026-04-10T08:45:58.753269+00:00"
 }

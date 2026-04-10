@@ -37,6 +37,44 @@ SYSTEM_ACTION_ALIASES = {
     "generate_new_skill_package": "create_custom_skill",
 }
 PENDING_SKILL_CANCEL_TOKENS = ("取消", "算了", "不用了", "停止", "cancel", "never mind")
+SKILL_CREATION_INTENT_PATTERNS = (
+    r"(新增|创建|生成|做|写|开发|定制|自定义).{0,12}(技能|skill)",
+    r"(技能|skill).{0,12}(新增|创建|生成|定制|自定义|开发)",
+    r"\b(create|add|generate|build|make|scaffold|customi[sz]e)\b.{0,20}\b(skill|custom skill)\b",
+    r"\b(skill|custom skill)\b.{0,20}\b(create|add|generate|build|customi[sz]e)\b",
+)
+ENVIRONMENT_QUERY_HINTS = (
+    "现在",
+    "当前",
+    "屋内",
+    "室内",
+    "房间",
+    "状态",
+    "温度",
+    "湿度",
+    "空气质量",
+    "空气",
+    "pm2.5",
+    "pm10",
+    "co2",
+    "二氧化碳",
+    "环境",
+    "情况",
+    "怎么样",
+    "如何",
+    "多少",
+    "查询",
+    "看下",
+    "看看",
+    "what's",
+    "what is",
+    "status",
+    "temperature",
+    "humidity",
+    "air quality",
+    "indoor",
+    "room",
+)
 
 
 class BrainCycleState(TypedDict, total=False):
@@ -702,6 +740,8 @@ class Brain:
         app_state: dict[str, Any],
     ) -> dict[str, Any] | None:
         for skill_name in ("skill_creator", "device_discovery"):
+            if skill_name == "skill_creator" and not self._looks_like_skill_creation_request(message):
+                continue
             skill = self._skill_loader.get_skill(skill_name)
             if not skill or not skill.chat_prompt:
                 continue
@@ -722,6 +762,25 @@ class Brain:
             }
 
         return None
+
+    @staticmethod
+    def _looks_like_skill_creation_request(message: str) -> bool:
+        text = message.strip()
+        if not text:
+            return False
+
+        lowered = text.lower()
+        if any(re.search(pattern, text, re.IGNORECASE) for pattern in SKILL_CREATION_INTENT_PATTERNS):
+            return True
+
+        has_skill_word = "技能" in text or "skill" in lowered
+        if not has_skill_word:
+            return False
+
+        if any(hint in text or hint in lowered for hint in ENVIRONMENT_QUERY_HINTS):
+            return False
+
+        return False
 
     def _route_pending_skill_creation(self, message: str) -> dict[str, Any] | None:
         pending = self._pending_skill_creation
