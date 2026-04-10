@@ -36,6 +36,7 @@ PLANNER_HINTS_PATH = Path(__file__).with_name("prompts") / "planner_hints.md"
 SYSTEM_ACTION_ALIASES = {
     "generate_new_skill_package": "create_custom_skill",
 }
+PENDING_SKILL_CANCEL_TOKENS = ("取消", "算了", "不用了", "停止", "cancel", "never mind")
 
 
 class BrainCycleState(TypedDict, total=False):
@@ -78,6 +79,7 @@ class Brain:
         )
         self._llm_model = settings.llm_model
         self._llm_disable_thinking = settings.llm_disable_thinking
+        self._pending_skill_creation: dict[str, Any] | None = None
         self._cycle_graph = self._build_cycle_graph()
         self._chat_graph = self._build_chat_graph()
 
@@ -287,6 +289,25 @@ class Brain:
         discovery = app_state["discovery"]
         user_memory = await self._memory.get_full_context()
         environment_state = self.get_environment_state()
+        pending = self._route_pending_skill_creation(state["message"])
+        if pending is not None:
+            return {
+                "planner_prompt": pending["prompt"],
+                "planner_output": pending["output"],
+                "plan": pending["plan"],
+            }
+
+        routed = await self._route_system_chat_message(
+            message=state["message"],
+            app_state=app_state,
+        )
+        if routed is not None:
+            return {
+                "planner_prompt": routed["prompt"],
+                "planner_output": routed["output"],
+                "plan": routed["plan"],
+            }
+
         skills = self._skill_loader.list_chat_skill_summaries()
         prompt = self._build_chat_planner_prompt(
             message=state["message"],
@@ -674,6 +695,163 @@ class Brain:
             "- Do not use regex or heuristics; infer intent from the message and context.\n"
         )
 
+    async def _route_system_chat_message(
+        self,
+        *,
+        message: str,
+        app_state: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        for skill_name in ("skill_creator", "device_discovery"):
+            skill = self._skill_loader.get_skill(skill_name)
+            if not skill or not skill.chat_prompt:
+                continue
+
+            prompt = self._build_system_chat_route_prompt(
+                skill=skill,
+                message=message,
+                app_state=app_state,
+            )
+            content = await self._invoke_llm_text(prompt, temperature=0.0, max_tokens=300)
+            plan = self._parse_system_chat_route(content, skill_name=skill.meta.name)
+            if plan is None:
+                continue
+            return {
+                "prompt": prompt,
+                "output": content,
+                "plan": plan,
+            }
+
+        return None
+
+    def _route_pending_skill_creation(self, message: str) -> dict[str, Any] | None:
+        pending = self._pending_skill_creation
+        if not pending:
+            return None
+
+        stripped = message.strip()
+        lowered = stripped.lower()
+        if any(token in stripped or token in lowered for token in PENDING_SKILL_CANCEL_TOKENS):
+            self._pending_skill_creation = None
+            return {
+                "prompt": "pending skill creation cancel",
+                "output": "",
+                "plan": ChatPlan(
+                    reply="已取消上一次技能创建请求。",
+                    should_execute=False,
+                ),
+            }
+
+        merged_request = self._merge_pending_skill_creation_request(
+            base_request=str(pending.get("request", "")).strip(),
+            follow_up_message=stripped,
+        )
+        task = TaskPlanItem(
+            kind="system_action",
+            system_skill="skill_creator",
+            system_action="create_custom_skill",
+            params={
+                "request": merged_request,
+                "allow_clarification": False,
+            },
+            reason="continue pending custom skill clarification",
+            priority=5,
+        )
+        return {
+            "prompt": "pending skill creation resume",
+            "output": "",
+            "plan": ChatPlan(
+                reply="",
+                should_execute=True,
+                task_plan_items=[task],
+            ),
+        }
+
+    @staticmethod
+    def _merge_pending_skill_creation_request(base_request: str, follow_up_message: str) -> str:
+        if not base_request:
+            return follow_up_message
+        if not follow_up_message:
+            return base_request
+        return (
+            f"{base_request}\n\n"
+            "Additional clarification from the user:\n"
+            f"{follow_up_message}"
+        )
+
+    def _build_system_chat_route_prompt(
+        self,
+        *,
+        skill: LoadedSkill,
+        message: str,
+        app_state: dict[str, Any],
+    ) -> str:
+        discovery = app_state.get("discovery")
+        settings_store = app_state.get("settings")
+        devices = discovery.get_all_devices() if discovery is not None and hasattr(discovery, "get_all_devices") else []
+        current_devices = [
+            {
+                "device_id": device.device_id,
+                "name": device.name,
+                "type": device.type,
+                "online": device.online,
+            }
+            for device in devices
+            if isinstance(device, Device)
+        ]
+        existing_custom_skills = self._skill_loader.list_custom_skill_names()
+        xiaomi_connected = bool(settings_store.get("xiaomi_cloud_devices", [])) if settings_store is not None and hasattr(settings_store, "get") else False
+
+        return skill.chat_prompt.format(
+            user_message=message,
+            existing_custom_skills=json.dumps(existing_custom_skills, ensure_ascii=False, indent=2),
+            current_devices=json.dumps(current_devices, ensure_ascii=False, indent=2),
+            xiaomi_connected=json.dumps(xiaomi_connected, ensure_ascii=False),
+            knowledge=skill.knowledge,
+        )
+
+    def _parse_system_chat_route(self, content: str, *, skill_name: str) -> ChatPlan | None:
+        allowed_actions = {
+            "skill_creator": {"create_custom_skill"},
+            "device_discovery": {"scan_local_devices", "start_xiaomi_qr_scan"},
+        }.get(skill_name, set())
+
+        json_str = self._extract_json(content)
+        if not json_str:
+            return None
+
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            return None
+
+        if not isinstance(data, dict):
+            return None
+
+        action = str(data.get("action", "")).strip()
+        if not action or action == "none":
+            return None
+        if allowed_actions and action not in allowed_actions:
+            return None
+
+        params = data.get("params", {})
+        if not isinstance(params, dict):
+            params = {}
+
+        reply = str(data.get("reply", "")).strip()
+        task = TaskPlanItem(
+            kind="system_action",
+            system_skill=skill_name,
+            system_action=action,
+            params=params,
+            reason=reply or f"chat router chose {action}",
+            priority=5,
+        )
+        return ChatPlan(
+            reply=reply,
+            should_execute=True,
+            task_plan_items=[task],
+        )
+
     def _load_planner_hints(self) -> str:
         try:
             return PLANNER_HINTS_PATH.read_text(encoding="utf-8").strip()
@@ -975,6 +1153,10 @@ class Brain:
             if plan.system_action == "create_custom_skill":
                 plan.params.setdefault("request", user_message)
             system_result = await self._execute_system_chat_action(plan, context)
+            self._update_pending_skill_creation_state(
+                plan=plan,
+                system_result=system_result,
+            )
             system_result["kind"] = task.kind
             system_result["stop"] = True
             return system_result
@@ -1023,6 +1205,31 @@ class Brain:
             "reply": f"我规划了一个暂不支持的任务类型: {task.kind}",
             "stop": True,
         }
+
+    def _update_pending_skill_creation_state(
+        self,
+        *,
+        plan: ChatPlan,
+        system_result: dict[str, Any],
+    ) -> None:
+        normalized_action = SYSTEM_ACTION_ALIASES.get(plan.system_action, plan.system_action)
+        result_action = str(system_result.get("action", "")).strip()
+        if normalized_action != "create_custom_skill" and result_action != "create_custom_skill":
+            return
+
+        status = str(system_result.get("status", "")).strip()
+        request = str(plan.params.get("request", "")).strip()
+        if status == "needs_clarification":
+            questions = system_result.get("questions", [])
+            if not isinstance(questions, list):
+                questions = []
+            self._pending_skill_creation = {
+                "request": request,
+                "questions": [str(item).strip() for item in questions if str(item).strip()],
+            }
+            return
+
+        self._pending_skill_creation = None
 
     async def _execute_cycle_task(
         self,

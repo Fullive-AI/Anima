@@ -241,6 +241,16 @@ class SkillLoader:
 
         return sorted(summaries, key=lambda item: item.name)
 
+    def list_custom_skill_names(self) -> list[str]:
+        if not self._cache_by_name:
+            self.discover()
+
+        return sorted(
+            skill.meta.name
+            for skill in self._cache_by_name.values()
+            if "custom" in skill.path.parts
+        )
+
     def list_system_device_skill_summaries(self) -> list[SkillSummary]:
         if not self._cache_by_name:
             self.discover()

@@ -6,9 +6,13 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+import logging
 
 from core.runtime.config import settings as env_settings
 from core.llm.openai_text_client import OpenAITextClient
+
+
+logger = logging.getLogger(__name__)
 
 
 def _build_llm(context: dict[str, Any]) -> OpenAITextClient | None:
@@ -247,6 +251,20 @@ def _string_list(value: Any) -> list[str]:
     return [str(item).strip() for item in value if str(item).strip()]
 
 
+def _coerce_bool(value: Any, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+    return bool(value)
+
+
 def _default_request_analysis(request: str, *, mode: str, device_context: dict[str, Any] | None = None) -> dict[str, Any]:
     device_context = device_context or {}
     device_types = _string_list(device_context.get("device_types"))
@@ -342,8 +360,19 @@ async def _analyze_request_with_llm(
     mode: str,
     request: str,
     device_context: dict[str, Any] | None = None,
+    allow_clarification: bool = True,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     device_context_json = json.dumps(device_context or {}, ensure_ascii=False, indent=2)
+    clarification_policy = (
+        "- Set should_ask_clarification to true when the request is too vague to generate a narrow safe skill.\n"
+        "- When clarification is not required, return an empty clarification_questions list."
+    )
+    if not allow_clarification:
+        clarification_policy = (
+            "- The user is answering a previous clarification round. Do not ask for more clarification.\n"
+            "- Infer the narrowest reasonable defaults from the full request and continue with a best-effort analysis.\n"
+            "- Set should_ask_clarification to false and return an empty clarification_questions list."
+        )
     base_prompt = f"""
 You are planning an Anima skill before any files are generated.
 
@@ -371,8 +400,8 @@ Return exactly one compact JSON object with this schema:
 Hard constraints:
 - Return JSON only. No markdown fences. No explanation.
 - Think like a skill designer: extract repeatable triggers, steps, and success criteria before generation.
-- Set should_ask_clarification to true when the request is too vague to generate a narrow safe skill.
-- When clarification is not required, return an empty clarification_questions list.
+- Clarification policy:
+{clarification_policy}
 - Keep the skill narrow. Prefer concrete triggers over generic "smart automation" wording.
 """
 
@@ -616,15 +645,15 @@ def _validate_generated_spec(
     if not domain_summary:
         domain_summary = f"This skill handles the automation request: {request}"
 
-    def _string_list(value: Any, fallback: list[str]) -> list[str]:
+    def _string_list_with_fallback(value: Any, fallback: list[str]) -> list[str]:
         if not isinstance(value, list):
             return fallback
         result = [str(item).strip() for item in value if str(item).strip()]
         return result or fallback
 
-    knowledge_points = _string_list(data.get("knowledge_points"), list(device_context.get("knowledge_points", [])))
-    hard_rules = _string_list(data.get("hard_rules"), list(device_context.get("hard_rules", [])))
-    learning_focus = _string_list(data.get("learning_focus"), list(device_context.get("learning_focus", [])))
+    knowledge_points = _string_list_with_fallback(data.get("knowledge_points"), list(device_context.get("knowledge_points", [])))
+    hard_rules = _string_list_with_fallback(data.get("hard_rules"), list(device_context.get("hard_rules", [])))
+    learning_focus = _string_list_with_fallback(data.get("learning_focus"), list(device_context.get("learning_focus", [])))
     supported_actions = _normalize_supported_actions(data.get("supported_actions"))
     if not supported_actions:
         supported_actions = _normalize_supported_actions(device_context.get("supported_actions"))
@@ -945,7 +974,9 @@ async def create_custom_skill(
     params: dict[str, Any] | None = None,
     reply: str = "",
 ) -> dict[str, Any]:
-    request = ((params or {}).get("request") or "").strip()
+    request_params = params or {}
+    request = (request_params.get("request") or "").strip()
+    allow_clarification = _coerce_bool(request_params.get("allow_clarification"), default=True)
     if not request:
         return {"reply": "请先告诉我这个 skill 要解决什么问题。", "error": "missing_request"}
 
@@ -958,8 +989,16 @@ async def create_custom_skill(
     if simple_skill_spec is not None:
         package = _render_simple_skill_package(request, spec=simple_skill_spec)
         target_dir = _unique_dir(base_dir, package["folder_name"])
-        _write_generated_package(target_dir, package)
-        skill_loader.discover()
+        try:
+            _write_generated_package(target_dir, package)
+            skill_loader.discover()
+        except Exception as exc:
+            logger.exception("Custom simple skill write/discover failed")
+            return {
+                "reply": f"新增 skill 时，写入脚手架文件失败：{exc}",
+                "action": "create_custom_skill",
+                "error": "skill_write_exception",
+            }
         created_name = target_dir.name
         return {
             "reply": reply or f"已创建自定义 skill：{created_name}",
@@ -979,11 +1018,20 @@ async def create_custom_skill(
             "error": "llm_required",
         }
 
-    analysis, analysis_errors = await _analyze_request_with_llm(
-        llm,
-        mode="custom",
-        request=request,
-    )
+    try:
+        analysis, analysis_errors = await _analyze_request_with_llm(
+            llm,
+            mode="custom",
+            request=request,
+            allow_clarification=allow_clarification,
+        )
+    except Exception as exc:
+        logger.exception("Custom skill analysis failed")
+        return {
+            "reply": f"新增 skill 时，需求分析阶段失败：{exc}",
+            "action": "create_custom_skill",
+            "error": "skill_analysis_exception",
+        }
     if not analysis:
         detail = f" 失败原因：{'；'.join(analysis_errors[:3])}" if analysis_errors else ""
         return {
@@ -992,23 +1040,44 @@ async def create_custom_skill(
             "details": analysis_errors,
         }
     if analysis.get("should_ask_clarification"):
-        questions = _string_list(analysis.get("clarification_questions"))[:3]
-        question_block = "\n".join(f"{idx}. {item}" for idx, item in enumerate(questions, start=1))
-        return {
-            "reply": "我需要先确认几件事，避免生成一个过于宽泛的 skill：\n" + question_block,
-            "action": "create_custom_skill",
-            "status": "needs_clarification",
-            "questions": questions,
-        }
+        if not allow_clarification:
+            analysis = {
+                **analysis,
+                "should_ask_clarification": False,
+                "clarification_questions": [],
+            }
+            constraints = _string_list(analysis.get("constraints"))
+            if "Infer any remaining gaps conservatively instead of asking follow-up questions." not in constraints:
+                analysis["constraints"] = [
+                    *constraints,
+                    "Infer any remaining gaps conservatively instead of asking follow-up questions.",
+                ]
+        else:
+            questions = _string_list(analysis.get("clarification_questions"))[:3]
+            question_block = "\n".join(f"{idx}. {item}" for idx, item in enumerate(questions, start=1))
+            return {
+                "reply": "我需要先确认几件事，避免生成一个过于宽泛的 skill：\n" + question_block,
+                "action": "create_custom_skill",
+                "status": "needs_clarification",
+                "questions": questions,
+            }
 
-    package, errors = await _generate_package_with_llm(
-        llm,
-        mode="custom",
-        request=request,
-        skill_name_hint=_normalize_slug("", request),
-        existing_names=existing_custom_skills,
-        analysis=analysis,
-    )
+    try:
+        package, errors = await _generate_package_with_llm(
+            llm,
+            mode="custom",
+            request=request,
+            skill_name_hint=_normalize_slug("", request),
+            existing_names=existing_custom_skills,
+            analysis=analysis,
+        )
+    except Exception as exc:
+        logger.exception("Custom skill generation failed")
+        return {
+            "reply": f"新增 skill 时，生成文件阶段失败：{exc}",
+            "action": "create_custom_skill",
+            "error": "skill_generation_exception",
+        }
     if not package:
         detail = f" 失败原因：{'；'.join(errors[:3])}" if errors else ""
         return {
@@ -1018,9 +1087,16 @@ async def create_custom_skill(
         }
 
     target_dir = _unique_dir(base_dir, package["folder_name"])
-    _write_generated_package(target_dir, package)
-
-    skill_loader.discover()
+    try:
+        _write_generated_package(target_dir, package)
+        skill_loader.discover()
+    except Exception as exc:
+        logger.exception("Custom skill write/discover failed")
+        return {
+            "reply": f"新增 skill 时，写入文件阶段失败：{exc}",
+            "action": "create_custom_skill",
+            "error": "skill_write_exception",
+        }
 
     created_name = target_dir.name
     return {

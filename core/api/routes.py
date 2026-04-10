@@ -112,7 +112,14 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.post("/api/chat")
     async def chat(body: dict):
         message = body.get("message", "")
-        return await app_state["brain"].handle_chat_message(message, app_state)
+        try:
+            return await app_state["brain"].handle_chat_message(message, app_state)
+        except Exception as exc:
+            logger.exception("Chat request failed")
+            return {
+                "reply": f"聊天请求执行失败：{exc}",
+                "error": "chat_request_failed",
+            }
 
     @app.get("/api/onboarding/status")
     async def onboarding_status():

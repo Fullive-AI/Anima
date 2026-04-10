@@ -2,11 +2,10 @@
   "topic": "user_humidifier_comfort_preferences",
   "title": "User humidifier comfort preferences and device status",
   "category": "preference",
-  "summary": "The user prefers 50% or higher ambient humidity for comfort, their Mijia Smart Anti-bacterial Humidifier 2 has confirmed persistent connection or functional issues that prevent automatic activation, and current ambient humidity remains 49% below the 50% comfort threshold",
+  "summary": "The user prefers 50% or higher ambient humidity for comfort, and the user's Mijia Smart Anti-bacterial Humidifier 2 still has persistent connection or functional issues that prevent successful automatic activation.",
   "details": [
-    "User prefers 50% or higher ambient humidity for comfort",
-    "Mijia Smart Anti-bacterial Humidifier 2 has persistent connection or functional issues that block automatic activation",
-    "Current ambient humidity is 49%, below the user's 50% comfort threshold"
+    "User requires 50%+ ambient humidity for comfort",
+    "Mijia Smart Anti-bacterial Humidifier 2 cannot be activated automatically due to persistent connection/functional issues"
   ],
   "device_types": [
     "humidifier"
@@ -15,5 +14,5 @@
   "source_actions": [
     "plan.reply"
   ],
-  "updated_at": "2026-04-09T08:22:29.236475+00:00"
+  "updated_at": "2026-04-10T03:14:01.689259+00:00"
 }

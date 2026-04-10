@@ -300,7 +300,7 @@ class TestBrain:
         assert actions[0]["action"] == "off"
         assert actions[0]["expected_state"] == {"power": False}
 
-    async def test_handle_chat_message_runs_unified_graph_for_system_action(self, tmp_path):
+    async def test_handle_chat_message_routes_device_discovery_before_unified_planner(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
         memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
@@ -333,8 +333,11 @@ class TestBrain:
 
         discovery = FakeDiscovery()
         brain.set_environment_provider(discovery.get_all_devices)
-        brain._invoke_llm_text = __import__("unittest.mock", fromlist=["AsyncMock"]).AsyncMock(
-            return_value='{"reply":"我先扫描一下当前设备。","should_execute":true,"system_action":"scan_local_devices","system_skill":"device_discovery","params":{},"skill_plan_items":[]}'
+        brain._invoke_llm_text = AsyncMock(
+            side_effect=[
+                '{"action":"none","params":{"request":""},"reply":""}',
+                '{"action":"scan_local_devices","params":{},"reply":"我先扫描一下当前设备。"}',
+            ]
         )
 
         result = await brain.handle_chat_message(
@@ -344,6 +347,129 @@ class TestBrain:
 
         assert result["action"] == "scan_local_devices"
         assert result["new_devices"] == 1
+        assert brain._invoke_llm_text.await_count == 2
+
+    async def test_handle_chat_message_routes_skill_creation_before_unified_planner(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        class FakeDiscovery:
+            def get_all_devices(self):
+                return []
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery()
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = AsyncMock(
+            return_value='{"action":"create_custom_skill","params":{"request":"新增一个控制窗帘的技能"},"reply":"我来创建这个技能。"}'
+        )
+        skill = loader.get_skill("skill_creator")
+        assert skill is not None
+        actions_module = loader.load_actions(skill)
+        assert actions_module is not None
+
+        with patch.object(
+            actions_module,
+            "create_custom_skill",
+            AsyncMock(return_value={"reply": "已创建", "action": "create_custom_skill", "status": "created", "folder_name": "curtain"}),
+        ) as create_mock:
+            result = await brain.handle_chat_message(
+                "帮我新增一个控制窗帘的技能",
+                {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+            )
+
+        assert result["action"] == "create_custom_skill"
+        assert result["status"] == "created"
+        assert brain._invoke_llm_text.await_count == 1
+        assert create_mock.await_count == 1
+
+    async def test_handle_chat_message_resumes_pending_skill_creation_after_clarification(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+
+        class FakeDiscovery:
+            def get_all_devices(self):
+                return []
+
+        class FakeSettings:
+            def get(self, key, default=None):
+                if key == "llm_api_key":
+                    return "sk-test"
+                return default
+
+        discovery = FakeDiscovery()
+        brain.set_environment_provider(discovery.get_all_devices)
+        brain._invoke_llm_text = AsyncMock(
+            return_value='{"action":"create_custom_skill","params":{"request":"新增一个起床提醒技能"},"reply":"我来创建这个技能。"}'
+        )
+        skill = loader.get_skill("skill_creator")
+        assert skill is not None
+        actions_module = loader.load_actions(skill)
+        assert actions_module is not None
+
+        create_mock = AsyncMock(
+            side_effect=[
+                {
+                    "reply": "我需要先确认几件事，避免生成一个过于宽泛的 skill：\n1. What specific time do you want to be woken up on weekdays?",
+                    "action": "create_custom_skill",
+                    "status": "needs_clarification",
+                    "questions": ["What specific time do you want to be woken up on weekdays?"],
+                },
+                {
+                    "reply": "已创建",
+                    "action": "create_custom_skill",
+                    "status": "created",
+                    "folder_name": "wake_up_reminder",
+                },
+            ]
+        )
+
+        with patch.object(actions_module, "create_custom_skill", create_mock):
+            first = await brain.handle_chat_message(
+                "新增一个起床提醒技能",
+                {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+            )
+            second = await brain.handle_chat_message(
+                "工作日早上 7:30 叫我起床，法定节假日不提醒",
+                {"discovery": discovery, "settings": FakeSettings(), "brain": brain},
+            )
+
+        assert first["status"] == "needs_clarification"
+        assert second["status"] == "created"
+        assert brain._invoke_llm_text.await_count == 1
+        assert create_mock.await_count == 2
+        second_request = create_mock.await_args_list[1].kwargs["params"]["request"]
+        assert create_mock.await_args_list[1].kwargs["params"]["allow_clarification"] is False
+        assert "新增一个起床提醒技能" in second_request
+        assert "工作日早上 7:30 叫我起床" in second_request
+        assert brain._pending_skill_creation is None
+
+    async def test_handle_chat_message_can_cancel_pending_skill_creation(self, tmp_path):
+        loader = SkillLoader(skills_dir="skills")
+        loader.discover()
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=object(), skill_loader=loader, memory=memory)
+        brain._pending_skill_creation = {
+            "request": "新增一个起床提醒技能",
+            "questions": ["What specific time do you want to be woken up on weekdays?"],
+        }
+
+        result = await brain.handle_chat_message(
+            "算了，先取消",
+            {"discovery": object(), "settings": type("Settings", (), {"get": lambda self, key, default=None: "sk-test" if key == "llm_api_key" else default})(), "brain": brain},
+        )
+
+        assert result["reply"] == "已取消上一次技能创建请求。"
+        assert brain._pending_skill_creation is None
 
     async def test_handle_chat_message_runs_speaker_skill_for_random_playback(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")

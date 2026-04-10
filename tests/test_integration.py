@@ -55,6 +55,25 @@ def fake_generated_spec(name: str, device_type: str) -> dict:
     }
 
 
+def fake_sparse_generated_spec(name: str, device_type: str) -> dict:
+    return {
+        "folder_name": name,
+        "skill_name": name,
+        "description": "generated test skill",
+        "device_types": [device_type],
+        "domain_summary": f"Skill for {device_type}",
+        "knowledge_points": ["Keep behavior safe."],
+        "hard_rules": ["Return none when context is unclear."],
+        "supported_actions": [{"name": "turn_on", "params": []}],
+        "learning_focus": ["Observe repeated user actions"],
+        "primary_steps": [],
+        "success_criteria": [],
+        "constraints": [],
+        "needed_inputs": [],
+        "assumptions": [],
+    }
+
+
 class FakeHumidifierAdapter(BaseAdapter):
     name = "fake"
 
@@ -329,6 +348,115 @@ class TestIntegrationPipeline:
         assert result["questions"] == ["What exact trigger should start this automation?"]
         generate_package_mock.assert_not_awaited()
 
+    async def test_create_custom_skill_stops_reasking_after_follow_up_clarification(self, tmp_path: Path):
+        temp_skills = tmp_path / "skills"
+        shutil.copytree("skills", temp_skills)
+
+        loader = SkillLoader(skills_dir=str(temp_skills))
+        loader.discover()
+        skill_creator = loader.get_skill("skill_creator")
+        assert skill_creator is not None
+        actions_module = loader.load_actions(skill_creator)
+        assert actions_module is not None
+
+        brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
+
+        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
+            "anima_skill_skill_creator._analyze_request_with_llm",
+            new_callable=AsyncMock,
+            return_value=(fake_request_analysis(clarification=True), []),
+        ) as analyze_mock, patch(
+            "anima_skill_skill_creator._generate_package_with_llm",
+            new_callable=AsyncMock,
+            return_value=(fake_generated_package("wake_up_reminder", "reminder"), []),
+        ) as generate_package_mock:
+            result = await actions_module.create_custom_skill(
+                context={"brain": brain, "settings": {}},
+                params={
+                    "request": (
+                        "新增一个起床提醒技能\n\n"
+                        "Additional clarification from the user:\n"
+                        "工作日早上 7:30 叫我起床，法定节假日不提醒"
+                    ),
+                    "allow_clarification": False,
+                },
+                reply="",
+            )
+
+        assert result["status"] == "created"
+        analyze_mock.assert_awaited_once()
+        assert analyze_mock.await_args.kwargs["allow_clarification"] is False
+        generate_package_mock.assert_awaited_once()
+        assert (temp_skills / "custom" / "wake_up_reminder" / "SKILL.md").exists()
+
+    async def test_create_custom_skill_returns_structured_error_when_analysis_raises(self, tmp_path: Path):
+        temp_skills = tmp_path / "skills"
+        shutil.copytree("skills", temp_skills)
+
+        loader = SkillLoader(skills_dir=str(temp_skills))
+        loader.discover()
+        skill_creator = loader.get_skill("skill_creator")
+        assert skill_creator is not None
+        actions_module = loader.load_actions(skill_creator)
+        assert actions_module is not None
+
+        brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
+
+        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
+            "anima_skill_skill_creator._analyze_request_with_llm",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("llm upstream 502"),
+        ):
+            result = await actions_module.create_custom_skill(
+                context={"brain": brain, "settings": {}},
+                params={"request": "新增一个起床提醒技能"},
+                reply="",
+            )
+
+        assert result["error"] == "skill_analysis_exception"
+        assert "llm upstream 502" in result["reply"]
+
+    async def test_create_custom_skill_accepts_sparse_generated_spec_without_crashing(self, tmp_path: Path):
+        temp_skills = tmp_path / "skills"
+        shutil.copytree("skills", temp_skills)
+
+        loader = SkillLoader(skills_dir=str(temp_skills))
+        loader.discover()
+        skill_creator = loader.get_skill("skill_creator")
+        assert skill_creator is not None
+        actions_module = loader.load_actions(skill_creator)
+        assert actions_module is not None
+
+        brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
+
+        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
+            "anima_skill_skill_creator._analyze_request_with_llm",
+            new_callable=AsyncMock,
+            return_value=(fake_request_analysis(clarification=False), []),
+        ), patch(
+            "anima_skill_skill_creator._generate_skill_spec_with_llm",
+            new_callable=AsyncMock,
+            return_value=(fake_sparse_generated_spec("wake_up_reminder", "reminder"), []),
+        ), patch(
+            "anima_skill_skill_creator._generate_file_with_llm",
+            new_callable=AsyncMock,
+            side_effect=[
+                (fake_generated_package("wake_up_reminder", "reminder")["files"]["SKILL.md"], []),
+                (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/knowledge.md"], []),
+                (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/decide.md"], []),
+                (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/learn.md"], []),
+                (fake_generated_package("wake_up_reminder", "reminder")["files"]["scripts/actions.py"], []),
+            ],
+        ):
+            result = await actions_module.create_custom_skill(
+                context={"brain": brain, "settings": {}},
+                params={"request": "新增一个起床提醒技能"},
+                reply="",
+            )
+
+        assert result["status"] == "created"
+        assert (temp_skills / "custom" / "wake_up_reminder" / "SKILL.md").exists()
+
     async def test_create_custom_skill_simple_scaffold_creates_curtain_skill_without_llm(self, tmp_path: Path):
         temp_skills = tmp_path / "skills"
         shutil.copytree("skills", temp_skills)
@@ -499,6 +627,26 @@ class TestIntegrationPipeline:
 
         assert response.status_code == 200
         assert response.content == b"RIFFdemoWAVE"
+
+    async def test_chat_endpoint_returns_structured_error_when_brain_raises(self, tmp_path):
+        app = create_app({
+            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+            "brain": type(
+                "BrokenBrain",
+                (),
+                {"handle_chat_message": staticmethod(AsyncMock(side_effect=RuntimeError("boom")))}
+            )(),
+            "memory": MemoryStore(base_dir=str(tmp_path / "memory")),
+            "settings": FakeSettings(),
+        })
+        client = TestClient(app)
+
+        response = client.post("/api/chat", json={"message": "新增一个技能"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] == "chat_request_failed"
+        assert "boom" in data["reply"]
 
     async def test_audio_registry_accepts_file_uri_paths(self, tmp_path):
         audio_file = tmp_path / "sample.wav"

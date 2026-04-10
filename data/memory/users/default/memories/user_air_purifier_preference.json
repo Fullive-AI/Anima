@@ -5,12 +5,14 @@
   "summary": "The user has clear preferences for air purifier usage, and all operations on the user's Mijia Smart Air Purifier 5 complete successfully.",
   "details": [
     "User has clear air purifier usage preferences",
-    "All operations on user's Mijia Smart Air Purifier 5 complete successfully"
+    "All operations on Mijia Smart Air Purifier 5 complete successfully"
   ],
   "device_types": [
     "air_purifier"
   ],
   "confidence": "high",
-  "source_actions": [],
-  "updated_at": "2026-04-09T08:04:35.249283+00:00"
+  "source_actions": [
+    "plan.reply"
+  ],
+  "updated_at": "2026-04-09T10:03:18.898466+00:00"
 }

@@ -1,0 +1,19 @@
+{
+  "topic": "user_custom_leave_home_turn_off_air_purifier_skill",
+  "title": "User's custom leave home turn off air purifier skill",
+  "category": "routine",
+  "summary": "The user's custom skill that automatically turns off the connected air purifier after the user leaves home is created, activated and working normally.",
+  "details": [
+    "Custom skill automatically turns off air purifier when user leaves home",
+    "Skill is active and working normally"
+  ],
+  "device_types": [
+    "air_purifier"
+  ],
+  "confidence": "high",
+  "source_actions": [
+    "plan.reply"
+  ],
+  "linked_custom_skill_name": "custom_skill_f4b0b238",
+  "updated_at": "2026-04-10T03:14:01.689470+00:00"
+}

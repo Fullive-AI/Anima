@@ -4,13 +4,15 @@
   "category": "preference",
   "summary": "The user has specific lighting preferences for the bedside light for pre-wake up and nighttime use.",
   "details": [
-    "Specific lighting preferences for pre-wake up use of bedside light",
-    "Specific lighting preferences for nighttime use of bedside light"
+    "User has specific lighting preferences for bedside light",
+    "Preferences apply to pre-wake up and nighttime use"
   ],
   "device_types": [
-    "bedside_light"
+    "light"
   ],
-  "confidence": "medium",
-  "source_actions": [],
-  "updated_at": "2026-04-09T08:04:35.249548+00:00"
+  "confidence": "high",
+  "source_actions": [
+    "plan.reply"
+  ],
+  "updated_at": "2026-04-09T10:03:18.898700+00:00"
 }

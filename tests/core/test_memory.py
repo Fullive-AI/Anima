@@ -147,6 +147,130 @@ class TestMemoryStore:
         assert "evening_lighting_routine" in memories
         assert memories["evening_lighting_routine"]["summary"].startswith("Lights are typically")
 
+    async def test_memory_extractor_skips_custom_skill_memory_without_real_custom_skill(self, monkeypatch):
+        await self.store.append_history(
+            "default",
+            {"action": "plan.reply", "params": {"reply": "已成功创建一个新的自定义技能。"}},
+        )
+
+        skills_dir = Path(self.tmpdir) / "skills"
+        skills_dir.mkdir()
+
+        monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
+        extractor = MemoryExtractionService(self.store, skills_dir=str(skills_dir))
+        extractor._invoke_llm_text = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "memories": [
+                        {
+                            "topic": "user_custom_curtain_control_skill",
+                            "title": "User's custom smart curtain control skill",
+                            "category": "context",
+                            "summary": "The user's requested custom smart curtain control skill has been successfully created and processed.",
+                            "details": ["Custom smart curtain control skill created and processed"],
+                            "device_types": ["curtain"],
+                            "confidence": "high",
+                            "source_actions": ["plan.reply"],
+                        }
+                    ],
+                    "forget_topics": [],
+                }
+            )
+        )
+
+        changed = await extractor.run_now("default")
+        memories = await self.store.get_extracted_memories("default")
+
+        assert changed is False
+        assert "user_custom_curtain_control_skill" not in memories
+
+    async def test_memory_extractor_keeps_custom_skill_memory_only_when_matching_real_custom_skill_exists(self, monkeypatch):
+        await self.store.append_history(
+            "default",
+            {"action": "plan.reply", "params": {"reply": "工作日早上8点起床提醒技能已创建并激活。"}},
+        )
+
+        custom_skill_dir = Path(self.tmpdir) / "skills" / "custom" / "workday_8am_smart_speaker_wakeup"
+        custom_skill_dir.mkdir(parents=True)
+        (custom_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: Workday 8AM Smart Speaker Wakeup\n"
+                "description: A recurring automated skill that triggers a wake-up alarm via connected smart speaker at 8 AM local time on workdays and skips alarms on holidays\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - smart_speaker\n"
+                "---\n"
+            ),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
+        extractor = MemoryExtractionService(self.store, skills_dir=str(Path(self.tmpdir) / "skills"))
+        extractor._invoke_llm_text = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "memories": [
+                        {
+                            "topic": "user_custom_8am_workday_wake_up_reminder_skill",
+                            "title": "User's custom 8 AM workday wake up reminder skill",
+                            "category": "routine",
+                            "summary": "The user's requested custom 8 AM workday wake up reminder skill that skips legal holidays and triggers via connected Xiaomi Smart Speaker has been successfully created and activated.",
+                            "details": [
+                                "Triggers at 8 AM on workdays",
+                                "Skips legal holidays",
+                                "Triggers via connected Xiaomi Smart Speaker",
+                            ],
+                            "device_types": ["smart_speaker"],
+                            "confidence": "high",
+                            "source_actions": ["plan.reply"],
+                        }
+                    ],
+                    "forget_topics": [],
+                }
+            )
+        )
+
+        changed = await extractor.run_now("default")
+        memories = await self.store.get_extracted_memories("default")
+
+        assert changed is True
+        assert memories["user_custom_8am_workday_wake_up_reminder_skill"]["linked_custom_skill_name"] == "Workday 8AM Smart Speaker Wakeup"
+
+    async def test_memory_extractor_cleans_up_existing_invalid_custom_skill_memories_without_llm(self):
+        await self.store.upsert_extracted_memory(
+            "default",
+            "user_custom_curtain_control_skill",
+            {
+                "title": "User's custom smart curtain control skill",
+                "category": "context",
+                "summary": "The user's requested custom smart curtain control skill has been successfully created and processed.",
+                "details": ["Custom smart curtain control skill created and processed"],
+                "device_types": ["curtain"],
+                "confidence": "high",
+                "source_actions": ["plan.reply"],
+            },
+        )
+
+        skills_dir = Path(self.tmpdir) / "skills"
+        skills_dir.mkdir()
+
+        extractor = MemoryExtractionService(self.store, skills_dir=str(skills_dir))
+        extractor._invoke_llm_text = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "memories": [],
+                    "forget_topics": [],
+                }
+            )
+        )
+
+        changed = await extractor.run_now("default")
+        memories = await self.store.get_extracted_memories("default")
+
+        assert changed is True
+        assert "user_custom_curtain_control_skill" not in memories
+
     async def test_preference_learner_updates_skill_profile_from_history_and_memories(self, monkeypatch):
         await self.store.append_history("default", {"action": "turn_on", "device_type": "light", "reason": "evening routine"})
         await self.store.append_history("default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}})
