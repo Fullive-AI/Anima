@@ -45,6 +45,87 @@ function formatTime(ts?: string) {
   }
 }
 
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const parts = text.split(/(\*\*.*?\*\*)/g)
+  return parts.filter(Boolean).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={index} className="font-semibold text-slate-800">{part.slice(2, -2)}</strong>
+    }
+    return <span key={index}>{part}</span>
+  })
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  const lines = content.split('\n').map((line) => line.trimEnd())
+  const blocks: ReactNode[] = []
+  let listItems: string[] = []
+
+  const flushList = (key: string) => {
+    if (!listItems.length) return
+    blocks.push(
+      <ol key={key} className="ml-5 list-decimal space-y-1 text-sm leading-6 text-slate-700">
+        {listItems.map((item, index) => (
+          <li key={`${key}-${index}`}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ol>,
+    )
+    listItems = []
+  }
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim()
+    if (!line) {
+      flushList(`list-${index}`)
+      return
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.*)$/)
+    if (orderedMatch) {
+      listItems.push(orderedMatch[1])
+      return
+    }
+
+    flushList(`list-${index}`)
+
+    if (line.startsWith('### ')) {
+      blocks.push(
+        <h3 key={`h3-${index}`} className="text-sm font-semibold text-slate-900">
+          {renderInlineMarkdown(line.slice(4))}
+        </h3>,
+      )
+      return
+    }
+
+    if (line.startsWith('## ')) {
+      blocks.push(
+        <h2 key={`h2-${index}`} className="text-base font-semibold text-slate-900">
+          {renderInlineMarkdown(line.slice(3))}
+        </h2>,
+      )
+      return
+    }
+
+    if (line.startsWith('# ')) {
+      blocks.push(
+        <h1 key={`h1-${index}`} className="text-lg font-semibold text-slate-900">
+          {renderInlineMarkdown(line.slice(2))}
+        </h1>,
+      )
+      return
+    }
+
+    blocks.push(
+      <p key={`p-${index}`} className="text-sm leading-6 text-slate-700">
+        {renderInlineMarkdown(line)}
+      </p>,
+    )
+  })
+
+  flushList('list-final')
+
+  return <div className="space-y-2">{blocks}</div>
+}
+
 export default function DecisionLog({ decisions, liveTrace, onDevicesChanged, onChatResult }: DecisionLogProps) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -173,7 +254,9 @@ export default function DecisionLog({ decisions, liveTrace, onDevicesChanged, on
                 <span className="text-xs font-mono text-slate-400">{formatTime(liveTrace.timestamp)}</span>
               </div>
               <p className="text-sm text-slate-700">{liveTrace.message}</p>
-              <p className="mt-1 text-xs text-violet-700">{liveTrace.result.reply}</p>
+              <div className="mt-2 rounded-lg bg-violet-50 px-3 py-2 text-violet-700">
+                <MarkdownMessage content={liveTrace.result.reply} />
+              </div>
             </div>
           </div>
         ) : null}
@@ -252,7 +335,7 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
 
       <div className="mt-3 space-y-2">
         <AssistantBubble timestamp={turn.timestamp}>
-          <p>{turn.result.reply}</p>
+          <MarkdownMessage content={turn.result.reply} />
           {turn.qrImage ? (
             <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
               <img
