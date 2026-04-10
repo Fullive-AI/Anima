@@ -1,5 +1,5 @@
 import { Bot, Cpu, Loader2, MessageSquareText, Plus, RefreshCw, Sparkles, Wrench, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, useSkills, type SkillInventoryItem } from '../hooks/useApi'
 
 interface SkillsPanelProps {
@@ -26,15 +26,20 @@ function statusLabel(skill: SkillInventoryItem) {
   return { label: 'Incomplete', className: 'bg-slate-100 text-slate-600 ring-slate-200' }
 }
 
-function SkillCard({ skill }: { skill: SkillInventoryItem }) {
+function SkillCard({ skill, highlighted }: { skill: SkillInventoryItem; highlighted?: boolean }) {
   const status = statusLabel(skill)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className={`rounded-2xl border bg-white p-4 shadow-sm transition-all duration-500 ${highlighted ? 'border-sky-400 ring-2 ring-sky-200 shadow-[0_0_0_1px_rgba(14,165,233,0.14),0_18px_40px_rgba(14,165,233,0.14)]' : 'border-slate-200'}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-semibold text-slate-800">{skill.name}</h4>
+            {highlighted ? (
+              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                Newly created
+              </span>
+            ) : null}
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${status.className}`}>
               {status.label}
             </span>
@@ -79,6 +84,7 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
   const [createReply, setCreateReply] = useState('')
   const [createError, setCreateError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [highlightedFolderName, setHighlightedFolderName] = useState<string | null>(null)
 
   const normalizedQuery = query.trim().toLowerCase()
   const filtered = useMemo(() => {
@@ -104,17 +110,26 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
   const systemCount = skills?.system_skills.length ?? 0
   const customCount = skills?.custom_skills.length ?? 0
 
+  useEffect(() => {
+    if (!highlightedFolderName) return
+    const id = window.setTimeout(() => setHighlightedFolderName(null), 8000)
+    return () => window.clearTimeout(id)
+  }, [highlightedFolderName])
+
   const handleCreateSkill = async () => {
     const text = draft.trim()
     if (!text || creating) return
 
+    const baselineCustomFolders = new Set((skills?.custom_skills || []).map((skill) => skill.folder_name))
     setCreating(true)
     setCreateError('')
     try {
       const result = await api.chat(text)
       setCreateReply(result.reply || '技能请求已提交')
       setDraft('')
-      await refresh()
+      const refreshedSkills = await refresh()
+      const createdSkill = refreshedSkills?.custom_skills.find((skill) => !baselineCustomFolders.has(skill.folder_name))
+      setHighlightedFolderName(createdSkill?.folder_name || null)
     } catch (error) {
       const message = error instanceof Error ? error.message : '新增技能失败'
       setCreateError(message)
@@ -242,7 +257,11 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
             <SectionTitle title="Custom Skills" detail={`${filtered.custom.length} visible`} />
             <div className="mt-4 space-y-3">
               {filtered.custom.length ? filtered.custom.map((skill) => (
-                <SkillCard key={`custom-${skill.folder_name}`} skill={skill} />
+                <SkillCard
+                  key={`custom-${skill.folder_name}`}
+                  skill={skill}
+                  highlighted={skill.folder_name === highlightedFolderName}
+                />
               )) : (
                 <p className="text-sm text-slate-500">{loading ? '正在加载自定义技能...' : '当前没有真实落盘的自定义技能'}</p>
               )}

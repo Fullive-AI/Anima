@@ -4,9 +4,9 @@
   "category": "routine",
   "summary": "The user's custom 8 AM workday wake up reminder skill remains created, activated and working normally.",
   "details": [
-    "Triggers wake-up alarm via smart speaker at 8 AM on workdays",
+    "Triggers wake-up alarm via connected smart speaker at 8 AM local time on workdays",
     "Skips alarms on holidays",
-    "Skill is active and functional"
+    "Skill is active and working normally"
   ],
   "device_types": [
     "smart_speaker"
@@ -16,5 +16,5 @@
     "plan.reply"
   ],
   "linked_custom_skill_name": "Workday 8AM Smart Speaker Wakeup",
-  "updated_at": "2026-04-10T07:40:02.197397+00:00"
+  "updated_at": "2026-04-10T07:43:29.174110+00:00"
 }

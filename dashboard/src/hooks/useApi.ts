@@ -388,8 +388,10 @@ export function useSkills(pollInterval = 15000) {
     try {
       const data = await api.getSkills()
       setSkills(data)
+      return data
     } catch {
       /* ignore */
+      return null
     } finally {
       setLoading(false)
     }
