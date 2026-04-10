@@ -2,10 +2,10 @@
   "topic": "user_xiaomi_smart_speaker_device_context",
   "title": "User's Xiaomi Smart Speaker device context",
   "category": "context",
-  "summary": "The user has a connected functional Xiaomi Smart Speaker that can accept and execute playback and alarm commands, which successfully triggered the scheduled 8AM workday wake-up alarm.",
+  "summary": "The user has a connected functional Xiaomi Smart Speaker that can execute commands, which successfully triggered the most recent scheduled 8AM workday wake-up alarm.",
   "details": [
-    "Connected and fully functional",
-    "Successfully triggered scheduled 8AM workday wake-up alarm"
+    "Xiaomi Smart Speaker is connected and functional",
+    "Most recent 8AM workday wake-up alarm triggered successfully as scheduled"
   ],
   "device_types": [
     "smart_speaker"
@@ -15,5 +15,5 @@
     "plan.reply"
   ],
   "linked_custom_skill_name": "Workday 8AM Smart Speaker Wakeup",
-  "updated_at": "2026-04-10T08:45:58.753269+00:00"
+  "updated_at": "2026-04-10T09:34:18.706035+00:00"
 }

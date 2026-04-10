@@ -1,6 +1,6 @@
-import { Bot, Cpu, Loader2, MessageSquareText, Plus, RefreshCw, Sparkles, Wrench, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { api, useSkills, type SkillInventoryItem } from '../hooks/useApi'
+import { Bot, Cpu, FilePenLine, Loader2, MessageSquareText, Plus, RefreshCw, Sparkles, Wrench, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { api, useSkills, type CustomSkillDetail, type SkillInventoryItem, type UpdateCustomSkillRequest } from '../hooks/useApi'
 
 interface SkillsPanelProps {
   open: boolean
@@ -26,7 +26,13 @@ function statusLabel(skill: SkillInventoryItem) {
   return { label: 'Incomplete', className: 'bg-slate-100 text-slate-600 ring-slate-200' }
 }
 
-function SkillCard({ skill }: { skill: SkillInventoryItem }) {
+function SkillCard({
+  skill,
+  onEdit,
+}: {
+  skill: SkillInventoryItem
+  onEdit?: (skill: SkillInventoryItem) => void
+}) {
   const status = statusLabel(skill)
 
   return (
@@ -68,6 +74,124 @@ function SkillCard({ skill }: { skill: SkillInventoryItem }) {
           <span>{skill.has_chat_prompt ? 'has chat prompt' : 'no chat prompt'}</span>
         </div>
       </div>
+
+      {skill.scope === 'custom' && onEdit ? (
+        <div className="mt-4">
+          <button
+            onClick={() => onEdit(skill)}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 cursor-pointer"
+          >
+            <FilePenLine className="h-4 w-4" />
+            编辑技能
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function SkillEditor({
+  skill,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  skill: CustomSkillDetail
+  saving: boolean
+  error: string
+  onClose: () => void
+  onSave: (payload: UpdateCustomSkillRequest) => Promise<void>
+}) {
+  const [name, setName] = useState(skill.meta.name)
+  const [description, setDescription] = useState(skill.meta.description)
+  const [deviceTypes, setDeviceTypes] = useState(skill.meta.device_types.join(', '))
+  const [triggerText, setTriggerText] = useState(skill.structured.trigger_text)
+  const [actionText, setActionText] = useState(skill.structured.action_text)
+  const [knowledgeMd, setKnowledgeMd] = useState(skill.content.knowledge_md)
+  const [decideMd, setDecideMd] = useState(skill.content.decide_md)
+
+  useEffect(() => {
+    setName(skill.meta.name)
+    setDescription(skill.meta.description)
+    setDeviceTypes(skill.meta.device_types.join(', '))
+    setTriggerText(skill.structured.trigger_text)
+    setActionText(skill.structured.action_text)
+    setKnowledgeMd(skill.content.knowledge_md)
+    setDecideMd(skill.content.decide_md)
+  }, [skill])
+
+  const handleSave = async () => {
+    await onSave({
+      mode: 'structured',
+      name: name.trim(),
+      description: description.trim(),
+      device_types: deviceTypes.split(',').map((item) => item.trim()).filter(Boolean),
+      trigger_text: triggerText.trim(),
+      action_text: actionText.trim(),
+      knowledge_md: knowledgeMd,
+      decide_md: decideMd,
+    })
+  }
+
+  return (
+    <div className="flex h-full w-[420px] flex-col border-l border-black/10 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-800">编辑自定义技能</h3>
+          <p className="text-xs text-slate-500">{skill.meta.folder_name}</p>
+        </div>
+        <button onClick={onClose} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <label className="block space-y-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">名称</span>
+          <input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">描述</span>
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">设备类型</span>
+          <input value={deviceTypes} onChange={(event) => setDeviceTypes(event.target.value)} placeholder="speaker, curtain" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">触发条件</span>
+          <textarea value={triggerText} onChange={(event) => setTriggerText(event.target.value)} rows={4} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">行为说明</span>
+          <textarea value={actionText} onChange={(event) => setActionText(event.target.value)} rows={4} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Knowledge</span>
+          <textarea value={knowledgeMd} onChange={(event) => setKnowledgeMd(event.target.value)} rows={6} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs text-slate-700 outline-none focus:border-sky-400" />
+        </label>
+
+        <label className="block space-y-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Decide Prompt</span>
+          <textarea value={decideMd} onChange={(event) => setDecideMd(event.target.value)} rows={8} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs text-slate-700 outline-none focus:border-sky-400" />
+        </label>
+
+        {error ? <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
+      </div>
+
+      <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
+        <button onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 cursor-pointer">取消</button>
+        <button onClick={() => void handleSave()} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:opacity-50 cursor-pointer">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePenLine className="h-4 w-4" />}
+          保存修改
+        </button>
+      </div>
     </div>
   )
 }
@@ -79,6 +203,11 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
   const [createReply, setCreateReply] = useState('')
   const [createError, setCreateError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [selectedSkill, setSelectedSkill] = useState<SkillInventoryItem | null>(null)
+  const [skillDetail, setSkillDetail] = useState<CustomSkillDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const normalizedQuery = query.trim().toLowerCase()
   const filtered = useMemo(() => {
@@ -123,9 +252,51 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
     }
   }
 
+  const handleOpenEditor = async (skill: SkillInventoryItem) => {
+    setSelectedSkill(skill)
+    setSkillDetail(null)
+    setDetailLoading(true)
+    setSaveError('')
+    try {
+      const detail = await api.getCustomSkillDetail(skill.folder_name)
+      setSkillDetail(detail)
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '读取技能详情失败')
+      setSkillDetail(null)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const handleCloseEditor = () => {
+    setSelectedSkill(null)
+    setSkillDetail(null)
+    setSaveError('')
+  }
+
+  const handleSaveSkill = async (payload: UpdateCustomSkillRequest) => {
+    if (!selectedSkill) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      await api.updateCustomSkill(selectedSkill.folder_name, payload)
+      const [detail] = await Promise.all([
+        api.getCustomSkillDetail(selectedSkill.folder_name),
+        refresh(),
+      ])
+      setSkillDetail(detail)
+      setCreateReply('技能已保存并重新加载')
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '保存技能失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 px-6 py-8 backdrop-blur-[3px]">
-      <div className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] bg-[#f6f4ee] shadow-2xl ring-1 ring-black/5">
+      <div className="flex h-full max-h-[92vh] w-full max-w-7xl overflow-hidden rounded-[30px] bg-[#f6f4ee] shadow-2xl ring-1 ring-black/5">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-black/10 bg-[#0f172a] px-6 py-4 text-white">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-sky-300/15 p-2 text-sky-200">
@@ -242,13 +413,43 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
             <SectionTitle title="Custom Skills" detail={`${filtered.custom.length} visible`} />
             <div className="mt-4 space-y-3">
               {filtered.custom.length ? filtered.custom.map((skill) => (
-                <SkillCard key={`custom-${skill.folder_name}`} skill={skill} />
+                <SkillCard key={`custom-${skill.folder_name}`} skill={skill} onEdit={handleOpenEditor} />
               )) : (
                 <p className="text-sm text-slate-500">{loading ? '正在加载自定义技能...' : '当前没有真实落盘的自定义技能'}</p>
               )}
             </div>
           </div>
         </div>
+        </div>
+
+        {selectedSkill ? (
+          detailLoading ? (
+            <div className="flex h-full w-[420px] items-center justify-center border-l border-black/10 bg-white">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                正在加载技能详情...
+              </div>
+            </div>
+          ) : skillDetail ? (
+            <SkillEditor
+              skill={skillDetail}
+              saving={saving}
+              error={saveError}
+              onClose={handleCloseEditor}
+              onSave={handleSaveSkill}
+            />
+          ) : (
+            <div className="flex h-full w-[420px] flex-col border-l border-black/10 bg-white">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h3 className="text-base font-semibold text-slate-800">编辑自定义技能</h3>
+                <button onClick={handleCloseEditor} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-5 text-sm text-rose-700">{saveError || '技能详情加载失败'}</div>
+            </div>
+          )
+        ) : null}
       </div>
     </div>
   )

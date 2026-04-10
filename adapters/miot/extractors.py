@@ -9,6 +9,7 @@ def default_sensors(device_type: str, *, include_generic: bool = False) -> list[
     type_sensors = {
         "humidifier": [("humidity", "%"), ("temperature", "°C"), ("water_level", "%")],
         "air_conditioner": [("temperature", "°C")],
+        "air_purifier": [("pm2_5", "µg/m3"), ("aqi", "AQI"), ("average_aqi", "AQI"), ("pm10", "µg/m3"), ("tvoc", "ppb"), ("co2", "ppm"), ("temperature", "°C"), ("humidity", "%")],
         "light": [("brightness", "%"), ("color_temp", "K")],
     }
     sensors = [("power", "on/off"), *type_sensors.get(device_type, [])]
@@ -26,6 +27,8 @@ def read_sensor_snapshot(device_type: str, dev: miio.Device) -> dict[str, Any]:
         return _filter_none(_read_humidifier_status(status))
     if device_type == "air_conditioner":
         return _filter_none(_read_air_conditioner_status(status))
+    if device_type == "air_purifier":
+        return _filter_none(_read_air_purifier_status(status))
     if device_type == "light":
         return _filter_none(_read_light_status(status))
     return _filter_none(_read_generic_status(status))
@@ -61,6 +64,45 @@ def _read_air_conditioner_status(status: Any) -> dict[str, Any]:
     return {
         "power": _extract_power_status(status),
         "temperature": _read_status_field(status, "temperature"),
+    }
+
+
+def _read_air_purifier_status(status: Any) -> dict[str, Any]:
+    aqi = _read_status_field(status, "aqi")
+    pm2_5 = (
+        _read_status_field(status, "pm2_5")
+        or _read_status_field(status, "pm25")
+        or _read_status_field(status, "aqi_pm2_5")
+        or aqi
+    )
+    pm10 = (
+        _read_status_field(status, "pm10_density")
+        or _read_status_field(status, "pm10")
+    )
+    tvoc = (
+        _read_status_field(status, "tvoc")
+        or _read_status_field(status, "tvoc_index")
+        or _read_status_field(status, "voc")
+    )
+    co2 = (
+        _read_status_field(status, "co2")
+        or _read_status_field(status, "co2_value")
+        or _read_status_field(status, "carbon_dioxide")
+    )
+    humidity = _read_status_field(status, "humidity")
+    if humidity is None:
+        humidity = _read_status_field(status, "relative_humidity")
+
+    return {
+        "power": _extract_power_status(status),
+        "pm2_5": pm2_5,
+        "aqi": aqi,
+        "average_aqi": _read_status_field(status, "average_aqi"),
+        "pm10": pm10,
+        "tvoc": tvoc,
+        "co2": co2,
+        "temperature": _read_status_field(status, "temperature"),
+        "humidity": humidity,
     }
 
 

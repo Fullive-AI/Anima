@@ -116,3 +116,22 @@ class TestMain:
 
         assert anima.brain.run_cycle.await_count == 2
         assert anima.discovery.updated == [("hum_01", {"humidity": 35})]
+
+    async def test_bootstrap_startup_runs_brain_cycle_immediately(self):
+        anima = Anima.__new__(Anima)
+        anima.discovery = SimpleNamespace(
+            scan=AsyncMock(),
+            devices={},
+        )
+        anima._ensure_system_skills_for_devices = AsyncMock()
+        anima._ensure_cold_start_profiles = AsyncMock()
+        anima._maybe_start_onboarding = AsyncMock()
+        anima._run_brain_cycle_serially = AsyncMock()
+
+        await anima._bootstrap_startup({"settings": object()})
+
+        anima.discovery.scan.assert_awaited_once()
+        anima._ensure_system_skills_for_devices.assert_awaited_once()
+        anima._ensure_cold_start_profiles.assert_awaited_once()
+        anima._maybe_start_onboarding.assert_awaited_once()
+        anima._run_brain_cycle_serially.assert_awaited_once()

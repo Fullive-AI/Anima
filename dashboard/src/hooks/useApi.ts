@@ -202,6 +202,39 @@ export interface SkillsSnapshot {
   custom_skills: SkillInventoryItem[]
 }
 
+export interface CustomSkillDetail {
+  meta: {
+    name: string
+    description: string
+    scope: 'custom'
+    folder_name: string
+    device_types: string[]
+    version: string
+    path: string
+  }
+  content: {
+    skill_md: string
+    knowledge_md: string
+    decide_md: string
+  }
+  structured: {
+    trigger_text: string
+    action_text: string
+  }
+  editable: boolean
+}
+
+export interface UpdateCustomSkillRequest {
+  mode: 'structured'
+  name: string
+  description: string
+  device_types: string[]
+  trigger_text: string
+  action_text: string
+  knowledge_md: string
+  decide_md: string
+}
+
 const api = {
   async getDevices(): Promise<Device[]> {
     const res = await fetch('/api/devices')
@@ -275,6 +308,31 @@ const api = {
   async getSkills(): Promise<SkillsSnapshot> {
     const res = await fetch('/api/skills')
     return res.json()
+  },
+
+  async getCustomSkillDetail(folderName: string): Promise<CustomSkillDetail> {
+    const res = await fetch(`/api/skills/custom/${folderName}`)
+    if (!res.ok) {
+      throw new Error(`读取技能详情失败：HTTP ${res.status}`)
+    }
+    return res.json()
+  },
+
+  async updateCustomSkill(folderName: string, payload: UpdateCustomSkillRequest): Promise<{ status: string; skill: SkillInventoryItem }> {
+    const res = await fetch(`/api/skills/custom/${folderName}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const text = await res.text()
+    const data = text ? JSON.parse(text) as { status: string; skill: SkillInventoryItem; detail?: string } : null
+    if (!res.ok) {
+      throw new Error(data && 'detail' in data && data.detail ? data.detail : `保存技能失败：HTTP ${res.status}`)
+    }
+    if (!data) {
+      throw new Error('后端返回了无效响应')
+    }
+    return data
   },
 }
 

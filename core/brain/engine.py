@@ -37,6 +37,7 @@ SYSTEM_ACTION_ALIASES = {
     "generate_new_skill_package": "create_custom_skill",
 }
 PENDING_SKILL_CANCEL_TOKENS = ("取消", "算了", "不用了", "停止", "cancel", "never mind")
+AIR_PURIFIER_AQI_THRESHOLD = 5.0
 SKILL_CREATION_INTENT_PATTERNS = (
     r"(新增|创建|生成|做|写|开发|定制|自定义).{0,12}(技能|skill)",
     r"(技能|skill).{0,12}(新增|创建|生成|定制|自定义|开发)",
@@ -118,6 +119,7 @@ class Brain:
         self._llm_model = settings.llm_model
         self._llm_disable_thinking = settings.llm_disable_thinking
         self._pending_skill_creation: dict[str, Any] | None = None
+        self._air_purifier_startup_bootstrap_pending = True
         self._cycle_graph = self._build_cycle_graph()
         self._chat_graph = self._build_chat_graph()
 
@@ -147,6 +149,24 @@ class Brain:
         if not devices or not lightweight_skills:
             return BrainCycleResult()
 
+        deterministic_tasks = self._build_deterministic_cycle_tasks(
+            devices=devices,
+            lightweight_skills=lightweight_skills,
+        )
+        if deterministic_tasks:
+            result = await self._graph_executor(
+                {
+                    "user_memory": user_memory,
+                    "environment_state": environment_state,
+                    "task_plan_items": deterministic_tasks,
+                }
+            )
+            return BrainCycleResult(
+                plan_items=self._cycle_tasks_to_skill_plan_items(deterministic_tasks, lightweight_skills),
+                task_plan_items=deterministic_tasks,
+                execution_results=result.get("execution_results", []),
+            )
+
         result = await self._cycle_graph.ainvoke(
             {
                 "user_memory": user_memory,
@@ -160,6 +180,101 @@ class Brain:
             task_plan_items=result.get("task_plan_items", []),
             execution_results=result.get("execution_results", []),
         )
+
+    def _build_deterministic_cycle_tasks(
+        self,
+        *,
+        devices: list[Device],
+        lightweight_skills: list[SkillSummary],
+    ) -> list[TaskPlanItem]:
+        skill_names = {skill.name for skill in lightweight_skills}
+        if "air_purifier" not in skill_names:
+            self._air_purifier_startup_bootstrap_pending = False
+            return []
+
+        purifier_devices = [device for device in devices if device.type == "air_purifier"]
+        if not purifier_devices:
+            self._air_purifier_startup_bootstrap_pending = False
+            return []
+
+        device = purifier_devices[0]
+        power_sensor = device.get_sensor("power")
+        power_value = self._coerce_sensor_bool(power_sensor.value if power_sensor else None)
+        aqi_value = self._read_air_purifier_aqi(device)
+
+        if self._air_purifier_startup_bootstrap_pending:
+            self._air_purifier_startup_bootstrap_pending = False
+            if power_value is not True:
+                return [
+                    TaskPlanItem(
+                        kind="execute_skill",
+                        skill_name="air_purifier",
+                        goal="turn on the air purifier on system startup",
+                        reason="startup automation bootstrap for air purifier",
+                        priority=1,
+                    )
+                ]
+            return []
+
+        if aqi_value is None:
+            return []
+
+        if aqi_value > AIR_PURIFIER_AQI_THRESHOLD and power_value is not True:
+            return [
+                TaskPlanItem(
+                    kind="execute_skill",
+                    skill_name="air_purifier",
+                    goal="turn on the air purifier because indoor AQI is above threshold",
+                    reason=f"air purifier automation: AQI {aqi_value} > {AIR_PURIFIER_AQI_THRESHOLD}",
+                    priority=1,
+                )
+            ]
+
+        if aqi_value <= AIR_PURIFIER_AQI_THRESHOLD and power_value is True:
+            return [
+                TaskPlanItem(
+                    kind="execute_skill",
+                    skill_name="air_purifier",
+                    goal="turn off the air purifier because indoor AQI is back under threshold",
+                    reason=f"air purifier automation: AQI {aqi_value} <= {AIR_PURIFIER_AQI_THRESHOLD}",
+                    priority=1,
+                )
+            ]
+
+        return []
+
+    @staticmethod
+    def _coerce_sensor_bool(value: Any) -> bool | None:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.lower()
+            if lowered in {"on", "true", "1"}:
+                return True
+            if lowered in {"off", "false", "0"}:
+                return False
+        return None
+
+    @staticmethod
+    def _coerce_sensor_number(value: Any) -> float | None:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
+
+    def _read_air_purifier_aqi(self, device: Device) -> float | None:
+        for sensor_name in ("aqi", "pm2_5", "average_aqi"):
+            sensor = device.get_sensor(sensor_name)
+            if sensor is None:
+                continue
+            numeric = self._coerce_sensor_number(sensor.value)
+            if numeric is not None:
+                return numeric
+        return None
 
     async def handle_chat_message(self, message: str, app_state: dict[str, Any]) -> dict[str, Any]:
         text = message.strip()

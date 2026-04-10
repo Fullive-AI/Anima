@@ -1,0 +1,23 @@
+{
+  "topic": "user_humidifier_preference_and_device_context",
+  "title": "User humidifier preference and device context",
+  "category": "preference",
+  "summary": "The user has an online, functional Mijia Smart Anti-bacterial Humidifier 2, confirms 50% as the indoor humidity comfort threshold, permits automatic activation when humidity drops below 50%. When indoor humidity dropped to 29-30% below the threshold, the device was successfully turned on and set to auto mode to maintain the 50% comfort threshold, the operation passed verification and aligns with the user's comfort-first, energy and water efficiency requirements.",
+  "details": [
+    "Device model: Mijia Smart Anti-bacterial Humidifier 2",
+    "User confirmed 50% RH as indoor humidity comfort threshold",
+    "User permits automatic activation when humidity drops below 50% RH",
+    "Automatic activation at 29-30% RH completed successfully with verification passed",
+    "Device set to auto mode to maintain 50% RH comfort threshold"
+  ],
+  "device_types": [
+    "humidifier"
+  ],
+  "confidence": "high",
+  "source_actions": [
+    "plan.execute_skill",
+    "turn_on",
+    "set_mode"
+  ],
+  "updated_at": "2026-04-10T10:01:19.690465+00:00"
+}

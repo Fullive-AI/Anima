@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -35,6 +36,71 @@ class ManualDeviceRequest(BaseModel):
 
 class ActivateDeviceRequest(BaseModel):
     token: str
+
+
+class UpdateCustomSkillRequest(BaseModel):
+    mode: str = "structured"
+    name: str
+    description: str
+    device_types: list[str]
+    trigger_text: str = ""
+    action_text: str = ""
+    knowledge_md: str = ""
+    decide_md: str = ""
+
+
+SKILL_FOLDER_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+
+
+def _validate_custom_skill_folder_name(folder_name: str) -> str:
+    if not SKILL_FOLDER_RE.match(folder_name):
+        raise HTTPException(status_code=400, detail="Invalid custom skill folder name")
+    return folder_name
+
+
+def _extract_markdown_section(body: str, heading: str) -> str:
+    pattern = rf"(?ms)^##\s+{re.escape(heading)}\s*\n(.*?)(?=^##\s+|\Z)"
+    match = re.search(pattern, body)
+    return match.group(1).strip() if match else ""
+
+
+def _render_custom_skill_md(
+    *,
+    name: str,
+    description: str,
+    device_types: list[str],
+    version: str,
+    trigger_text: str,
+    action_text: str,
+) -> str:
+    frontmatter = [
+        "---",
+        f"name: {name}",
+        f"description: {description}",
+        "metadata:",
+        "  device_types:",
+        *[f"    - {device_type}" for device_type in device_types],
+        f"  version: {version}",
+        "---",
+        "",
+        f"# {name}",
+        "",
+        "## Trigger",
+        trigger_text.strip() or "Describe when this custom skill should be triggered.",
+        "",
+        "## Action",
+        action_text.strip() or "Describe what this custom skill should do when triggered.",
+        "",
+        "## Working Rules",
+        "- Keep this skill narrowly scoped to the device types above.",
+        "- Prefer safe no-op behaviour when required context is missing.",
+        "",
+        "## Success Criteria",
+        "- The skill triggers under the intended conditions.",
+        "- The skill performs the intended action safely and predictably.",
+        "",
+    ]
+    return "\n".join(frontmatter)
 
 
 def create_app(app_state: dict[str, Any]) -> FastAPI:
@@ -178,6 +244,126 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                 item.__dict__
                 for item in skill_loader.list_custom_skills_with_meta()
             ],
+        }
+
+    @app.get("/api/skills/custom/{folder_name}")
+    async def get_custom_skill_detail(folder_name: str):
+        safe_folder_name = _validate_custom_skill_folder_name(folder_name)
+        skill_loader = app_state["brain"]._skill_loader
+        skill_loader.discover()
+
+        custom_skill = next(
+            (
+                skill
+                for skill in skill_loader._cache_by_name.values()
+                if "custom" in skill.path.parts and skill.path.name == safe_folder_name
+            ),
+            None,
+        )
+        if custom_skill is None:
+            raise HTTPException(status_code=404, detail="Custom skill not found")
+
+        skill_md_path = custom_skill.path / "SKILL.md"
+        if not skill_md_path.exists():
+            raise HTTPException(status_code=404, detail="SKILL.md not found")
+
+        skill_md = skill_md_path.read_text(encoding="utf-8")
+        frontmatter, body = skill_loader._parse_frontmatter(skill_md)
+        metadata = frontmatter.get("metadata", {}) if isinstance(frontmatter.get("metadata"), dict) else {}
+        version = str(frontmatter.get("version") or metadata.get("version") or custom_skill.meta.version or "0.1.0")
+
+        return {
+            "meta": {
+                "name": custom_skill.meta.name,
+                "description": custom_skill.meta.description,
+                "scope": "custom",
+                "folder_name": safe_folder_name,
+                "device_types": list(custom_skill.meta.device_types),
+                "version": version,
+                "path": str(custom_skill.path),
+            },
+            "content": {
+                "skill_md": skill_md,
+                "knowledge_md": (custom_skill.path / "references" / "knowledge.md").read_text(encoding="utf-8") if (custom_skill.path / "references" / "knowledge.md").exists() else "",
+                "decide_md": (custom_skill.path / "references" / "decide.md").read_text(encoding="utf-8") if (custom_skill.path / "references" / "decide.md").exists() else "",
+            },
+            "structured": {
+                "trigger_text": _extract_markdown_section(body, "Trigger"),
+                "action_text": _extract_markdown_section(body, "Action"),
+            },
+            "editable": True,
+        }
+
+    @app.put("/api/skills/custom/{folder_name}")
+    async def update_custom_skill(folder_name: str, body: UpdateCustomSkillRequest):
+        safe_folder_name = _validate_custom_skill_folder_name(folder_name)
+        skill_loader = app_state["brain"]._skill_loader
+        skill_loader.discover()
+
+        custom_skill = next(
+            (
+                skill
+                for skill in skill_loader._cache_by_name.values()
+                if "custom" in skill.path.parts and skill.path.name == safe_folder_name
+            ),
+            None,
+        )
+        if custom_skill is None:
+            raise HTTPException(status_code=404, detail="Custom skill not found")
+        if body.mode != "structured":
+            raise HTTPException(status_code=400, detail="Only structured mode is supported")
+
+        name = body.name.strip()
+        description = body.description.strip()
+        device_types = [device_type.strip() for device_type in body.device_types if device_type.strip()]
+        if not name:
+            raise HTTPException(status_code=400, detail="Skill name cannot be empty")
+        if not description:
+            raise HTTPException(status_code=400, detail="Skill description cannot be empty")
+        if not device_types:
+            raise HTTPException(status_code=400, detail="At least one device type is required")
+
+        skill_md_path = custom_skill.path / "SKILL.md"
+        existing_skill_md = skill_md_path.read_text(encoding="utf-8")
+        frontmatter, _existing_body = skill_loader._parse_frontmatter(existing_skill_md)
+        metadata = frontmatter.get("metadata", {}) if isinstance(frontmatter.get("metadata"), dict) else {}
+        version = str(frontmatter.get("version") or metadata.get("version") or custom_skill.meta.version or "0.1.0")
+
+        rendered_skill_md = _render_custom_skill_md(
+            name=name,
+            description=description,
+            device_types=device_types,
+            version=version,
+            trigger_text=body.trigger_text,
+            action_text=body.action_text,
+        )
+
+        references_dir = custom_skill.path / "references"
+        references_dir.mkdir(parents=True, exist_ok=True)
+        skill_md_path.write_text(rendered_skill_md, encoding="utf-8")
+        (references_dir / "knowledge.md").write_text(body.knowledge_md or "", encoding="utf-8")
+
+        decide_path = references_dir / "decide.md"
+        if body.decide_md.strip():
+            decide_path.write_text(body.decide_md, encoding="utf-8")
+        elif not decide_path.exists():
+            decide_path.write_text("Use {current_data}, {capabilities}, {user_preferences}, {learned_profile}, {recent_history}, and {knowledge} to decide whether to return `none` or an action.", encoding="utf-8")
+
+        skill_loader.discover()
+        updated_skill = next(
+            (
+                skill
+                for skill in skill_loader._cache_by_name.values()
+                if "custom" in skill.path.parts and skill.path.name == safe_folder_name
+            ),
+            None,
+        )
+        if updated_skill is None:
+            raise HTTPException(status_code=500, detail="Skill reload failed after update")
+
+        return {
+            "status": "updated",
+            "skill": skill_loader._to_inventory_item(updated_skill).__dict__,
         }
 
     @app.get("/api/environment")

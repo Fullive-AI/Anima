@@ -10,6 +10,8 @@ interface EnvironmentPanelProps {
 const SIGNAL_META: Record<string, { label: string; icon: typeof Gauge; unitFallback?: string }> = {
   temperature: { label: '温度', icon: Thermometer, unitFallback: '°C' },
   humidity: { label: '湿度', icon: Droplets, unitFallback: '%' },
+  aqi: { label: '空气质量指数', icon: Gauge, unitFallback: 'AQI' },
+  pm10: { label: 'PM10', icon: Gauge, unitFallback: 'µg/m3' },
   brightness: { label: '亮度', icon: Lightbulb, unitFallback: '%' },
   color_temp: { label: '色温', icon: Zap, unitFallback: 'K' },
   water_level: { label: '水位', icon: Waves, unitFallback: '%' },
@@ -52,7 +54,7 @@ function formatTime(timestamp?: string) {
 
 export default function EnvironmentPanel({ environment, refreshing = false, onRefresh }: EnvironmentPanelProps) {
   const signals = environment?.signals || {}
-  const featured = ['temperature', 'humidity']
+  const featured = ['temperature', 'humidity', 'aqi', 'pm10']
     .map((name) => ({ name, summary: summarizeSignal(signals[name]) }))
     .filter((item) => item.summary)
   const deviceSignals = Object.entries(signals)
@@ -94,7 +96,7 @@ export default function EnvironmentPanel({ environment, refreshing = false, onRe
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {featured.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-xs text-slate-400 md:col-span-2 xl:col-span-4">
-                当前没有可聚合的温度、湿度类环境信号
+                当前没有可聚合的温度、湿度或空气质量类环境信号
               </div>
             ) : (
               featured.map(({ name, summary }) => {

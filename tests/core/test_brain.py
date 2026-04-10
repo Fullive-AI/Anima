@@ -310,6 +310,73 @@ class TestBrain:
         assert actions[0]["action"] == "off"
         assert actions[0]["expected_state"] == {"power": False}
 
+    def test_build_deterministic_cycle_tasks_bootstraps_air_purifier_on_startup(self):
+        brain = Brain.__new__(Brain)
+        brain._air_purifier_startup_bootstrap_pending = True
+        purifier = Device(
+            device_id="purifier_01",
+            name="Purifier",
+            adapter="fake",
+            type="air_purifier",
+            sensors=[Sensor(name="power", unit="on/off", value=False)],
+        )
+
+        tasks = brain._build_deterministic_cycle_tasks(
+            devices=[purifier],
+            lightweight_skills=[SkillSummary(name="air_purifier", description="purifier", device_type="air_purifier")],
+        )
+
+        assert len(tasks) == 1
+        assert tasks[0].kind == "execute_skill"
+        assert tasks[0].skill_name == "air_purifier"
+        assert "turn on" in tasks[0].goal
+
+    def test_build_deterministic_cycle_tasks_turns_off_purifier_when_aqi_is_low(self):
+        brain = Brain.__new__(Brain)
+        brain._air_purifier_startup_bootstrap_pending = False
+        purifier = Device(
+            device_id="purifier_01",
+            name="Purifier",
+            adapter="fake",
+            type="air_purifier",
+            sensors=[
+                Sensor(name="power", unit="on/off", value=True),
+                Sensor(name="aqi", unit="AQI", value=3),
+            ],
+        )
+
+        tasks = brain._build_deterministic_cycle_tasks(
+            devices=[purifier],
+            lightweight_skills=[SkillSummary(name="air_purifier", description="purifier", device_type="air_purifier")],
+        )
+
+        assert len(tasks) == 1
+        assert tasks[0].skill_name == "air_purifier"
+        assert "turn off" in tasks[0].goal
+
+    def test_build_deterministic_cycle_tasks_uses_average_aqi_when_aqi_missing(self):
+        brain = Brain.__new__(Brain)
+        brain._air_purifier_startup_bootstrap_pending = False
+        purifier = Device(
+            device_id="purifier_01",
+            name="Purifier",
+            adapter="fake",
+            type="air_purifier",
+            sensors=[
+                Sensor(name="power", unit="on/off", value=False),
+                Sensor(name="average_aqi", unit="AQI", value=8),
+            ],
+        )
+
+        tasks = brain._build_deterministic_cycle_tasks(
+            devices=[purifier],
+            lightweight_skills=[SkillSummary(name="air_purifier", description="purifier", device_type="air_purifier")],
+        )
+
+        assert len(tasks) == 1
+        assert tasks[0].skill_name == "air_purifier"
+        assert "turn on" in tasks[0].goal
+
     async def test_handle_chat_message_routes_device_discovery_before_unified_planner(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()

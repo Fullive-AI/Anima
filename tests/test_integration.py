@@ -674,6 +674,79 @@ class TestIntegrationPipeline:
         assert data["custom_skills"][0]["folder_name"] == "night_curtain"
         assert data["custom_skills"][0]["has_decide_prompt"] is True
 
+    async def test_custom_skill_detail_and_update_endpoints(self, tmp_path):
+        skills_dir = tmp_path / "skills"
+        custom_skill_dir = skills_dir / "custom" / "night_curtain"
+        custom_skill_dir.mkdir(parents=True)
+        (custom_skill_dir / "SKILL.md").write_text(
+            (
+                "---\n"
+                "name: night_curtain\n"
+                "description: close curtains at night\n"
+                "metadata:\n"
+                "  device_types:\n"
+                "    - curtain\n"
+                "  version: 2.0.0\n"
+                "---\n\n"
+                "# night_curtain\n\n"
+                "## Trigger\n"
+                "After 9 PM every day.\n\n"
+                "## Action\n"
+                "Close connected curtains.\n"
+            ),
+            encoding="utf-8",
+        )
+        (custom_skill_dir / "references").mkdir()
+        (custom_skill_dir / "references" / "knowledge.md").write_text("Curtains should close after dark.", encoding="utf-8")
+        (custom_skill_dir / "references" / "decide.md").write_text("Return none with {current_data}.", encoding="utf-8")
+
+        loader = SkillLoader(skills_dir=str(skills_dir))
+        loader.discover()
+        memory = MemoryStore(base_dir=str(tmp_path / "memory"))
+        brain = Brain(bus=EventBus(), skill_loader=loader, memory=memory)
+
+        app = create_app({
+            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+            "brain": brain,
+            "memory": memory,
+            "settings": FakeSettings(),
+        })
+        client = TestClient(app)
+
+        detail = client.get("/api/skills/custom/night_curtain")
+
+        assert detail.status_code == 200
+        detail_data = detail.json()
+        assert detail_data["meta"]["name"] == "night_curtain"
+        assert detail_data["structured"]["trigger_text"] == "After 9 PM every day."
+        assert detail_data["structured"]["action_text"] == "Close connected curtains."
+
+        update = client.put(
+            "/api/skills/custom/night_curtain",
+            json={
+                "mode": "structured",
+                "name": "night_curtain",
+                "description": "close curtains at 10 PM",
+                "device_types": ["curtain"],
+                "trigger_text": "At 10 PM every day.",
+                "action_text": "Close bedroom curtains.",
+                "knowledge_md": "Keep curtains closed overnight.",
+                "decide_md": "Return an action when the time condition is met.",
+            },
+        )
+
+        assert update.status_code == 200
+        update_data = update.json()
+        assert update_data["status"] == "updated"
+        assert update_data["skill"]["description"] == "close curtains at 10 PM"
+
+        updated_skill_md = (custom_skill_dir / "SKILL.md").read_text(encoding="utf-8")
+        assert "description: close curtains at 10 PM" in updated_skill_md
+        assert "## Trigger\nAt 10 PM every day." in updated_skill_md
+        assert "## Action\nClose bedroom curtains." in updated_skill_md
+        assert (custom_skill_dir / "references" / "knowledge.md").read_text(encoding="utf-8") == "Keep curtains closed overnight."
+        assert (custom_skill_dir / "references" / "decide.md").read_text(encoding="utf-8") == "Return an action when the time condition is met."
+
     async def test_audio_file_endpoint_serves_registered_local_audio(self, tmp_path):
         audio_file = tmp_path / "sample.wav"
         audio_file.write_bytes(b"RIFFdemoWAVE")

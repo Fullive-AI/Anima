@@ -130,7 +130,10 @@ export default function DecisionLog({ decisions, liveTrace, onDevicesChanged, on
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [conversation, setConversation] = useState<ConversationTurn[]>([])
-  const recent = [...decisions].reverse().slice(0, 30)
+  const recent = [...decisions]
+    .filter((decision) => decision.action && !decision.action.startsWith('plan.'))
+    .reverse()
+    .slice(0, 30)
 
   const updateConversation = (id: string, updater: (turn: ConversationTurn) => ConversationTurn) => {
     setConversation((items) => items.map((item) => (item.id === id ? updater(item) : item)))
@@ -351,13 +354,13 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
           ) : null}
         </AssistantBubble>
 
-        {(turn.result.task_plan_items || []).map((task, index) => (
+        {(turn.result.task_plan_items || []).filter((task) => task.kind !== 'reply').map((task, index) => (
           <AssistantBubble key={`${turn.id}-plan-${index}`} timestamp={turn.timestamp} accent="violet">
             <TaskPlanCard task={task} />
           </AssistantBubble>
         ))}
 
-        {(turn.result.task_results || []).map((task, index) => (
+        {(turn.result.task_results || []).filter((task) => task.kind !== 'reply').map((task, index) => (
           <AssistantBubble key={`${turn.id}-task-${index}`} timestamp={turn.timestamp} accent="slate">
             <TaskResultCard task={task} />
           </AssistantBubble>

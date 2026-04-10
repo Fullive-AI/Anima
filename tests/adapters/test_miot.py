@@ -63,6 +63,68 @@ class TestMIoTAdapter:
         assert device.get_sensor("humidity").value == 48
         assert device.get_sensor("water_level").value == 75
 
+    async def test_subscribe_refreshes_air_purifier_air_quality_sensors(self):
+        adapter = MIoTAdapter()
+        device = Device(
+            device_id="miot_air_purifier",
+            name="Air Purifier",
+            adapter="miot",
+            type="air_purifier",
+            sensors=[
+                Sensor(name="power", unit="on/off"),
+                Sensor(name="pm2_5", unit="µg/m3"),
+                Sensor(name="aqi", unit="AQI"),
+                Sensor(name="tvoc", unit="ppb"),
+                Sensor(name="co2", unit="ppm"),
+                Sensor(name="temperature", unit="°C"),
+                Sensor(name="humidity", unit="%"),
+            ],
+        )
+
+        status = SimpleNamespace(
+            is_on=True,
+            pm2_5=12,
+            aqi=21,
+            tvoc=87,
+            co2=514,
+            temperature=24.6,
+            humidity=46,
+        )
+        miio_device = SimpleNamespace(status=lambda: status)
+
+        with patch.object(adapter, "_get_miio_device", return_value=miio_device):
+            await adapter.subscribe(device)
+
+        assert device.get_sensor("power").value is True
+        assert device.get_sensor("pm2_5").value == 12
+        assert device.get_sensor("aqi").value == 21
+        assert device.get_sensor("tvoc").value == 87
+        assert device.get_sensor("co2").value == 514
+        assert device.get_sensor("temperature").value == 24.6
+        assert device.get_sensor("humidity").value == 46
+
+    async def test_subscribe_maps_aqi_to_pm25_when_pm25_field_is_missing(self):
+        adapter = MIoTAdapter()
+        device = Device(
+            device_id="miot_air_purifier",
+            name="Air Purifier",
+            adapter="miot",
+            type="air_purifier",
+            sensors=[
+                Sensor(name="pm2_5", unit="µg/m3"),
+                Sensor(name="aqi", unit="AQI"),
+            ],
+        )
+
+        status = SimpleNamespace(aqi=9)
+        miio_device = SimpleNamespace(status=lambda: status)
+
+        with patch.object(adapter, "_get_miio_device", return_value=miio_device):
+            await adapter.subscribe(device)
+
+        assert device.get_sensor("aqi").value == 9
+        assert device.get_sensor("pm2_5").value == 9
+
     def test_unknown_model_gets_generic_reflection_capabilities(self):
         adapter = MIoTAdapter()
 

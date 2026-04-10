@@ -129,6 +129,7 @@ class Anima:
         await self._ensure_system_skills_for_devices(app_state)
         await self._ensure_cold_start_profiles()
         await self._maybe_start_onboarding(app_state)
+        await self._run_brain_cycle_serially()
 
     async def _maybe_start_onboarding(self, app_state: dict[str, object]) -> None:
         if app_state.get("_xiaomi_qr_flow"):
