@@ -11,6 +11,8 @@
     "air_purifier"
   ],
   "confidence": "high",
-  "source_actions": [],
-  "updated_at": "2026-04-10T07:38:37.275792+00:00"
+  "source_actions": [
+    "plan.reply"
+  ],
+  "updated_at": "2026-04-10T07:47:18.369990+00:00"
 }

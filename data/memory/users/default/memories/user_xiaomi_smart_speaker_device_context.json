@@ -4,14 +4,16 @@
   "category": "context",
   "summary": "The user has a connected functional Xiaomi Smart Speaker that can accept and execute playback commands, and random local playback is executed per platform rules when sound output is requested without specified content.",
   "details": [
-    "User has a connected functional Xiaomi Smart Speaker",
-    "Device accepts and executes playback commands",
-    "Random local playback runs per platform rules for unspecified sound output requests"
+    "User has a connected, functional Xiaomi Smart Speaker",
+    "Device can accept and execute playback commands",
+    "Random local playback runs per platform rules when sound output is requested without specified content"
   ],
   "device_types": [
     "smart_speaker"
   ],
   "confidence": "high",
-  "source_actions": [],
-  "updated_at": "2026-04-10T07:38:37.275479+00:00"
+  "source_actions": [
+    "plan.reply"
+  ],
+  "updated_at": "2026-04-10T07:47:18.369634+00:00"
 }

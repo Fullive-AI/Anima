@@ -4,7 +4,6 @@ import DeviceList from './components/DeviceList'
 import DeviceCard from './components/DeviceCard'
 import DecisionLog, { type LiveTrace } from './components/DecisionLog'
 import EnvironmentPanel from './components/EnvironmentPanel'
-import ChatBar from './components/ChatBar'
 import SettingsPanel from './components/SettingsPanel'
 import HelpPanel from './components/HelpPanel'
 import StartupOnboardingModal from './components/StartupOnboardingModal'
@@ -64,10 +63,14 @@ export default function App() {
             <DeviceCard devices={devices} selectedId={selectedId} onDevicesChanged={refresh} />
           </div>
         </main>
-        <DecisionLog decisions={decisions} liveTrace={liveTrace} />
+        <DecisionLog
+          decisions={decisions}
+          liveTrace={liveTrace}
+          onDevicesChanged={refresh}
+          onChatResult={handleChatResult}
+        />
       </div>
 
-      <ChatBar onDevicesChanged={refresh} onChatResult={handleChatResult} />
       <StartupOnboardingModal onDevicesChanged={refresh} />
 
       <SettingsPanel

@@ -4,8 +4,8 @@
   "category": "context",
   "summary": "No air conditioning devices are currently connected to the user's smart home, and local network scanning for available air conditioner devices remains ongoing.",
   "details": [
-    "No air conditioning devices connected to the user's smart home",
-    "Local network scanning for available air conditioner devices is ongoing"
+    "No air conditioning devices are currently connected to the user's smart home",
+    "Local network scanning for available air conditioner devices remains ongoing"
   ],
   "device_types": [
     "air_conditioner"
@@ -14,5 +14,5 @@
   "source_actions": [
     "plan.reply"
   ],
-  "updated_at": "2026-04-10T07:43:29.172161+00:00"
+  "updated_at": "2026-04-10T07:48:12.492805+00:00"
 }

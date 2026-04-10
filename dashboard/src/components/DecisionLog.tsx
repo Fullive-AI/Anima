@@ -1,15 +1,38 @@
-import { Brain, Clock, GitBranch, MessageSquareMore, RefreshCw, Sparkles, Wrench } from 'lucide-react'
-import type { ChatExecutionResult, ChatResponse, ChatTaskPlanItem, ChatTaskResult, Decision } from '../hooks/useApi'
+import { useState } from 'react'
+import {
+  Brain,
+  Clock,
+  GitBranch,
+  Loader2,
+  MessageSquare,
+  MessageSquareMore,
+  RefreshCw,
+  Send,
+  Sparkles,
+  Wrench,
+} from 'lucide-react'
+import { api, type ChatExecutionResult, type ChatResponse, type ChatTaskPlanItem, type ChatTaskResult, type Decision } from '../hooks/useApi'
 
 interface DecisionLogProps {
   decisions: Decision[]
   liveTrace?: LiveTrace | null
+  onDevicesChanged: () => void
+  onChatResult?: (message: string, result: ChatResponse) => void
 }
 
 export interface LiveTrace {
   timestamp: string
   message: string
   result: ChatResponse
+}
+
+interface ConversationTurn {
+  id: string
+  timestamp: string
+  userMessage: string
+  result: ChatResponse
+  qrImage?: string
+  qrPolling?: boolean
 }
 
 function formatTime(ts?: string) {
@@ -22,18 +45,123 @@ function formatTime(ts?: string) {
   }
 }
 
-export default function DecisionLog({ decisions, liveTrace }: DecisionLogProps) {
-  const recent = [...decisions].reverse().slice(0, 50)
+export default function DecisionLog({ decisions, liveTrace, onDevicesChanged, onChatResult }: DecisionLogProps) {
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [conversation, setConversation] = useState<ConversationTurn[]>([])
+  const recent = [...decisions].reverse().slice(0, 30)
+
+  const updateConversation = (id: string, updater: (turn: ConversationTurn) => ConversationTurn) => {
+    setConversation((items) => items.map((item) => (item.id === id ? updater(item) : item)))
+  }
+
+  const handleSend = async () => {
+    const text = message.trim()
+    if (!text || sending) return
+
+    setSending(true)
+    try {
+      const result = await api.chat(text)
+      const turnId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const timestamp = new Date().toISOString()
+      setConversation((items) => [
+        ...items,
+        {
+          id: turnId,
+          timestamp,
+          userMessage: text,
+          result,
+          qrImage: result.qr_image_b64 || '',
+          qrPolling: false,
+        },
+      ])
+      onChatResult?.(text, result)
+      setMessage('')
+
+      if (result.refresh_devices) {
+        onDevicesChanged()
+      }
+
+      if (result.status === 'qr_required' && result.qr_image_b64) {
+        updateConversation(turnId, (turn) => ({ ...turn, qrPolling: true }))
+        const country = result.country || 'cn'
+        const pollInterval = window.setInterval(async () => {
+          try {
+            const response = await fetch('/api/settings/xiaomi/qr/poll', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ country }),
+            })
+            const pollResult = await response.json()
+            if (pollResult.status === 'qr_pending') return
+
+            window.clearInterval(pollInterval)
+            updateConversation(turnId, (turn) => ({ ...turn, qrPolling: false, qrImage: '' }))
+
+            if (pollResult.status === 'ok') {
+              const reply = `连接成功：云端 ${pollResult.cloud_devices || 0} 台设备，更新 ${pollResult.updated || 0} 台，新增 ${pollResult.registered || 0} 台。`
+              updateConversation(turnId, (turn) => ({
+                ...turn,
+                result: { ...turn.result, reply },
+              }))
+              onDevicesChanged()
+              return
+            }
+
+            updateConversation(turnId, (turn) => ({
+              ...turn,
+              result: { ...turn.result, reply: pollResult.error || '扫码登录失败' },
+            }))
+          } catch {
+            window.clearInterval(pollInterval)
+            updateConversation(turnId, (turn) => ({
+              ...turn,
+              qrPolling: false,
+              result: { ...turn.result, reply: '扫码状态轮询失败，请稍后重试' },
+            }))
+          }
+        }, 2000)
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '连接失败，请检查后端是否运行'
+      setConversation((items) => [
+        ...items,
+        {
+          id: `${Date.now()}-error`,
+          timestamp: new Date().toISOString(),
+          userMessage: text,
+          result: { reply: errorMessage },
+        },
+      ])
+      setMessage('')
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
-    <aside className="w-72 min-w-[288px] bg-white border-l border-slate-200 flex flex-col">
+    <aside className="w-[420px] min-w-[420px] border-l border-slate-200 bg-white flex flex-col">
       <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2">
         <Brain className="w-4 h-4 text-violet-500" />
-        <h2 className="text-sm font-medium text-slate-500 uppercase tracking-wider">AI 决策流</h2>
+        <div>
+          <h2 className="text-sm font-medium text-slate-500 uppercase tracking-wider">对话与 AI 决策流</h2>
+          <p className="text-xs text-slate-400">连续展示用户消息、Anima 回复和每一步执行进度</p>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {liveTrace && (
+      <div className="flex-1 overflow-y-auto bg-slate-50/70">
+        {conversation.length === 0 && !liveTrace ? (
+          <div className="p-5 text-sm text-slate-400">
+            <p>右侧会持续展示完整对话和执行进度。</p>
+            <p className="mt-1 text-xs">你发起的每一轮请求、Anima 的回复、plan 和 skill 执行都会留在这里。</p>
+          </div>
+        ) : null}
+
+        {conversation.map((turn) => (
+          <ConversationCard key={turn.id} turn={turn} />
+        ))}
+
+        {!conversation.length && liveTrace ? (
           <div className="border-b border-slate-200 bg-violet-50/50 p-4">
             <div className="mb-2 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-violet-500" />
@@ -47,55 +175,125 @@ export default function DecisionLog({ decisions, liveTrace }: DecisionLogProps) 
               <p className="text-sm text-slate-700">{liveTrace.message}</p>
               <p className="mt-1 text-xs text-violet-700">{liveTrace.result.reply}</p>
             </div>
-            <div className="space-y-2">
-              {(liveTrace.result.task_plan_items || []).map((task, index) => (
-                <TaskPlanCard key={`${liveTrace.timestamp}-plan-${index}`} task={task} />
-              ))}
-              {(liveTrace.result.task_results || []).map((task, index) => (
-                <TaskResultCard key={`${liveTrace.timestamp}-${index}`} task={task} />
-              ))}
-              {(liveTrace.result.execution_results || []).map((item, index) => (
-                <ExecutionResultCard key={`${liveTrace.timestamp}-exec-${index}`} item={item} />
-              ))}
-            </div>
           </div>
-        )}
+        ) : null}
 
-        {recent.length === 0 ? (
-          <div className="p-4 text-sm text-slate-400 text-center">
-            <p>暂无决策记录</p>
-            <p className="mt-1 text-xs">AI 做出决策后会实时显示在这里</p>
+        <div className="border-t border-slate-200 bg-white px-4 py-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">系统决策记录</span>
           </div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {recent.map((d, i) => (
-              <li key={i} className="px-4 py-3 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-3 h-3 text-slate-300" />
-                  <span className="text-xs text-slate-400 font-mono">{formatTime(d.timestamp)}</span>
-                </div>
-                <p className="text-sm text-slate-700">
-                  <span className="text-violet-600 font-medium">{formatDecisionAction(d.action)}</span>
-                  {d.device_id && <span className="text-slate-400"> → {d.device_id}</span>}
-                </p>
-                {d.reason && (
-                  <p className="text-xs text-slate-400 mt-1">{d.reason}</p>
-                )}
-                {d.action?.startsWith('plan.') && 'goal' in d && typeof d.goal === 'string' && d.goal && (
-                  <p className="mt-1 text-xs text-violet-600">{d.goal}</p>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+          {recent.length === 0 ? (
+            <p className="text-sm text-slate-400">暂无决策记录</p>
+          ) : (
+            <ul className="space-y-2">
+              {recent.map((d, i) => (
+                <li key={i} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-3 h-3 text-slate-300" />
+                    <span className="text-xs text-slate-400 font-mono">{formatTime(d.timestamp)}</span>
+                  </div>
+                  <p className="text-sm text-slate-700">
+                    <span className="text-violet-600 font-medium">{formatDecisionAction(d.action)}</span>
+                    {d.device_id && <span className="text-slate-400"> → {d.device_id}</span>}
+                  </p>
+                  {d.reason ? <p className="text-xs text-slate-400 mt-1">{d.reason}</p> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 bg-white p-4">
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <div className="mb-2 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-slate-400" />
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">对话输入</span>
+            </div>
+            <textarea
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  void handleSend()
+                }
+              }}
+              rows={3}
+              placeholder="直接提需求、补充澄清信息，或让 Anima 新增一个 skill..."
+              className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
+            />
+          </div>
+          <button
+            onClick={() => void handleSend()}
+            disabled={sending || !message.trim()}
+            className="inline-flex h-[52px] items-center gap-2 rounded-2xl bg-violet-500 px-4 text-sm font-medium text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <span>{sending ? '发送中' : '发送'}</span>
+          </button>
+        </div>
       </div>
     </aside>
   )
 }
 
+function ConversationCard({ turn }: { turn: ConversationTurn }) {
+  return (
+    <div className="border-b border-slate-200 bg-white px-4 py-4">
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-[20px] rounded-tr-md bg-slate-900 px-4 py-3 text-sm leading-6 text-white shadow-sm">
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-400">You · {formatTime(turn.timestamp)}</div>
+          {turn.userMessage}
+        </div>
+      </div>
+
+      <div className="mt-3 flex">
+        <div className="max-w-[92%] rounded-[22px] rounded-tl-md border border-violet-100 bg-violet-50 px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">
+          <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-violet-600">
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Anima · {formatTime(turn.timestamp)}</span>
+          </div>
+          <p>{turn.result.reply}</p>
+
+          {turn.qrImage ? (
+            <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
+              <img
+                src={`data:image/png;base64,${turn.qrImage}`}
+                alt="米家扫码登录"
+                className="mx-auto h-40 w-40 rounded-lg border border-slate-200"
+              />
+              <p className="mt-2 flex items-center justify-center gap-2 text-sm text-violet-600">
+                <Loader2 className={`h-4 w-4 ${turn.qrPolling ? 'animate-spin' : ''}`} />
+                请让客户打开米家 App 扫码
+              </p>
+            </div>
+          ) : null}
+
+          {(turn.result.task_plan_items?.length || turn.result.task_results?.length || turn.result.execution_results?.length) ? (
+            <div className="mt-4 space-y-2">
+              {(turn.result.task_plan_items || []).map((task, index) => (
+                <TaskPlanCard key={`${turn.id}-plan-${index}`} task={task} />
+              ))}
+              {(turn.result.task_results || []).map((task, index) => (
+                <TaskResultCard key={`${turn.id}-task-${index}`} task={task} />
+              ))}
+              {(turn.result.execution_results || []).map((item, index) => (
+                <ExecutionResultCard key={`${turn.id}-exec-${index}`} item={item} />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TaskPlanCard({ task }: { task: ChatTaskPlanItem }) {
   return (
-    <div className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2">
+    <div className="rounded-lg border border-violet-100 bg-white px-3 py-2">
       <div className="flex items-center gap-2">
         <GitBranch className="h-4 w-4 text-violet-600" />
         <span className="text-sm font-medium text-violet-700">
@@ -117,7 +315,7 @@ function TaskResultCard({ task }: { task: ChatTaskResult }) {
         {getTaskIcon(task.kind)}
         <span className="text-sm font-medium text-slate-700">{label}</span>
       </div>
-      {detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}
+      {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
     </div>
   )
 }

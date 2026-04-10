@@ -5,8 +5,7 @@
   "summary": "The user prefers 50% or higher ambient humidity for comfort, permits automatic re-activation attempts after prior failed activations, and their Mijia Smart Anti-bacterial Humidifier 2 has persistent connection or functional issues that consistently prevent successful automatic activation, with multiple recent automatic activation attempts all failing.",
   "details": [
     "User prefers 50% or higher ambient humidity for comfort",
-    "User permits automatic re-activation attempts after failed humidifier activation",
-    "User's Mijia Smart Anti-bacterial Humidifier 2 has persistent connection/functional issues",
+    "Mijia Smart Anti-bacterial Humidifier 2 has persistent connection or functional issues blocking successful automatic activation",
     "Multiple recent automatic activation attempts for the humidifier have failed"
   ],
   "device_types": [
@@ -16,5 +15,5 @@
   "source_actions": [
     "plan.reply"
   ],
-  "updated_at": "2026-04-10T07:43:29.173442+00:00"
+  "updated_at": "2026-04-10T07:48:12.495186+00:00"
 }

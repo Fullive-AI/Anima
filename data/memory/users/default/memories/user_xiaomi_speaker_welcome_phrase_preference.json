@@ -10,6 +10,8 @@
     "smart_speaker"
   ],
   "confidence": "high",
-  "source_actions": [],
-  "updated_at": "2026-04-10T07:38:37.276864+00:00"
+  "source_actions": [
+    "plan.reply"
+  ],
+  "updated_at": "2026-04-10T07:47:18.370911+00:00"
 }
