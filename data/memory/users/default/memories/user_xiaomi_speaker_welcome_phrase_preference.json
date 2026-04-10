@@ -4,14 +4,14 @@
   "category": "preference",
   "summary": "The user repeatedly requests the Xiaomi Smart Speaker to use a specific welcome phrase.",
   "details": [
-    "User repeatedly requests Xiaomi Smart Speaker to use a specific welcome phrase"
+    "User repeatedly requests Xiaomi Smart Speaker to use a specific custom welcome phrase"
   ],
   "device_types": [
     "smart_speaker"
   ],
-  "confidence": "high",
+  "confidence": "medium",
   "source_actions": [
     "plan.reply"
   ],
-  "updated_at": "2026-04-09T10:03:18.899212+00:00"
+  "updated_at": "2026-04-10T03:46:12.960441+00:00"
 }

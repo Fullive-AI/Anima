@@ -64,6 +64,9 @@ class Anima:
             audio_registry=self.audio_registry,
             token_store_path=f"{settings.data_dir}/xiaomi_mina_token.json",
         )
+        self._brain_cycle_lock = asyncio.Lock()
+        self._brain_cycle_pending = False
+        self._brain_cycle_task: asyncio.Task[None] | None = None
 
         # Adapters
         adapters = [MIoTAdapter(settings_store=self.settings_store, speaker_player=self.speaker_player)]
@@ -91,17 +94,7 @@ class Anima:
         }
 
         # Setup scheduled jobs
-        self.scheduler.add_job("device_scan", self.discovery.scan, interval_seconds=300)
-        self.scheduler.add_job(
-            "learn_preferences",
-            lambda: self.preference_learner.run_now(),
-            interval_seconds=300,
-        )
-        self.scheduler.add_job(
-            "brain_tick",
-            self.brain.run_cycle,
-            interval_seconds=60,
-        )
+        self._register_scheduler_jobs()
 
         if mode == "cli":
             logger.info("Scanning for devices...")
@@ -190,9 +183,9 @@ class Anima:
         # Update cached sensor values
         self.discovery.update_device_sensors(device_id, sensor_data)
 
-        # Trigger the scheduler-driven Brain graph so all sensor updates flow
-        # through model planning instead of short-circuiting via rules.
-        await self.brain.run_cycle()
+        # Queue a serialized Brain cycle so sensor refreshes can drive planning
+        # without re-entering nested cycles during command verification.
+        self._request_brain_cycle()
 
     async def _on_device_discovered(self, event: Event) -> None:
         device_id = event.device_id
@@ -238,6 +231,53 @@ class Anima:
                 logger.info("Auto-generated system skills: %s", ", ".join(created))
         except Exception:
             logger.exception("Failed to auto-generate missing system skills")
+
+    def _register_scheduler_jobs(self) -> None:
+        self.scheduler.add_job("device_scan", self.discovery.scan, interval_seconds=7200)
+        self.scheduler.add_job(
+            "environment_refresh",
+            self.discovery.refresh_device_states,
+            interval_seconds=60,
+        )
+        self.scheduler.add_job(
+            "learn_preferences",
+            lambda: self.preference_learner.run_now(),
+            interval_seconds=300,
+        )
+        self.scheduler.add_job(
+            "brain_tick",
+            self._run_brain_cycle_serially,
+            interval_seconds=60,
+        )
+
+    def _ensure_brain_cycle_state(self) -> None:
+        if not hasattr(self, "_brain_cycle_lock"):
+            self._brain_cycle_lock = asyncio.Lock()
+        if not hasattr(self, "_brain_cycle_pending"):
+            self._brain_cycle_pending = False
+        if not hasattr(self, "_brain_cycle_task"):
+            self._brain_cycle_task = None
+
+    def _request_brain_cycle(self) -> None:
+        self._ensure_brain_cycle_state()
+        self._brain_cycle_pending = True
+        task = self._brain_cycle_task
+        if task is not None and not task.done():
+            return
+        self._brain_cycle_task = asyncio.create_task(self._drain_brain_cycles())
+
+    async def _run_brain_cycle_serially(self) -> None:
+        self._request_brain_cycle()
+        task = self._brain_cycle_task
+        if task is not None:
+            await task
+
+    async def _drain_brain_cycles(self) -> None:
+        self._ensure_brain_cycle_state()
+        async with self._brain_cycle_lock:
+            while self._brain_cycle_pending:
+                self._brain_cycle_pending = False
+                await self.brain.run_cycle()
 
     async def _ensure_cold_start_profiles(self) -> None:
         device_types = [
