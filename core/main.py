@@ -27,7 +27,7 @@ from core.scheduler.scheduler import Scheduler
 from core.models import Event, EventType
 
 # Adapters
-from adapters.miot.adapter import MIoTAdapter
+from adapters.miot.adapter import MIoTAdapter, MIIO_AVAILABLE as _MIOT_AVAILABLE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,7 +69,7 @@ class Anima:
         self._brain_cycle_task: asyncio.Task[None] | None = None
 
         # Adapters
-        adapters = [MIoTAdapter(settings_store=self.settings_store, speaker_player=self.speaker_player)]
+        adapters = [MIoTAdapter(settings_store=self.settings_store, speaker_player=self.speaker_player)] if _MIOT_AVAILABLE else []
         self.discovery = DiscoveryOrchestrator(bus=self.bus, adapters=adapters)
         self.brain.set_environment_provider(self.discovery.get_all_devices)
 

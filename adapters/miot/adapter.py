@@ -3,8 +3,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import miio
-from miio.integrations.airpurifier.zhimi.airpurifier_miot import AirPurifierMiot
+try:
+    import miio
+    from miio.integrations.airpurifier.zhimi.airpurifier_miot import AirPurifierMiot
+    MIIO_AVAILABLE = True
+except ImportError:
+    miio = None  # type: ignore[assignment]
+    AirPurifierMiot = None  # type: ignore[assignment]
+    MIIO_AVAILABLE = False
 
 from adapters.base import BaseAdapter
 from core.models import ActionResult, Capability, Device, Sensor
@@ -18,8 +24,9 @@ logger = logging.getLogger(__name__)
 
 # Alias newer Xiaomi purifier model names to the closest supported MIoT mapping
 # from python-miio so dynamic commands can resolve set_property() mappings.
-if "xiaomi.airp.mp5" not in AirPurifierMiot._mappings and "zhimi.airp.mb5" in AirPurifierMiot._mappings:
-    AirPurifierMiot._mappings["xiaomi.airp.mp5"] = AirPurifierMiot._mappings["zhimi.airp.mb5"]
+if MIIO_AVAILABLE and AirPurifierMiot is not None:
+    if "xiaomi.airp.mp5" not in AirPurifierMiot._mappings and "zhimi.airp.mb5" in AirPurifierMiot._mappings:
+        AirPurifierMiot._mappings["xiaomi.airp.mp5"] = AirPurifierMiot._mappings["zhimi.airp.mb5"]
 
 # Model prefix → device type mapping
 MODEL_TYPE_MAP = {
@@ -48,7 +55,7 @@ class MIoTAdapter(BaseAdapter):
     name = "miot"
 
     def __init__(self, settings_store=None, speaker_player=None) -> None:
-        self._known_devices: dict[str, miio.Device] = {}
+        self._known_devices: dict[str, Any] = {}
         self._device_infos: dict[str, dict] = {}
         self._settings = settings_store
         self._speaker_player = speaker_player
@@ -274,6 +281,9 @@ class MIoTAdapter(BaseAdapter):
         return devices
 
     async def discover(self) -> list[Device]:
+        if not MIIO_AVAILABLE:
+            logger.warning("python-miio not installed, MIoT adapter disabled. Install with: uv sync --extra miot")
+            return []
         seen_ips: set[str] = set()
         seen_ids: set[str] = set()
         devices: list[Device] = []
@@ -332,7 +342,10 @@ class MIoTAdapter(BaseAdapter):
         )
         return devices
 
-    def _get_miio_device(self, device_id: str) -> miio.Device | None:
+    def _get_miio_device(self, device_id: str) -> Any | None:
+        if not MIIO_AVAILABLE:
+            return None
+
         info = self._device_infos.get(device_id)
         if not info:
             return None

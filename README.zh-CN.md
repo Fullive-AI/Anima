@@ -29,10 +29,7 @@ pnpm install
 # 配置
 cp .env.example .env      # 填入 ANIMA_LLM_API_KEY
 
-# 启动 MQTT Broker
-docker compose up mqtt -d
-
-# 启动（控制面板 + 后端同时启动）
+# 启动（MQTT Broker + 控制面板 + 后端同时启动）
 pnpm dev
 ```
 
@@ -54,7 +51,6 @@ pnpm dev
 
 - [Node.js](https://nodejs.org/) >= 18 + [pnpm](https://pnpm.io/) >= 8
 - [uv](https://docs.astral.sh/uv/)（Python 包管理器，pnpm install 时自动安装后端依赖）
-- [Docker](https://www.docker.com/)（用于 MQTT Broker）
 
 ## 架构
 

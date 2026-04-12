@@ -4,9 +4,10 @@
   "private": true,
   "description": "Make Every Hardware Intelligent",
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c blue,green \"pnpm run dev:backend\" \"pnpm run dev:frontend\"",
+    "dev": "concurrently -n broker,backend,frontend -c yellow,blue,green \"pnpm run dev:broker\" \"pnpm run dev:backend\" \"pnpm run dev:frontend\"",
     "dev:frontend": "pnpm --filter dashboard dev",
     "dev:backend": "cd . && uv run python -m core.main",
+    "dev:broker": "uv run amqtt -c amqtt.yaml",
     "build": "pnpm --filter dashboard build",
     "postinstall": "uv sync --extra dev --python 3.13"
   },
