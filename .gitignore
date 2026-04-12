@@ -12,3 +12,10 @@ data/memory/users/*/learned.md
 data/config.json
 node_modules/
 dashboard/dist/
+
+# Local IDE / tool artifacts
+.claude/settings.local.json
+.playwright-mcp/
+
+# Duplicate / temp files
+CLAUDE copy.md
