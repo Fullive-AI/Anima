@@ -1,10 +1,14 @@
 # Anima — Make Every Hardware Intelligent
 
 ## Quick Start
-cd anima && uv sync
-cp .env.example .env  # fill in LLM_API_KEY
-docker compose up mqtt -d  # start MQTT broker
-uv run python -m core.main  # start Anima
+pnpm install
+cp .env.example .env  # fill in ANIMA_LLM_API_KEY
+pnpm dev              # starts MQTT broker + backend (port 8080) + frontend (port 3000) together
+
+# Or start individually:
+# pnpm dev:broker    — MQTT broker (amqtt)
+# pnpm dev:backend   — Python backend only (uv run python -m core.main)
+# pnpm dev:frontend  — React dashboard only (port 3000)
 
 ## Test
 cd anima && uv run pytest tests/ -v

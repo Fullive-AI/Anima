@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-import miio
+try:
+    import miio
+except ImportError:
+    miio = None  # type: ignore[assignment]
 
 
 def default_sensors(device_type: str, *, include_generic: bool = False) -> list[tuple[str, str]]:

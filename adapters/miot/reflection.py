@@ -4,7 +4,10 @@ import enum
 import inspect
 from typing import Any
 
-import miio
+try:
+    import miio
+except ImportError:
+    miio = None  # type: ignore[assignment]
 
 from core.models import Capability
 

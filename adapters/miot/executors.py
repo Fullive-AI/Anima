@@ -3,8 +3,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import miio
-from miio.integrations.airpurifier.zhimi.airpurifier_miot import AirPurifierMiot
+try:
+    import miio
+    from miio.integrations.airpurifier.zhimi.airpurifier_miot import AirPurifierMiot
+except ImportError:
+    miio = None  # type: ignore[assignment]
+    AirPurifierMiot = None  # type: ignore[assignment]
 
 from .reflection import coerce_command_value, extract_command_inputs
 

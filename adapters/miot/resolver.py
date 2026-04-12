@@ -3,13 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import miio
-from miio.airconditioner_miot import AirConditionerMiot
-from miio.integrations.airpurifier.zhimi.airpurifier_miot import AirPurifierMiot
-from miio.integrations.humidifier.deerma.airhumidifier_jsqs import AirHumidifierJsqs
-from miio.integrations.humidifier.deerma.airhumidifier_mjjsq import AirHumidifierMjjsq
-from miio.integrations.humidifier.zhimi.airhumidifier import AirHumidifier
-from miio.integrations.light.yeelight.yeelight import Yeelight
+try:
+    import miio
+    from miio.airconditioner_miot import AirConditionerMiot
+    from miio.integrations.airpurifier.zhimi.airpurifier_miot import AirPurifierMiot
+    from miio.integrations.humidifier.deerma.airhumidifier_jsqs import AirHumidifierJsqs
+    from miio.integrations.humidifier.deerma.airhumidifier_mjjsq import AirHumidifierMjjsq
+    from miio.integrations.humidifier.zhimi.airhumidifier import AirHumidifier
+    from miio.integrations.light.yeelight.yeelight import Yeelight
+except ImportError:
+    miio = None  # type: ignore[assignment]
+    AirConditionerMiot = None  # type: ignore[assignment]
+    AirPurifierMiot = None  # type: ignore[assignment]
+    AirHumidifierJsqs = None  # type: ignore[assignment]
+    AirHumidifierMjjsq = None  # type: ignore[assignment]
+    AirHumidifier = None  # type: ignore[assignment]
+    Yeelight = None  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)
