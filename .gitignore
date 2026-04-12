@@ -19,3 +19,8 @@ dashboard/dist/
 
 # Duplicate / temp files
 CLAUDE copy.md
+
+# Ralph automation tool
+.ralph/
+.ralphrc
+/tests/e2e/screenshots

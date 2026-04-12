@@ -34,66 +34,55 @@ export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp
   }
 
   return (
-    <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shadow-sm">
+    <header className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
       <div className="flex items-center gap-3">
-        <Activity className="w-6 h-6 text-violet-500" />
-        <h1 className="text-xl font-semibold text-slate-800">Anima</h1>
-        <span className="text-sm text-slate-400">Make Every Hardware Intelligent</span>
+        <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-violet-600 shadow-sm">
+          <Activity className="w-4 h-4 text-white" />
+        </div>
+        <h1 className="text-base font-semibold text-slate-900 tracking-tight">Anima</h1>
+        <span className="hidden sm:block text-xs text-slate-400 font-medium">Make Every Hardware Intelligent</span>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-sm">
-          {connected ? (
-            <><Wifi className="w-4 h-4 text-emerald-500" /><span className="text-emerald-600">在线</span></>
-          ) : (
-            <><WifiOff className="w-4 h-4 text-red-400" /><span className="text-red-500">离线</span></>
-          )}
+      <div className="flex items-center gap-1.5">
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium mr-2 ${
+          connected
+            ? 'bg-emerald-50 text-emerald-700'
+            : 'bg-red-50 text-red-600'
+        }`}>
+          {connected
+            ? <><Wifi className="w-3.5 h-3.5" /><span>在线</span></>
+            : <><WifiOff className="w-3.5 h-3.5" /><span>离线</span></>
+          }
         </div>
 
-        <span className="text-sm text-slate-400">
-          {deviceCount} 台设备
-        </span>
+        <span className="text-xs text-slate-400 mr-2">{deviceCount} 台设备</span>
 
         <button
           onClick={handleScan}
           disabled={scanning}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white rounded-lg transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-lg transition-colors cursor-pointer shadow-sm"
         >
-          <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
-          扫描设备
+          <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
+          扫描
         </button>
 
-        <button
-          onClick={onOpenSettings}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-          title="设置"
-        >
-          <Settings className="w-5 h-5 text-slate-500" />
-        </button>
+        <div className="w-px h-5 bg-slate-200 mx-1" />
 
-        <button
-          onClick={onOpenHelp}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-          title="使用帮助"
-        >
-          <HelpCircle className="w-5 h-5 text-slate-500" />
-        </button>
-
-        <button
-          onClick={onOpenMemory}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-          title="记忆调试"
-        >
-          <BrainCircuit className="w-5 h-5 text-slate-500" />
-        </button>
-
-        <button
-          onClick={onOpenSkills}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-          title="技能中心"
-        >
-          <Sparkles className="w-5 h-5 text-slate-500" />
-        </button>
+        {[
+          { icon: Settings, label: '设置', onClick: onOpenSettings },
+          { icon: HelpCircle, label: '使用帮助', onClick: onOpenHelp },
+          { icon: BrainCircuit, label: '记忆调试', onClick: onOpenMemory },
+          { icon: Sparkles, label: '技能中心', onClick: onOpenSkills },
+        ].map(({ icon: Icon, label, onClick }) => (
+          <button
+            key={label}
+            onClick={onClick}
+            title={label}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer text-slate-500 hover:text-slate-700"
+          >
+            <Icon className="w-4 h-4" />
+          </button>
+        ))}
       </div>
     </header>
   )

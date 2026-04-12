@@ -38,6 +38,10 @@ SYSTEM_ACTION_ALIASES = {
 }
 PENDING_SKILL_CANCEL_TOKENS = ("取消", "算了", "不用了", "停止", "cancel", "never mind")
 AIR_PURIFIER_AQI_THRESHOLD = 5.0
+AC_HIGH_TEMP_THRESHOLD = 28.0
+AC_LOW_TEMP_THRESHOLD = 16.0
+HUMIDIFIER_LOW_HUMIDITY_THRESHOLD = 35.0
+HUMIDIFIER_HIGH_HUMIDITY_THRESHOLD = 70.0
 SKILL_CREATION_INTENT_PATTERNS = (
     r"(新增|创建|生成|做|写|开发|定制|自定义).{0,12}(技能|skill)",
     r"(技能|skill).{0,12}(新增|创建|生成|定制|自定义|开发)",
@@ -188,60 +192,103 @@ class Brain:
         lightweight_skills: list[SkillSummary],
     ) -> list[TaskPlanItem]:
         skill_names = {skill.name for skill in lightweight_skills}
-        if "air_purifier" not in skill_names:
-            self._air_purifier_startup_bootstrap_pending = False
-            return []
+        tasks: list[TaskPlanItem] = []
 
-        purifier_devices = [device for device in devices if device.type == "air_purifier"]
-        if not purifier_devices:
-            self._air_purifier_startup_bootstrap_pending = False
-            return []
+        # ── Air purifier automation ──────────────────────────────────────────
+        if "air_purifier" in skill_names:
+            purifier_devices = [d for d in devices if d.type == "air_purifier"]
+            if purifier_devices:
+                device = purifier_devices[0]
+                power_sensor = device.get_sensor("power")
+                power_value = self._coerce_sensor_bool(power_sensor.value if power_sensor else None)
+                aqi_value = self._read_air_purifier_aqi(device)
 
-        device = purifier_devices[0]
-        power_sensor = device.get_sensor("power")
-        power_value = self._coerce_sensor_bool(power_sensor.value if power_sensor else None)
-        aqi_value = self._read_air_purifier_aqi(device)
+                if self._air_purifier_startup_bootstrap_pending:
+                    self._air_purifier_startup_bootstrap_pending = False
+                    if power_value is not True:
+                        tasks.append(TaskPlanItem(
+                            kind="execute_skill",
+                            skill_name="air_purifier",
+                            goal="系统启动，已帮主人开启空气净化器，保持室内空气清新",
+                            reason="启动自动化：空气净化器开机引导",
+                            priority=1,
+                        ))
+                elif aqi_value is not None:
+                    if aqi_value > AIR_PURIFIER_AQI_THRESHOLD and power_value is not True:
+                        tasks.append(TaskPlanItem(
+                            kind="execute_skill",
+                            skill_name="air_purifier",
+                            goal=f"室内 AQI 已达 {aqi_value}，空气有点差，已帮主人开启净化器",
+                            reason=f"空气质量自动化：AQI {aqi_value} > 阈值 {AIR_PURIFIER_AQI_THRESHOLD}",
+                            priority=1,
+                        ))
+                    elif aqi_value <= AIR_PURIFIER_AQI_THRESHOLD and power_value is True:
+                        tasks.append(TaskPlanItem(
+                            kind="execute_skill",
+                            skill_name="air_purifier",
+                            goal=f"室内空气已恢复清新（AQI {aqi_value}），已帮主人关闭净化器",
+                            reason=f"空气质量自动化：AQI {aqi_value} ≤ 阈值 {AIR_PURIFIER_AQI_THRESHOLD}",
+                            priority=1,
+                        ))
+            else:
+                self._air_purifier_startup_bootstrap_pending = False
 
-        if self._air_purifier_startup_bootstrap_pending:
-            self._air_purifier_startup_bootstrap_pending = False
-            if power_value is not True:
-                return [
-                    TaskPlanItem(
+        # ── Air conditioner temperature automation ───────────────────────────
+        if "air_conditioner" in skill_names:
+            ac_devices = [d for d in devices if d.type == "air_conditioner"]
+            for ac in ac_devices:
+                power_sensor = ac.get_sensor("power")
+                power_value = self._coerce_sensor_bool(power_sensor.value if power_sensor else None)
+                # Try both "temperature" and "current_temperature" sensor names
+                temp_sensor = ac.get_sensor("temperature") or ac.get_sensor("current_temperature")
+                temp_value = self._coerce_sensor_number(temp_sensor.value if temp_sensor else None)
+                if temp_value is None:
+                    continue
+                if temp_value >= AC_HIGH_TEMP_THRESHOLD and power_value is not True:
+                    tasks.append(TaskPlanItem(
                         kind="execute_skill",
-                        skill_name="air_purifier",
-                        goal="turn on the air purifier on system startup",
-                        reason="startup automation bootstrap for air purifier",
-                        priority=1,
-                    )
-                ]
-            return []
+                        skill_name="air_conditioner",
+                        goal=f"室内温度已达 {temp_value}°C，有点热了，帮主人开启空调降温到舒适温度（约24°C）",
+                        reason=f"温度自动化：当前 {temp_value}°C ≥ 阈值 {AC_HIGH_TEMP_THRESHOLD}°C",
+                        priority=2,
+                    ))
+                elif temp_value <= AC_LOW_TEMP_THRESHOLD and power_value is True:
+                    tasks.append(TaskPlanItem(
+                        kind="execute_skill",
+                        skill_name="air_conditioner",
+                        goal=f"室内温度已降至 {temp_value}°C，已帮主人关闭空调",
+                        reason=f"温度自动化：当前 {temp_value}°C ≤ 阈值 {AC_LOW_TEMP_THRESHOLD}°C",
+                        priority=2,
+                    ))
 
-        if aqi_value is None:
-            return []
+        # ── Humidifier humidity automation ───────────────────────────────────
+        if "humidifier" in skill_names:
+            humidifier_devices = [d for d in devices if d.type == "humidifier"]
+            for hum in humidifier_devices:
+                power_sensor = hum.get_sensor("power")
+                power_value = self._coerce_sensor_bool(power_sensor.value if power_sensor else None)
+                hum_sensor = hum.get_sensor("humidity")
+                hum_value = self._coerce_sensor_number(hum_sensor.value if hum_sensor else None)
+                if hum_value is None:
+                    continue
+                if hum_value < HUMIDIFIER_LOW_HUMIDITY_THRESHOLD and power_value is not True:
+                    tasks.append(TaskPlanItem(
+                        kind="execute_skill",
+                        skill_name="humidifier",
+                        goal=f"室内湿度只有 {hum_value}%，有点干燥，已帮主人开启加湿器",
+                        reason=f"湿度自动化：当前 {hum_value}% < 阈值 {HUMIDIFIER_LOW_HUMIDITY_THRESHOLD}%",
+                        priority=2,
+                    ))
+                elif hum_value > HUMIDIFIER_HIGH_HUMIDITY_THRESHOLD and power_value is True:
+                    tasks.append(TaskPlanItem(
+                        kind="execute_skill",
+                        skill_name="humidifier",
+                        goal=f"室内湿度已达 {hum_value}%，湿度够了，已帮主人关闭加湿器",
+                        reason=f"湿度自动化：当前 {hum_value}% > 阈值 {HUMIDIFIER_HIGH_HUMIDITY_THRESHOLD}%",
+                        priority=2,
+                    ))
 
-        if aqi_value > AIR_PURIFIER_AQI_THRESHOLD and power_value is not True:
-            return [
-                TaskPlanItem(
-                    kind="execute_skill",
-                    skill_name="air_purifier",
-                    goal="turn on the air purifier because indoor AQI is above threshold",
-                    reason=f"air purifier automation: AQI {aqi_value} > {AIR_PURIFIER_AQI_THRESHOLD}",
-                    priority=1,
-                )
-            ]
-
-        if aqi_value <= AIR_PURIFIER_AQI_THRESHOLD and power_value is True:
-            return [
-                TaskPlanItem(
-                    kind="execute_skill",
-                    skill_name="air_purifier",
-                    goal="turn off the air purifier because indoor AQI is back under threshold",
-                    reason=f"air purifier automation: AQI {aqi_value} <= {AIR_PURIFIER_AQI_THRESHOLD}",
-                    priority=1,
-                )
-            ]
-
-        return []
+        return tasks
 
     @staticmethod
     def _coerce_sensor_bool(value: Any) -> bool | None:
@@ -286,6 +333,64 @@ class Brain:
 
         result = await self._chat_graph.ainvoke({"message": text, "app_state": app_state})
         return result.get("result", {"reply": "我暂时没有需要执行的操作。"})
+
+    async def handle_chat_message_stream(self, message: str, app_state: dict[str, Any]):
+        """Streaming variant: yields SSE chunks via ReAct agentic loop."""
+        from core.brain.react_agent import ReActAgent
+        text = message.strip()
+        if not text:
+            yield 'data: {"reply":"请先输入你的需求。","done":true}\n\n'
+            return
+
+        if not settings.llm_api_key and not app_state["settings"].get("llm_api_key", ""):
+            yield 'data: {"reply":"聊天入口现在统一走模型决策，请先配置可用的 LLM。","error":"llm_required","done":true}\n\n'
+            return
+
+        intent = self._classify_intent(text)
+        if intent == "chitchat":
+            # Fast path: direct streaming, no tool loop
+            reply_text = ""
+            async for chunk in self._stream_chitchat_reply(text):
+                reply_text += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'reply', 'content': reply_text, 'done': True}, ensure_ascii=False)}\n\n"
+            return
+
+        # ReAct agentic loop for all other intents
+        agent = ReActAgent(
+            llm=self._llm,
+            model=self._llm_model,
+            disable_thinking=self._llm_disable_thinking,
+            skill_loader=self._skill_loader,
+            memory=self._memory,
+        )
+        app_state_with_brain = dict(app_state)
+        app_state_with_brain["brain"] = self
+
+        async for event in agent.run(text, app_state_with_brain):
+            yield event.to_sse()
+
+    async def _stream_chitchat_reply(self, message: str):
+        """Stream a direct chitchat reply without full planner overhead."""
+        extra_body: dict[str, Any] = {}
+        if self._llm_disable_thinking:
+            extra_body["thinking"] = {"type": "disabled"}
+        prompt = (
+            "你是 Anima，一个智能家居助手。用简短友好的中文回复用户。\n"
+            f"用户说：{message}"
+        )
+        stream = await self._llm.chat.completions.create(
+            model=self._llm_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=200,
+            stream=True,
+            extra_body=extra_body or None,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield delta
 
     async def execute_device_skill(
         self,
@@ -440,7 +545,7 @@ class Brain:
     async def _graph_chat_planner(self, state: dict[str, Any]) -> dict[str, Any]:
         app_state = state["app_state"]
         discovery = app_state["discovery"]
-        user_memory = await self._memory.get_full_context()
+        user_memory = await self._memory.get_planner_context()
         environment_state = self.get_environment_state()
         pending = self._route_pending_skill_creation(state["message"])
         if pending is not None:
@@ -461,6 +566,7 @@ class Brain:
                 "plan": routed["plan"],
             }
 
+        intent = self._classify_intent(state["message"])
         skills = self._skill_loader.list_chat_skill_summaries()
         prompt = self._build_chat_planner_prompt(
             message=state["message"],
@@ -468,6 +574,7 @@ class Brain:
             environment_state=environment_state,
             user_memory=user_memory,
             skill_summaries=skills,
+            intent=intent,
         )
         content = await self._invoke_llm_text(prompt, temperature=0.1, max_tokens=900)
         plan = self._parse_chat_plan(content, skills)
@@ -751,21 +858,17 @@ class Brain:
             {"name": skill.name, "description": skill.description}
             for skill in lightweight_skills
         ]
+        _j = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
         planner_hints = self._load_planner_hints()
         return (
             "You are Anima's scheduler-driven planner.\n"
             "Inspect the current device state, environment, user memory, and available skills.\n"
             "Break the cycle into small tasks. Tasks may refresh environment state, execute a device skill, or reply with no-op reasoning.\n\n"
-            "Available skill summaries:\n"
-            f"{json.dumps(skill_summaries, ensure_ascii=False, indent=2)}\n\n"
-            "Planner hints:\n"
-            f"{planner_hints}\n\n"
-            "Current devices:\n"
-            f"{json.dumps(device_summaries, ensure_ascii=False, indent=2)}\n\n"
-            "Environment snapshot:\n"
-            f"{json.dumps(environment_state, ensure_ascii=False, indent=2)}\n\n"
-            "User memory:\n"
-            f"{json.dumps(user_memory, ensure_ascii=False, indent=2)}\n\n"
+            f"Available skill summaries:\n{_j(skill_summaries)}\n\n"
+            f"Planner hints:\n{planner_hints}\n\n"
+            f"Current devices:\n{_j(device_summaries)}\n\n"
+            f"Environment signals:\n{_j(environment_state.get('signals', {}))}\n\n"
+            f"User memory:\n{_j(user_memory)}\n\n"
             "Return JSON only. Preferred schema:\n"
             "{\n"
             '  "task_plan_items": [\n'
@@ -794,33 +897,35 @@ class Brain:
         environment_state: dict[str, Any],
         user_memory: dict[str, Any],
         skill_summaries: list[SkillSummary],
+        intent: str = "general",
     ) -> str:
-        device_summaries = [
-            {
-                "device_id": device.device_id,
-                "name": device.name,
-                "type": device.type,
-                "online": device.online,
-            }
-            for device in devices
-        ]
-        skills = [
-            {"name": skill.name, "description": skill.description, "device_type": skill.device_type}
-            for skill in skill_summaries
-        ]
-        return (
+        _j = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+        skills = [{"name": s.name, "description": s.description} for s in skill_summaries]
+
+        parts = [
             "You are Anima's unified chat planner running inside LangGraph.\n"
             "Break the user's request into small actionable tasks.\n"
             "A task may ask the user for clarification, refresh the environment, execute a system action, execute one or more device skills, or reply only.\n\n"
             f"User message:\n{message}\n\n"
-            "Available skills:\n"
-            f"{json.dumps(skills, ensure_ascii=False, indent=2)}\n\n"
-            "Current devices:\n"
-            f"{json.dumps(device_summaries, ensure_ascii=False, indent=2)}\n\n"
-            "Environment snapshot:\n"
-            f"{json.dumps(environment_state, ensure_ascii=False, indent=2)}\n\n"
-            "User memory:\n"
-            f"{json.dumps(user_memory, ensure_ascii=False, indent=2)}\n\n"
+            f"Available skills:\n{_j(skills)}\n\n",
+        ]
+
+        if intent in ("device_control", "env_query", "general"):
+            device_summaries = [
+                {"id": d.device_id, "name": d.name, "type": d.type, "online": d.online}
+                for d in devices
+            ]
+            # Compact environment: only signal values
+            env_signals = environment_state.get("signals", {})
+            parts.append(f"Devices:\n{_j(device_summaries)}\n\nEnvironment signals:\n{_j(env_signals)}\n\n")
+
+        prefs = user_memory.get("preferences", "")
+        history = user_memory.get("history", [])
+        if isinstance(history, list):
+            history = history[-3:]
+        parts.append(f"User preferences:\n{prefs}\n\nRecent history:\n{_j(history)}\n\n")
+
+        return "".join(parts) + (
             "Output JSON only with this schema:\n"
             "{\n"
             '  "reply": "string",\n'
@@ -877,6 +982,33 @@ class Brain:
             }
 
         return None
+
+    _CHITCHAT_PATTERNS = (
+        r"^(你好|hi|hello|嗨|哈喽|早|晚安|早安|谢谢|谢了|感谢|好的|好|ok|okay|嗯|哦|明白|知道了|没事|不用了|再见)[\s!！。.]*$",
+    )
+    _HOME_AWAY_PATTERNS = (
+        r"(我走了|拜拜|出门了|我要出门|我不在了|我离开了|我出去了)",
+        r"(我回来了|我到家了|我回家了|我在家了|到家了|回来了)",
+    )
+    _DEVICE_KEYWORDS = (
+        "开", "关", "调", "设置", "控制", "打开", "关闭", "启动", "停止",
+        "温度", "湿度", "亮度", "音量", "模式", "净化", "加湿", "空调", "灯",
+        "turn", "set", "control", "adjust", "switch",
+    )
+
+    def _classify_intent(self, message: str) -> str:
+        """Classify message intent without LLM. Returns: chitchat | home_away | device_control | env_query | general."""
+        text = message.strip()
+        lowered = text.lower()
+        if any(re.search(p, text, re.IGNORECASE) for p in self._CHITCHAT_PATTERNS):
+            return "chitchat"
+        if any(re.search(p, text, re.IGNORECASE) for p in self._HOME_AWAY_PATTERNS):
+            return "home_away"
+        if any(kw in text or kw in lowered for kw in self._DEVICE_KEYWORDS):
+            return "device_control"
+        if any(hint in text or hint in lowered for hint in ENVIRONMENT_QUERY_HINTS):
+            return "env_query"
+        return "general"
 
     @staticmethod
     def _looks_like_skill_creation_request(message: str) -> bool:

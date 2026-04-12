@@ -121,6 +121,11 @@ export interface RefreshEnvironmentResult {
   environment: EnvironmentSnapshot
 }
 
+export interface Room {
+  room_id: string
+  name: string
+}
+
 export interface ScanResult {
   new_devices: number
   total: number
@@ -236,6 +241,63 @@ export interface UpdateCustomSkillRequest {
 }
 
 const api = {
+  async createVirtualDevice(name: string, deviceType: string): Promise<{ device_id: string; name: string; type: string }> {
+    const res = await fetch('/api/admin/virtual-devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, device_type: deviceType }),
+    })
+    return res.json()
+  },
+
+  async deleteVirtualDevice(deviceId: string): Promise<void> {
+    await fetch(`/api/admin/virtual-devices/${deviceId}`, { method: 'DELETE' })
+  },
+
+  async updateVirtualSensors(deviceId: string, sensors: Record<string, number | boolean | string>): Promise<{ success: boolean }> {
+    const res = await fetch(`/api/devices/${deviceId}/sensors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sensors }),
+    })
+    return res.json()
+  },
+
+  async getRooms(): Promise<Room[]> {
+    const res = await fetch('/api/rooms')
+    return res.json()
+  },
+
+  async createRoom(name: string): Promise<Room> {
+    const res = await fetch('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    return res.json()
+  },
+
+  async renameRoom(roomId: string, name: string): Promise<Room> {
+    const res = await fetch(`/api/rooms/${roomId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    return res.json()
+  },
+
+  async deleteRoom(roomId: string): Promise<void> {
+    await fetch(`/api/rooms/${roomId}`, { method: 'DELETE' })
+  },
+
+  async setDeviceRoom(deviceId: string, roomId: string | null): Promise<void> {
+    await fetch(`/api/devices/${deviceId}/room`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room_id: roomId }),
+    })
+  },
+
   async getDevices(): Promise<Device[]> {
     const res = await fetch('/api/devices')
     return res.json()

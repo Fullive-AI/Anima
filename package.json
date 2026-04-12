@@ -12,6 +12,7 @@
     "postinstall": "uv sync --extra dev --python 3.13"
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.0.0",
+    "playwright": "^1.59.1"
   }
 }

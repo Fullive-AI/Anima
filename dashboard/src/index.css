@@ -1,8 +1,138 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ─────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --color-primary:        #7c3aed; /* violet-700 */
+  --color-primary-light:  #8b5cf6; /* violet-500 */
+  --color-primary-dim:    #ede9fe; /* violet-100 */
+  --color-primary-glow:   rgba(124, 58, 237, 0.12);
+
+  /* Surface */
+  --color-bg:             #f1f5f9; /* slate-100 */
+  --color-surface:        #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border:         #e2e8f0; /* slate-200 */
+  --color-border-subtle:  #f1f5f9; /* slate-100 */
+
+  /* Text */
+  --color-text-primary:   #0f172a; /* slate-900 */
+  --color-text-secondary: #475569; /* slate-600 */
+  --color-text-muted:     #94a3b8; /* slate-400 */
+
+  /* Semantic */
+  --color-success:        #059669; /* emerald-600 */
+  --color-success-bg:     #ecfdf5;
+  --color-warning:        #d97706; /* amber-600 */
+  --color-warning-bg:     #fffbeb;
+  --color-error:          #dc2626;
+  --color-error-bg:       #fef2f2;
+
+  /* Radius */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-2xl: 28px;
+
+  /* Shadow */
+  --shadow-sm:  0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-md:  0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04);
+  --shadow-lg:  0 12px 32px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.06);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   margin: 0;
-  background: #f8fafc;
-  color: #334155;
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: "Inter", "PingFang SC", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ─── Global Selection ───────────────────────────────────────────────────── */
+::selection {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+::-moz-selection {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* ─── Range Input ────────────────────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 99px;
+  background: #e2e8f0;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 5px var(--color-primary-glow);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+
+/* ─── Focus Ring ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
 }

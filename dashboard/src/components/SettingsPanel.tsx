@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Wifi, WifiOff, Brain, Eye, EyeOff, X, Check, Loader2, Plus, Monitor, Settings } from 'lucide-react'
+import { Wifi, WifiOff, Brain, Eye, EyeOff, X, Check, Loader2, Plus, Monitor, Settings, Cpu, Trash2 } from 'lucide-react'
+import { api } from '../hooks/useApi'
 
 interface SettingsPanelProps {
   open: boolean
@@ -39,6 +40,12 @@ export default function SettingsPanel({ open, onClose, onDevicesChanged }: Setti
   const [manualError, setManualError] = useState('')
 
   const [showKey, setShowKey] = useState(false)
+
+  // Virtual device state
+  const [virtualName, setVirtualName] = useState('')
+  const [virtualType, setVirtualType] = useState('light')
+  const [virtualAdding, setVirtualAdding] = useState(false)
+  const [virtualResult, setVirtualResult] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -405,6 +412,62 @@ export default function SettingsPanel({ open, onClose, onDevicesChanged }: Setti
                 </div>
               </div>
             )}
+          </section>
+
+          <hr className="border-slate-200" />
+
+          {/* Virtual Device Section */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Cpu className="w-4 h-4 text-violet-500" />
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">虚拟设备</h3>
+            </div>
+            <p className="text-sm text-slate-500 mb-3">创建虚拟设备用于测试，行为与真实设备完全一致。</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="设备名称（如：客厅灯）"
+                  value={virtualName}
+                  onChange={e => setVirtualName(e.target.value)}
+                  className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-violet-400"
+                />
+                <select
+                  value={virtualType}
+                  onChange={e => setVirtualType(e.target.value)}
+                  className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-violet-400"
+                >
+                  <option value="light">灯光</option>
+                  <option value="humidifier">加湿器</option>
+                  <option value="air_conditioner">空调</option>
+                  <option value="air_purifier">空气净化器</option>
+                </select>
+              </div>
+              {virtualResult && <p className="text-sm text-emerald-600">{virtualResult}</p>}
+              <button
+                onClick={async () => {
+                  if (!virtualName.trim()) return
+                  setVirtualAdding(true)
+                  setVirtualResult('')
+                  try {
+                    const data = await api.createVirtualDevice(virtualName.trim(), virtualType)
+                    setVirtualResult(`已创建: ${data.name}`)
+                    setVirtualName('')
+                    onDevicesChanged()
+                    setTimeout(() => setVirtualResult(''), 3000)
+                  } catch {
+                    setVirtualResult('创建失败')
+                  } finally {
+                    setVirtualAdding(false)
+                  }
+                }}
+                disabled={virtualAdding || !virtualName.trim()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm bg-violet-500 hover:bg-violet-600 disabled:opacity-40 text-white rounded-lg transition-colors cursor-pointer"
+              >
+                {virtualAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                创建虚拟设备
+              </button>
+            </div>
           </section>
         </div>
       </div>

@@ -1,0 +1,167 @@
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Mic, MicOff, X } from 'lucide-react'
+
+interface VoiceOrbProps {
+  onSend: (text: string, isVoice: boolean) => void
+  disabled?: boolean
+}
+
+// Extend window for webkit prefix
+declare global {
+  interface Window {
+    webkitSpeechRecognition: new () => SpeechRecognition
+    SpeechRecognition: new () => SpeechRecognition
+  }
+}
+
+export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
+  const [listening, setListening] = useState(false)
+  const [transcript, setTranscript] = useState('')
+  const [finalText, setFinalText] = useState('')
+  const [supported, setSupported] = useState(true)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastFinalRef = useRef('')
+
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { setSupported(false); return }
+  }, [])
+
+  const clearSilenceTimer = () => {
+    if (silenceTimer.current) {
+      clearTimeout(silenceTimer.current)
+      silenceTimer.current = null
+    }
+  }
+
+  const stopListening = useCallback(() => {
+    clearSilenceTimer()
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+    setListening(false)
+  }, [])
+
+  const sendText = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    stopListening()
+    setTranscript('')
+    setFinalText('')
+    lastFinalRef.current = ''
+    onSend(`[语音输入] ${trimmed}`, true)
+  }, [onSend, stopListening])
+
+  const startListening = useCallback(() => {
+    if (disabled) return
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) return
+
+    const recognition = new SR()
+    recognition.lang = 'zh-CN'
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognitionRef.current = recognition
+
+    recognition.onstart = () => setListening(true)
+
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      let interim = ''
+      let final = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const result = e.results[i]
+        if (result.isFinal) {
+          final += result[0].transcript
+        } else {
+          interim += result[0].transcript
+        }
+      }
+      if (final) {
+        lastFinalRef.current += final
+        setFinalText(lastFinalRef.current)
+      }
+      setTranscript(lastFinalRef.current + interim)
+
+      // Reset silence timer on any speech
+      clearSilenceTimer()
+      silenceTimer.current = setTimeout(() => {
+        const text = lastFinalRef.current || interim
+        if (text.trim()) sendText(text)
+        else stopListening()
+      }, 2000)
+    }
+
+    recognition.onerror = () => stopListening()
+    recognition.onend = () => {
+      // If still listening (not manually stopped), restart for continuous mode
+      if (recognitionRef.current) {
+        try { recognition.start() } catch { stopListening() }
+      } else {
+        setListening(false)
+      }
+    }
+
+    recognition.start()
+  }, [disabled, sendText, stopListening])
+
+  const handleClick = () => {
+    if (listening) {
+      const text = lastFinalRef.current || transcript
+      if (text.trim()) sendText(text)
+      else stopListening()
+    } else {
+      startListening()
+    }
+  }
+
+  if (!supported) return null
+
+  return (
+    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 pointer-events-none">
+      {/* Transcript bubble */}
+      {listening && (
+        <div className="pointer-events-auto max-w-xs w-max bg-white/95 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-2.5 shadow-lg flex items-center gap-2">
+          <span className="text-sm text-slate-700 max-w-[220px] truncate">
+            {transcript || <span className="text-slate-400 italic">正在聆听...</span>}
+          </span>
+          {transcript && (
+            <button
+              onClick={() => { setTranscript(''); setFinalText(''); lastFinalRef.current = '' }}
+              className="text-slate-400 hover:text-slate-600 flex-shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Orb button */}
+      <div className="pointer-events-auto relative flex items-center justify-center">
+        {/* Pulse rings when listening */}
+        {listening && (
+          <>
+            <span className="absolute w-16 h-16 rounded-full bg-violet-400/20 animate-ping" />
+            <span className="absolute w-20 h-20 rounded-full bg-violet-400/10 animate-ping [animation-delay:0.3s]" />
+          </>
+        )}
+        <button
+          onClick={handleClick}
+          disabled={disabled}
+          title={listening ? '点击发送 / 再次点击停止' : '语音输入'}
+          className={`relative w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all duration-200 cursor-pointer
+            ${listening
+              ? 'bg-violet-600 scale-110 shadow-violet-400/40 shadow-2xl'
+              : 'bg-white border-2 border-violet-200 hover:border-violet-400 hover:scale-105 hover:shadow-violet-200/60'
+            }
+            ${disabled ? 'opacity-40 cursor-not-allowed' : ''}
+          `}
+        >
+          {listening
+            ? <MicOff className="w-6 h-6 text-white" />
+            : <Mic className="w-6 h-6 text-violet-500" />
+          }
+        </button>
+      </div>
+    </div>
+  )
+}

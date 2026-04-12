@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from core.models import DeviceCommand
@@ -36,6 +36,27 @@ class ManualDeviceRequest(BaseModel):
 
 class ActivateDeviceRequest(BaseModel):
     token: str
+
+
+class RoomRequest(BaseModel):
+    name: str
+
+
+class DeviceRoomRequest(BaseModel):
+    room_id: str | None = None
+
+
+class VirtualDeviceRequest(BaseModel):
+    name: str
+    device_type: str = "light"
+
+
+class VirtualSensorUpdateRequest(BaseModel):
+    sensors: dict[str, float | int | bool | str]
+
+
+class DeviceRenameRequest(BaseModel):
+    name: str
 
 
 class UpdateCustomSkillRequest(BaseModel):
@@ -132,6 +153,8 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         discovery = app_state["discovery"]
         miot = next((a for a in discovery._adapters if isinstance(a, MIoTAdapter)), None)
 
+        store = app_state["settings"]
+        device_rooms = store.get("device_rooms", {})
         result = []
         for d in discovery.get_all_devices():
             data = d.model_dump()
@@ -140,6 +163,8 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                 info = miot._device_infos.get(d.device_id, {})
                 data["needs_token"] = info.get("needs_token", False)
                 data["ip"] = info.get("ip", "")
+            # Fill room from persistent store
+            data["room"] = device_rooms.get(d.device_id, d.room)
             result.append(data)
         return result
 
@@ -173,12 +198,218 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
     @app.get("/api/rooms")
     async def list_rooms():
-        return app_state.get("rooms", [])
+        store = app_state["settings"]
+        return store.get("rooms", [])
+
+    @app.post("/api/rooms")
+    async def create_room(req: RoomRequest):
+        store = app_state["settings"]
+        import uuid
+        rooms = store.get("rooms", [])
+        room = {"room_id": str(uuid.uuid4()), "name": req.name.strip()}
+        rooms.append(room)
+        store.set("rooms", rooms)
+        return room
+
+    @app.put("/api/rooms/{room_id}")
+    async def rename_room(room_id: str, req: RoomRequest):
+        store = app_state["settings"]
+        rooms = store.get("rooms", [])
+        for r in rooms:
+            if r["room_id"] == room_id:
+                r["name"] = req.name.strip()
+                store.set("rooms", rooms)
+                return r
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    @app.delete("/api/rooms/{room_id}")
+    async def delete_room(room_id: str):
+        store = app_state["settings"]
+        rooms = [r for r in store.get("rooms", []) if r["room_id"] != room_id]
+        store.set("rooms", rooms)
+        # Clear room assignment from devices
+        device_rooms = store.get("device_rooms", {})
+        device_rooms = {k: v for k, v in device_rooms.items() if v != room_id}
+        store.set("device_rooms", device_rooms)
+        return {"success": True}
+
+    @app.put("/api/devices/{device_id}/room")
+    async def set_device_room(device_id: str, req: DeviceRoomRequest):
+        store = app_state["settings"]
+        device_rooms = store.get("device_rooms", {})
+        if req.room_id is None:
+            device_rooms.pop(device_id, None)
+        else:
+            device_rooms[device_id] = req.room_id
+        store.set("device_rooms", device_rooms)
+        # Update in-memory device object
+        discovery = app_state["discovery"]
+        device = discovery.get_device(device_id)
+        if device:
+            device.room = req.room_id
+        return {"success": True}
+
+    @app.post("/api/admin/virtual-devices")
+    async def create_virtual_device(req: VirtualDeviceRequest):
+        from adapters.virtual.adapter import VirtualAdapter
+        import uuid
+        from core.models import Event, EventType
+
+        discovery = app_state["discovery"]
+        store = app_state["settings"]
+
+        virtual = next((a for a in discovery._adapters if isinstance(a, VirtualAdapter)), None)
+        if not virtual:
+            raise HTTPException(status_code=500, detail="Virtual adapter not available")
+
+        device_id = f"virtual_{uuid.uuid4().hex[:8]}"
+        name = req.name.strip() or f"虚拟{req.device_type}"
+        device = virtual.register_device(device_id=device_id, name=name, device_type=req.device_type)
+
+        discovery.devices[device_id] = device
+        discovery._adapter_map[device_id] = virtual
+
+        await discovery._bus.emit(Event(
+            type=EventType.DEVICE_DISCOVERED,
+            device_id=device_id,
+            data=device.model_dump(),
+        ))
+
+        # Persist
+        virtual_devices = store.get("virtual_devices", [])
+        virtual_devices.append({"device_id": device_id, "name": name, "device_type": req.device_type})
+        store.set("virtual_devices", virtual_devices)
+
+        return {"success": True, "device_id": device_id, "name": name, "type": req.device_type}
+
+    @app.delete("/api/admin/virtual-devices/{device_id}")
+    async def delete_virtual_device(device_id: str):
+        from adapters.virtual.adapter import VirtualAdapter
+
+        discovery = app_state["discovery"]
+        store = app_state["settings"]
+
+        virtual = next((a for a in discovery._adapters if isinstance(a, VirtualAdapter)), None)
+        if virtual:
+            virtual.remove_device(device_id)
+
+        discovery.devices.pop(device_id, None)
+        discovery._adapter_map.pop(device_id, None)
+
+        virtual_devices = [v for v in store.get("virtual_devices", []) if v["device_id"] != device_id]
+        store.set("virtual_devices", virtual_devices)
+
+        return {"success": True}
+
+    @app.post("/api/devices/{device_id}/sensors")
+    async def update_virtual_sensors(device_id: str, req: VirtualSensorUpdateRequest):
+        """Manually update sensor values for a virtual device, triggering SENSOR_UPDATED."""
+        from adapters.virtual.adapter import VirtualAdapter
+        from core.models import Event, EventType
+
+        discovery = app_state["discovery"]
+        device = discovery.get_device(device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        virtual = next((a for a in discovery._adapters if isinstance(a, VirtualAdapter)), None)
+        if not virtual or device_id not in virtual._devices:
+            raise HTTPException(status_code=400, detail="Not a virtual device")
+
+        state = virtual._states.setdefault(device_id, {})
+        state.update(req.sensors)
+
+        # Sync into device sensor objects
+        for sensor in device.sensors:
+            if sensor.name in req.sensors:
+                sensor.value = req.sensors[sensor.name]
+
+        # Emit SENSOR_UPDATED to trigger brain cycle
+        await discovery._bus.emit(Event(
+            type=EventType.SENSOR_UPDATED,
+            device_id=device_id,
+            data=dict(state),
+        ))
+
+        return {"success": True, "device_id": device_id, "updated": req.sensors}
+
+    @app.patch("/api/devices/{device_id}/rename")
+    async def rename_device(device_id: str, req: DeviceRenameRequest):
+        discovery = app_state["discovery"]
+        store = app_state["settings"]
+        device = discovery.get_device(device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        device.name = req.name.strip()
+        # Persist for virtual devices
+        virtual_devices = store.get("virtual_devices", [])
+        for v in virtual_devices:
+            if v["device_id"] == device_id:
+                v["name"] = device.name
+        store.set("virtual_devices", virtual_devices)
+        return {"success": True, "device_id": device_id, "name": device.name}
+
+    @app.delete("/api/devices/{device_id}")
+    async def delete_device(device_id: str):
+        from adapters.virtual.adapter import VirtualAdapter
+        discovery = app_state["discovery"]
+        store = app_state["settings"]
+        device = discovery.get_device(device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        # Remove from virtual adapter if applicable
+        virtual = next((a for a in discovery._adapters if isinstance(a, VirtualAdapter)), None)
+        if virtual and device_id in virtual._devices:
+            virtual.remove_device(device_id)
+            virtual_devices = [v for v in store.get("virtual_devices", []) if v["device_id"] != device_id]
+            store.set("virtual_devices", virtual_devices)
+        # Remove from discovery
+        discovery.devices.pop(device_id, None)
+        discovery._adapter_map.pop(device_id, None)
+        # Remove room assignment
+        device_rooms = store.get("device_rooms", {})
+        device_rooms.pop(device_id, None)
+        store.set("device_rooms", device_rooms)
+        return {"success": True}
+
+    @app.get("/api/brain/events")
+    async def brain_events():
+        """SSE stream for proactive brain notifications."""
+        import asyncio
+        queue: asyncio.Queue[str] = asyncio.Queue()
+        app_state.setdefault("_brain_event_queues", []).append(queue)
+
+        async def generate():
+            try:
+                yield "data: {\"type\":\"connected\"}\n\n"
+                while True:
+                    try:
+                        msg = await asyncio.wait_for(queue.get(), timeout=25.0)
+                        yield f"data: {msg}\n\n"
+                    except asyncio.TimeoutError:
+                        yield "data: {\"type\":\"ping\"}\n\n"
+            finally:
+                queues = app_state.get("_brain_event_queues", [])
+                if queue in queues:
+                    queues.remove(queue)
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/api/chat")
     async def chat(body: dict):
         message = body.get("message", "")
+        stream = body.get("stream", False)
         try:
+            if stream:
+                return StreamingResponse(
+                    app_state["brain"].handle_chat_message_stream(message, app_state),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+                )
             return await app_state["brain"].handle_chat_message(message, app_state)
         except Exception as exc:
             logger.exception("Chat request failed")

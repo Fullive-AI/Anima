@@ -9,25 +9,28 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PREFERENCES = """# User Preferences
+DEFAULT_PREFERENCES = """# 用户偏好
 
-## Comfort
-- temperature: not set
-- humidity: not set
-- brightness: not set
+## 舒适度
+- 温度: 24°C（夏天制冷目标温度，冬天可适当调高）
+- 湿度: 50%（舒适湿度范围 45-55%）
+- 亮度: 白天适中，晚上温暖偏暗
 
-## Schedule
-- wake_up: not set
-- sleep: not set
+## 作息时间
+- 起床: 07:00-08:00
+- 睡觉: 22:30-00:00
 
-## Notes
-(AI will learn and update this section)
+## 在家状态
+- 默认在家
+
+## 备注
+（AI 会根据使用习惯自动学习并更新此部分）
 """
 
 COLD_START_COMFORT_DEFAULTS = {
-    "temperature": "22-24°C",
-    "humidity": "45-55%",
-    "brightness": "daytime moderate, evening warm and dim",
+    "temperature": "24°C（夏天制冷，冬天可调高至26°C）",
+    "humidity": "50%（舒适范围 45-55%）",
+    "brightness": "白天适中亮度，晚上温暖偏暗",
 }
 
 LEARNED_PROFILE_KEYS = (
@@ -190,43 +193,46 @@ class MemoryStore:
 
     def _build_cold_start_preferences(self, *, device_types: list[str], style: str) -> str:
         lines = [
-            "# User Preferences",
+            "# 用户偏好",
             "",
-            "> Cold-start defaults generated from currently connected device types.",
-            "> These values are an initial comfort-oriented baseline and should evolve from real usage history.",
+            "> 根据当前已连接设备类型自动生成的初始偏好配置。",
+            "> 这是舒适导向的基础默认值，会随实际使用习惯自动更新。",
             "",
-            "## Comfort",
-            f"- temperature: {COLD_START_COMFORT_DEFAULTS['temperature'] if 'air_conditioner' in device_types else 'not set'}",
-            f"- humidity: {COLD_START_COMFORT_DEFAULTS['humidity'] if {'humidifier', 'air_purifier'} & set(device_types) else 'not set'}",
-            f"- brightness: {COLD_START_COMFORT_DEFAULTS['brightness'] if 'light' in device_types else 'not set'}",
+            "## 舒适度",
+            f"- 温度: {COLD_START_COMFORT_DEFAULTS['temperature'] if 'air_conditioner' in device_types else '未设置'}",
+            f"- 湿度: {COLD_START_COMFORT_DEFAULTS['humidity'] if {'humidifier', 'air_purifier'} & set(device_types) else '未设置'}",
+            f"- 亮度: {COLD_START_COMFORT_DEFAULTS['brightness'] if 'light' in device_types else '未设置'}",
             "",
-            "## Schedule",
-            "- wake_up: 07:00-08:00",
-            "- sleep: 22:30-00:00",
+            "## 作息时间",
+            "- 起床: 07:00-08:00",
+            "- 睡觉: 22:30-00:00",
             "",
-            "## Device Notes",
+            "## 在家状态",
+            "- 默认在家",
+            "",
+            "## 设备偏好",
         ]
 
         if "air_conditioner" in device_types:
-            lines.append("- air_conditioner: prioritize comfort over energy savings during active hours.")
+            lines.append("- 空调: 优先舒适，活跃时段温度保持在24°C左右，睡前避免剧烈温度变化。")
         if "humidifier" in device_types:
-            lines.append("- humidifier: prefer keeping rooms in a comfortable humidity band before they feel dry.")
+            lines.append("- 加湿器: 湿度低于45%时主动加湿，保持室内不干燥。")
         if "air_purifier" in device_types:
-            lines.append("- air_purifier: prefer cleaner air during occupied periods and sleep hours.")
+            lines.append("- 空气净化器: 有人在家时保持空气清新，睡眠时段优先安静模式。")
         if "light" in device_types:
-            lines.append("- light: prefer brighter neutral light in daytime and warmer dimmer light at night.")
+            lines.append("- 灯光: 白天中性亮光，晚上暖色调偏暗，睡前自动调暗。")
         if "speaker" in device_types:
-            lines.append("- speaker: keep voice interactions low-noise by default; only speak aloud for explicit requests.")
+            lines.append("- 音箱: 仅在用户明确要求时播报，默认保持安静。")
         if not device_types:
-            lines.append("- home: no active device-specific preferences have been inferred yet.")
+            lines.append("- 暂无设备特定偏好，等待设备接入后自动生成。")
 
         lines.extend(
             [
                 "",
-                "## Cold-Start Notes",
-                f"- style: {style}",
-                "- source: generated from currently available device types, not from learned behavior.",
-                "- overwrite_policy: later explicit user edits and learned profiles should take precedence.",
+                "## 初始化说明",
+                f"- 风格: {style}",
+                "- 来源: 根据当前已连接设备类型生成，非学习行为。",
+                "- 更新策略: 用户明确设置和学习到的行为偏好优先级更高。",
             ]
         )
         return "\n".join(lines) + "\n"
@@ -460,12 +466,31 @@ class MemoryStore:
         if not isinstance(data, dict):
             data = {}
 
+        # confidence_notes may itself be a JSON string (double-serialized) — unwrap it
+        raw_notes = data.get("confidence_notes", "")
+        if isinstance(raw_notes, str):
+            stripped_notes = raw_notes.strip()
+            # Strip markdown code fences if present
+            if stripped_notes.startswith("```"):
+                stripped_notes = re.sub(r"^```[a-z]*\n?", "", stripped_notes).rstrip("`").strip()
+            try:
+                parsed_notes = json.loads(stripped_notes)
+                if isinstance(parsed_notes, dict):
+                    # Merge unwrapped fields back, confidence_notes becomes a plain string summary
+                    for field in ("stable_preferences", "time_based_patterns", "seasonal_patterns", "weak_signals"):
+                        if field in parsed_notes and not data.get(field):
+                            data[field] = parsed_notes[field]
+                    raw_notes = str(parsed_notes.get("confidence_notes", stripped_notes)).strip()
+            except (json.JSONDecodeError, ValueError):
+                raw_notes = stripped_notes
+        confidence_notes = str(raw_notes).strip()
+
         profile = {
             "stable_preferences": cls._normalize_learned_list(data.get("stable_preferences")),
             "time_based_patterns": cls._normalize_learned_list(data.get("time_based_patterns")),
             "seasonal_patterns": cls._normalize_learned_list(data.get("seasonal_patterns")),
             "weak_signals": cls._normalize_learned_list(data.get("weak_signals")),
-            "confidence_notes": str(data.get("confidence_notes", "")).strip(),
+            "confidence_notes": confidence_notes,
         }
 
         metadata = data.get("metadata", {})
@@ -577,4 +602,11 @@ class MemoryStore:
             "learned_profiles": await self.get_learned_profiles(user_id),
             "memory_manifest": await self.get_memory_manifest(user_id),
             "extracted_memories": await self.get_extracted_memories(user_id),
+        }
+
+    async def get_planner_context(self, user_id: str = "default") -> dict[str, Any]:
+        """Lightweight context for chat planner — omits heavy learned profiles and extracted memories."""
+        return {
+            "preferences": await self.get_preferences(user_id),
+            "history": await self.get_history(user_id, limit=5),
         }

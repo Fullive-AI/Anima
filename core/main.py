@@ -28,6 +28,7 @@ from core.models import Event, EventType
 
 # Adapters
 from adapters.miot.adapter import MIoTAdapter, MIIO_AVAILABLE as _MIOT_AVAILABLE
+from adapters.virtual.adapter import VirtualAdapter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +71,8 @@ class Anima:
 
         # Adapters
         adapters = [MIoTAdapter(settings_store=self.settings_store, speaker_player=self.speaker_player)] if _MIOT_AVAILABLE else []
+        self.virtual_adapter = VirtualAdapter(bus=self.bus)
+        adapters.append(self.virtual_adapter)
         self.discovery = DiscoveryOrchestrator(bus=self.bus, adapters=adapters)
         self.brain.set_environment_provider(self.discovery.get_all_devices)
 
@@ -91,7 +94,9 @@ class Anima:
             "settings": self.settings_store,
             "audio_registry": self.audio_registry,
             "ensure_system_skills": self._ensure_system_skills_for_devices,
+            "_brain_event_queues": [],
         }
+        self._app_state = app_state
 
         # Setup scheduled jobs
         self._register_scheduler_jobs()
@@ -123,13 +128,35 @@ class Anima:
             )
 
     async def _bootstrap_startup(self, app_state: dict[str, object]) -> None:
+        logger.info("Starting Anima v0.1 — Make Every Hardware Intelligent")
+        self._restore_virtual_devices()
         logger.info("Scanning for devices...")
         await self.discovery.scan()
         logger.info("Found %d device(s)", len(self.discovery.devices))
+        self._sync_device_rooms()
         await self._ensure_system_skills_for_devices(app_state)
         await self._ensure_cold_start_profiles()
         await self._maybe_start_onboarding(app_state)
         await self._run_brain_cycle_serially()
+
+    def _restore_virtual_devices(self) -> None:
+        virtual_devices = self.settings_store.get("virtual_devices", [])
+        for vd in virtual_devices:
+            device = self.virtual_adapter.register_device(
+                device_id=vd["device_id"],
+                name=vd["name"],
+                device_type=vd["device_type"],
+            )
+            self.discovery.devices[device.device_id] = device
+            self.discovery._adapter_map[device.device_id] = self.virtual_adapter
+            logger.info("Restored virtual device: %s (%s)", device.name, device.device_id)
+
+    def _sync_device_rooms(self) -> None:
+        device_rooms = self.settings_store.get("device_rooms", {})
+        for device_id, room_id in device_rooms.items():
+            device = self.discovery.get_device(device_id)
+            if device:
+                device.room = room_id
 
     async def _maybe_start_onboarding(self, app_state: dict[str, object]) -> None:
         if app_state.get("_xiaomi_qr_flow"):
@@ -278,7 +305,29 @@ class Anima:
         async with self._brain_cycle_lock:
             while self._brain_cycle_pending:
                 self._brain_cycle_pending = False
-                await self.brain.run_cycle()
+                result = await self.brain.run_cycle()
+                # Push proactive notifications to SSE subscribers
+                if result and result.task_plan_items:
+                    await self._push_brain_events(result)
+
+    async def _push_brain_events(self, result: object) -> None:
+        import json
+        queues = getattr(self, "_app_state", {}).get("_brain_event_queues", [])
+        if not queues:
+            return
+        items = getattr(result, "task_plan_items", [])
+        for item in items:
+            goal = getattr(item, "goal", "")
+            if not goal:
+                continue
+            msg = json.dumps({
+                "type": "proactive_action",
+                "skill": getattr(item, "skill_name", ""),
+                "goal": goal,
+                "reason": getattr(item, "reason", ""),
+            }, ensure_ascii=False)
+            for q in list(queues):
+                await q.put(msg)
 
     async def _ensure_cold_start_profiles(self) -> None:
         device_types = [
