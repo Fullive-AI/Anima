@@ -91,9 +91,9 @@ class RulesEngine:
 
             # Cooldown check
             now = time.monotonic()
-            last = self._last_triggered.get(rule.name, 0)
-            if rule.cooldown_seconds > 0 and (now - last) < rule.cooldown_seconds:
-                continue
+            if rule.cooldown_seconds > 0 and rule.name in self._last_triggered:
+                if (now - self._last_triggered[rule.name]) < rule.cooldown_seconds:
+                    continue
 
             self._last_triggered[rule.name] = now
             command = rule.action.model_copy()
