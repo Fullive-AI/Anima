@@ -18,7 +18,7 @@
 
 <!-- <img src="./assets/demo.gif" alt="Anima Dashboard Demo" width="800"> -->
 
-**[快速开始](#-快速开始)** · **[架构](#架构)** · **[技能系统](#技能系统)** · **[贡献指南](./CONTRIBUTING.md)** · **[路线图](#-路线图)** · **[更新日志](./CHANGELOG.md)**
+**[快速开始](#快速开始)** · **[架构](#架构)** · **[技能系统](#技能系统)** · **[贡献](#贡献)** · **[路线图](#路线图)** · **[更新日志](./CHANGELOG.md)**
 
 </div>
 
@@ -73,7 +73,7 @@
 │         │                                                        │
 │         │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐     │
 │         │  │ REST API │  │   Chat   │  │    Dashboard     │     │
-│         │  │ (8080)   │  │  (WS)    │  │   (Vite/3000)   │     │
+│         │  │ (8080)   │  │  (SSE)   │  │   (Vite/3000)   │     │
 │         │  └──────────┘  └──────────┘  └──────────────────┘     │
 │         └────────────────────────────────────────────────────────│
 └──────────────────────────┬─────────────────────────────────────────┘
@@ -97,7 +97,7 @@
 ### 环境要求
 
 - [Node.js](https://nodejs.org/) >= 18 + [pnpm](https://pnpm.io/) >= 8
-- [Python](https://www.python.org/) >= 3.11（uv 由 pnpm 自动安装）
+- [Python](https://www.python.org/) >= 3.11 + [uv](https://docs.astral.sh/uv/)
 
 ### 安装与运行
 
@@ -129,6 +129,8 @@ cp .env.example .env  # 填入 API 密钥
 docker compose up -d
 ```
 
+后端运行在 **8080** 端口。挂载 `data/` 和 `skills/` 实现数据持久化。
+
 ---
 
 ## 配置
@@ -142,6 +144,9 @@ ANIMA_LLM_MODEL=gpt-4o
 
 # 可选：自定义 API 端点（DeepSeek / 豆包 / Ollama 等）
 ANIMA_LLM_BASE_URL=https://api.deepseek.com/v1
+
+# 可选：禁用深度思考（部分提供商需要）
+ANIMA_LLM_DISABLE_THINKING=false
 ```
 
 **支持的 LLM 提供商**（任何 OpenAI 兼容 API）：
@@ -151,6 +156,7 @@ ANIMA_LLM_BASE_URL=https://api.deepseek.com/v1
 | OpenAI | `gpt-4o` | _（留空）_ |
 | DeepSeek | `deepseek-chat` | `https://api.deepseek.com/v1` |
 | 豆包 | `doubao-seed-2-0-lite-260215` | `https://ark.cn-beijing.volces.com/api/v3` |
+| Anthropic (代理) | `claude-sonnet-4-20250514` | 你的代理 URL |
 | Ollama（本地） | `llama3` | `http://localhost:11434/v1` |
 
 ---
@@ -158,6 +164,18 @@ ANIMA_LLM_BASE_URL=https://api.deepseek.com/v1
 ## 技能系统
 
 每个技能教会 Anima **如何让一种设备类型变得自主智能** — 不只是开关控制。
+
+```
+skills/
+  system/              # 内置技能
+    humidifier/
+      SKILL.md          # 领域知识和决策逻辑
+      references/       # 参考文档
+      scripts/
+        actions.py      # 可执行的技能动作
+  custom/              # 自定义技能
+    _template/          # 复制此模板创建新技能
+```
 
 ### 内置技能
 
@@ -169,6 +187,8 @@ ANIMA_LLM_BASE_URL=https://api.deepseek.com/v1
 | **空气净化器** | 人在感知净化、睡眠静音、AQI 启发式 |
 | **音箱** | 播放导向行为、安静时段保护、安全默认 |
 | **协调器** | 跨设备编排 — 防止冲突、创造协同 |
+| **设备发现** | 自动扫描和注册新设备 |
+| **技能创建器** | 通过自然语言 AI 生成自定义技能 |
 
 ### 编写自定义技能
 
@@ -180,16 +200,141 @@ cp -r skills/custom/_template skills/custom/my-skill
 
 ---
 
+## Dashboard
+
+React Dashboard 提供完整的控制和监控体验：
+
+- **设备列表** — 所有已发现设备的实时状态，支持传感器编辑和命令控制
+- **环境视图** — 跨房间的聚合传感器数据
+- **AI 决策流** — 通过 SSE 实时观察 Anima 的推理过程
+- **统一聊天** — 自然语言控制、设备发现、技能创建
+- **记忆调试器** — 查看已学习的偏好和决策历史
+- **设置** — LLM 配置、小米扫码登录、设备管理
+- **虚拟设备** — 无需真实硬件即可创建演示设备体验 Anima
+
+---
+
 ## 开发
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm install` | 安装所有依赖 |
+| `pnpm install` | 安装所有依赖（前端 + 后端）|
 | `pnpm dev` | 启动 Broker + 后端 + Dashboard |
 | `pnpm dev:frontend` | 仅 Dashboard (端口 3000) |
 | `pnpm dev:backend` | 仅后端 (端口 8080) |
+| `pnpm dev:broker` | 仅 MQTT Broker (端口 1883) |
 | `pnpm build` | 构建前端 |
 | `uv run pytest tests/ -v` | 运行测试 |
+| `uv run ruff check .` | Python 代码检查 |
+
+### REST API
+
+FastAPI Swagger 文档运行时访问 `http://localhost:8080/docs`。
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `GET` | `/health` | 健康检查 |
+| `GET` | `/api/devices` | 设备列表 |
+| `POST` | `/api/chat` | 统一聊天入口 |
+| `GET` | `/api/environment` | 环境传感器快照 |
+| `GET` | `/api/decisions` | AI 决策历史 |
+| `GET` | `/api/memory` | 学习到的偏好 |
+| `POST` | `/api/scan` | 触发设备重新扫描 |
+
+<details>
+<summary><strong>完整 API 参考</strong></summary>
+
+**设备**
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `GET` | `/api/devices` | 设备列表 |
+| `GET` | `/api/devices/{device_id}` | 设备详情 |
+| `POST` | `/api/devices/{device_id}/command` | 发送控制命令 |
+| `POST` | `/api/devices/{device_id}/sensors` | 更新传感器数据 |
+| `PATCH` | `/api/devices/{device_id}/rename` | 重命名设备 |
+| `DELETE` | `/api/devices/{device_id}` | 删除设备 |
+| `PUT` | `/api/devices/{device_id}/room` | 分配设备到房间 |
+| `POST` | `/api/devices/add` | 手动添加 MIoT 设备 |
+| `POST` | `/api/devices/{device_id}/activate` | Token 激活设备 |
+
+**虚拟设备**
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `POST` | `/api/admin/virtual-devices` | 创建虚拟设备 |
+| `DELETE` | `/api/admin/virtual-devices/{device_id}` | 删除虚拟设备 |
+
+**房间**
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `GET` | `/api/rooms` | 房间列表 |
+| `POST` | `/api/rooms` | 创建房间 |
+| `PUT` | `/api/rooms/{room_id}` | 更新房间 |
+| `DELETE` | `/api/rooms/{room_id}` | 删除房间 |
+
+**技能**
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `GET` | `/api/skills` | 技能列表 |
+| `GET` | `/api/skills/custom/{folder_name}` | 自定义技能详情 |
+| `PUT` | `/api/skills/custom/{folder_name}` | 更新自定义技能 |
+
+**环境与大脑**
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `GET` | `/api/environment` | 环境传感器快照 |
+| `POST` | `/api/environment/refresh` | 刷新环境数据 |
+| `GET` | `/api/brain/events` | AI 决策 SSE 流 |
+| `GET` | `/api/onboarding/status` | 引导状态 |
+
+**设置与小米**
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `GET` | `/api/settings` | 仪表盘设置 |
+| `GET` | `/api/settings/xiaomi/status` | 小米云状态 |
+| `POST` | `/api/settings/xiaomi/qr/start` | 启动扫码登录 |
+| `POST` | `/api/settings/xiaomi/qr/poll` | 轮询扫码状态 |
+| `POST` | `/api/settings/xiaomi/disconnect` | 断开小米 |
+| `GET` | `/api/settings/llm/status` | LLM 配置状态 |
+| `POST` | `/api/settings/llm/configure` | 保存 LLM 配置 |
+
+</details>
+
+---
+
+## 项目结构
+
+```
+Anima/
+├── core/                       # Python 后端
+│   ├── brain/                  # LLM 大脑（规划 + 执行 + 技能）
+│   ├── events/                 # 异步事件总线
+│   ├── memory/                 # 偏好学习与存储
+│   ├── scheduler/              # 定时任务
+│   ├── api/                    # FastAPI REST API
+│   ├── devices/                # 设备发现编排器
+│   ├── runtime/                # 配置、MQTT 客户端、设置存储
+│   ├── llm/                    # LLM 客户端
+│   ├── media/                  # 音频注册与音箱播放
+│   └── main.py                 # 入口文件
+├── adapters/                   # 设备协议适配器
+│   ├── miot/                   # 小米 MIoT
+│   └── virtual/                # 虚拟设备（演示/测试）
+├── skills/
+│   ├── system/                 # 内置 AI 技能（8 个技能）
+│   └── custom/                 # 用户创建的技能
+├── dashboard/                  # React + Vite + Tailwind 前端
+├── tests/                      # Pytest + Playwright 测试套件
+├── docs/                       # 设计文档
+├── docker-compose.yml          # Docker 部署
+├── pyproject.toml              # Python 配置
+└── package.json                # pnpm monorepo 根配置
+```
 
 ---
 
@@ -197,9 +342,9 @@ cp -r skills/custom/_template skills/custom/my-skill
 
 | 版本 | 里程碑 | 状态 |
 |------|--------|------|
-| **v0.1** | **"它活了"** — 核心框架、MIoT 适配器、Dashboard、LLM 大脑、记忆学习、内置技能 | **当前** |
-| v0.2 | **"更聪明"** — Matter 适配器、实时 WebSocket、房间管理 | 计划中 |
-| v0.3 | **"社区来了"** — 技能商店、适配器插件、Telegram Bot、HA 桥接 | 计划中 |
+| **v0.1** | **"它活了"** — 核心框架、MIoT 适配器、Dashboard、LLM 大脑、记忆学习、内置技能、CLI + API、Docker | **当前** |
+| v0.2 | **"更聪明"** — Matter 适配器、实时 WebSocket、房间管理、高级偏好学习 | 计划中 |
+| v0.3 | **"社区来了"** — 技能商店、适配器插件、Telegram Bot、HomeAssistant 桥接 | 计划中 |
 | v0.4 | **"更强大"** — 多用户、树莓派镜像、安全加固 | 计划中 |
 
 ---
@@ -213,6 +358,7 @@ cp -r skills/custom/_template skills/custom/my-skill
 | 贡献指南 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
 | 安全策略 | [`SECURITY.md`](./SECURITY.md) |
 | 更新日志 | [`CHANGELOG.md`](./CHANGELOG.md) |
+| Agent 架构指南 | [`AGENT.md`](./AGENT.md) |
 
 ---
 

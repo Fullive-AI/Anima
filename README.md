@@ -18,7 +18,7 @@ An open-source **Agentic AI OS** for hardware — auto-discovers devices, gives 
 
 <!-- <img src="./assets/demo.gif" alt="Anima Dashboard Demo" width="800"> -->
 
-**[Quick Start](#-quick-start)** · **[Architecture](#architecture)** · **[Skill System](#skill-system)** · **[Contributing](./CONTRIBUTING.md)** · **[Roadmap](#-roadmap)** · **[Changelog](./CHANGELOG.md)**
+**[Quick Start](#quick-start)** · **[Architecture](#architecture)** · **[Skill System](#skill-system)** · **[Contributing](#contributing)** · **[Roadmap](#roadmap)** · **[Changelog](./CHANGELOG.md)**
 
 </div>
 
@@ -74,7 +74,7 @@ Most smart-home systems are dumb remotes — they toggle switches and follow rig
 │  │                                                               │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐            │
 │  │  │ REST API │  │   Chat   │  │    Dashboard     │            │
-│  │  │ (8080)   │  │  (WS)    │  │   (Vite/3000)   │            │
+│  │  │ (8080)   │  │  (SSE)   │  │   (Vite/3000)   │            │
 │  │  └──────────┘  └──────────┘  └──────────────────┘            │
 │  └───────────────────────────────────────────────────────────────│
 └──────────────────────────┬─────────────────────────────────────────┘
@@ -101,7 +101,7 @@ Most smart-home systems are dumb remotes — they toggle switches and follow rig
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) >= 18 + [pnpm](https://pnpm.io/) >= 8
-- [Python](https://www.python.org/) >= 3.11 (uv is auto-installed by pnpm)
+- [Python](https://www.python.org/) >= 3.11 + [uv](https://docs.astral.sh/uv/)
 
 ### Install & Run
 
@@ -193,6 +193,8 @@ skills/
 | **Air Purifier** | Occupancy-aware purification, sleep-time quiet mode, AQI heuristics |
 | **Speaker** | Playback-oriented behavior, quiet-hour protection, safe defaults |
 | **Coordinator** | Cross-device orchestration — prevents conflicts, creates synergies |
+| **Device Discovery** | Automatic scanning and registration of new devices |
+| **Skill Creator** | AI-powered generation of custom skills from natural language |
 
 ### Write Your Own Skill
 
@@ -208,12 +210,13 @@ cp -r skills/custom/_template skills/custom/my-skill
 
 The React Dashboard provides a complete control and monitoring experience:
 
-- **Device List** — live status of all discovered devices
+- **Device List** — live status of all discovered devices with sensor editing and command controls
 - **Environment View** — aggregated sensor data across rooms
-- **AI Decision Stream** — watch Anima's reasoning in real-time
-- **Unified Chat** — natural language control and queries
+- **AI Decision Stream** — watch Anima's reasoning in real-time via SSE
+- **Unified Chat** — natural language control, device discovery, and skill creation
 - **Memory Debugger** — inspect learned preferences and decision history
 - **Settings** — LLM config, Xiaomi QR onboarding, device management
+- **Virtual Devices** — create demo devices to experience Anima without real hardware
 
 ---
 
@@ -232,7 +235,7 @@ The React Dashboard provides a complete control and monitoring experience:
 
 ### REST API
 
-FastAPI Swagger docs available at `http://localhost:8080/docs`.
+FastAPI Swagger docs available at `http://localhost:8080/docs` when running.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -247,14 +250,57 @@ FastAPI Swagger docs available at `http://localhost:8080/docs`.
 <details>
 <summary><strong>Full API Reference</strong></summary>
 
+**Devices**
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET` | `/api/devices` | List all devices |
 | `GET` | `/api/devices/{device_id}` | Device details |
 | `POST` | `/api/devices/{device_id}/command` | Send command to device |
+| `POST` | `/api/devices/{device_id}/sensors` | Update sensor values |
+| `PATCH` | `/api/devices/{device_id}/rename` | Rename a device |
+| `DELETE` | `/api/devices/{device_id}` | Remove a device |
+| `PUT` | `/api/devices/{device_id}/room` | Assign device to room |
 | `POST` | `/api/devices/add` | Add manual MIoT device |
 | `POST` | `/api/devices/{device_id}/activate` | Activate with token |
+
+**Virtual Devices**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/admin/virtual-devices` | Create virtual device |
+| `DELETE` | `/api/admin/virtual-devices/{device_id}` | Remove virtual device |
+
+**Rooms**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `GET` | `/api/rooms` | List rooms |
+| `POST` | `/api/rooms` | Create room |
+| `PUT` | `/api/rooms/{room_id}` | Update room |
+| `DELETE` | `/api/rooms/{room_id}` | Delete room |
+
+**Skills**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/skills` | List all skills |
+| `GET` | `/api/skills/custom/{folder_name}` | Get custom skill details |
+| `PUT` | `/api/skills/custom/{folder_name}` | Update custom skill |
+
+**Environment & Brain**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/environment` | Aggregated sensor snapshot |
 | `POST` | `/api/environment/refresh` | Refresh environment |
+| `GET` | `/api/brain/events` | SSE stream of AI decisions |
+| `GET` | `/api/onboarding/status` | Check onboarding state |
+
+**Settings & Xiaomi**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `GET` | `/api/settings` | Dashboard settings |
 | `GET` | `/api/settings/xiaomi/status` | Xiaomi cloud status |
 | `POST` | `/api/settings/xiaomi/qr/start` | Start QR login |
@@ -276,18 +322,20 @@ Anima/
 │   ├── events/                 # Async EventBus
 │   ├── memory/                 # Preference learning & storage
 │   ├── scheduler/              # Periodic jobs
-│   ├── api/                    # FastAPI REST + WebSocket
+│   ├── api/                    # FastAPI REST API
 │   ├── devices/                # Discovery orchestrator
+│   ├── runtime/                # Config, MQTT client, settings store
 │   ├── llm/                    # LLM client
+│   ├── media/                  # Audio registry & speaker playback
 │   └── main.py                 # Entry point
 ├── adapters/                   # Device protocol adapters
 │   ├── miot/                   # Xiaomi MIoT
 │   └── virtual/                # Virtual devices (demo/testing)
 ├── skills/
-│   ├── system/                 # Built-in AI skills
+│   ├── system/                 # Built-in AI skills (8 skills)
 │   └── custom/                 # User-created skills
 ├── dashboard/                  # React + Vite + Tailwind frontend
-├── tests/                      # Pytest test suite
+├── tests/                      # Pytest + Playwright test suite
 ├── docs/                       # Design documents
 ├── docker-compose.yml          # Docker deployment
 ├── pyproject.toml              # Python config
