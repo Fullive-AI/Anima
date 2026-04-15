@@ -33,14 +33,26 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Run tests
-        run: uv run pytest tests/ -v --tb=long --junit-xml=test-results.xml
+        run: |
+          uv run pytest tests/ -v --tb=long --junit-xml=test-results.xml 2>&1 | tee test-output.txt
+          exit ${PIPESTATUS[0]}
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo '## Test Results (Python ${{ matrix.python-version }})' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -60 test-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.python-version }}
-          path: test-results.xml
+          path: |
+            test-results.xml
+            test-output.txt
 
   frontend:
     runs-on: ubuntu-latest
