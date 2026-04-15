@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 
 import uvicorn
@@ -112,9 +113,13 @@ class Anima:
 
             # Run CLI mode
             scheduler_task = asyncio.create_task(self.scheduler.start())
-            await interactive_cli(self.discovery, self.brain)
-            self.scheduler.stop()
-            scheduler_task.cancel()
+            try:
+                await interactive_cli(self.discovery, self.brain)
+            finally:
+                self.scheduler.stop()
+                scheduler_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await scheduler_task
 
         elif mode == "full":
             # Run API server + scheduler
@@ -123,11 +128,35 @@ class Anima:
             config = uvicorn.Config(app, host=settings.api_host, port=settings.api_port, log_level="info")
             server = uvicorn.Server(config)
 
-            await asyncio.gather(
-                server.serve(),
-                self.scheduler.start(),
-                self._bootstrap_startup(app_state),
-            )
+            await self._run_full_mode(server, app_state)
+
+    async def _run_full_mode(self, server: uvicorn.Server, app_state: dict[str, object]) -> None:
+        server_task = asyncio.create_task(server.serve(), name="uvicorn-server")
+        scheduler_task = asyncio.create_task(self.scheduler.start(), name="anima-scheduler")
+        bootstrap_task = asyncio.create_task(self._bootstrap_startup(app_state), name="anima-bootstrap")
+        tasks = {server_task, scheduler_task, bootstrap_task}
+
+        try:
+            while tasks:
+                done, tasks = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    if task.cancelled():
+                        continue
+                    exc = task.exception()
+                    if exc is not None:
+                        raise exc
+                    if task is server_task:
+                        return
+        except asyncio.CancelledError:
+            raise
+        finally:
+            server.should_exit = True
+            self.scheduler.stop()
+            if self._brain_cycle_task is not None and not self._brain_cycle_task.done():
+                self._brain_cycle_task.cancel()
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _bootstrap_startup(self, app_state: dict[str, object]) -> None:
         logger.info("Starting Anima v0.1 — Make Every Hardware Intelligent")
@@ -317,24 +346,51 @@ class Anima:
 
     async def _push_brain_events(self, result: object) -> None:
         import json
+        from datetime import datetime, timezone
 
         queues = getattr(self, "_app_state", {}).get("_brain_event_queues", [])
         if not queues:
             return
+
+        execution_results = getattr(result, "execution_results", []) or []
+        for execution_result in execution_results:
+            plan_item = getattr(execution_result, "plan_item", None)
+            actions = getattr(execution_result, "actions", []) or []
+            verifications = getattr(execution_result, "verifications", []) or []
+            for index, action in enumerate(actions):
+                verification = verifications[index] if index < len(verifications) else None
+                msg = json.dumps({
+                    "type": "proactive_action",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "skill": getattr(plan_item, "skill_name", "") if plan_item else getattr(action, "skill_name", ""),
+                    "goal": getattr(plan_item, "goal", "") if plan_item else "",
+                    "reason": getattr(action, "reason", "") or (getattr(plan_item, "reason", "") if plan_item else ""),
+                    "device_id": getattr(action, "device_id", ""),
+                    "action": getattr(action, "action", ""),
+                    "params": getattr(action, "params", {}),
+                    "verification_passed": getattr(verification, "verified", None) if verification else None,
+                    "final_status": getattr(verification, "status", "") if verification else "",
+                }, ensure_ascii=False)
+                for q in list(queues):
+                    await q.put(msg)
+
+        if execution_results:
+            return
+
         items = getattr(result, "task_plan_items", [])
         for item in items:
+            if getattr(item, "kind", "") == "execute_skill":
+                continue
             goal = getattr(item, "goal", "")
             if not goal:
                 continue
-            msg = json.dumps(
-                {
-                    "type": "proactive_action",
-                    "skill": getattr(item, "skill_name", ""),
-                    "goal": goal,
-                    "reason": getattr(item, "reason", ""),
-                },
-                ensure_ascii=False,
-            )
+            msg = json.dumps({
+                "type": "proactive_action",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "skill": getattr(item, "skill_name", ""),
+                "goal": goal,
+                "reason": getattr(item, "reason", ""),
+            }, ensure_ascii=False)
             for q in list(queues):
                 await q.put(msg)
 

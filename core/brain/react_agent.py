@@ -74,7 +74,7 @@ TOOLS: list[dict[str, Any]] = [
                 "properties": {
                     "skill_name": {"type": "string", "description": "skill 名称"},
                     "device_id": {"type": "string", "description": "目标设备 ID"},
-                    "goal": {"type": "string", "description": "目标描述，如 turn on、set brightness to 50%"},
+                    "goal": {"type": "string", "description": "中文目标描述，如 打开设备、把亮度调到50%"},
                 },
                 "required": ["skill_name", "device_id", "goal"],
             },

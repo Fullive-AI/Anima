@@ -46,8 +46,8 @@ def execute_action(dev: miio.Device, action: str, params: dict[str, Any]) -> Non
         _send_with_fallbacks(dev, [("set_power", ["off"]), ("power", ["off"])])
         return
 
-    if aliased == "set_humidity":
-        value = params.get("value")
+    if aliased in {"set_humidity", "set_target_humidity"}:
+        value = _first_present(params, ("value", "humidity", "target_humidity", "relative_humidity"))
         if hasattr(dev, "set_target_humidity"):
             dev.set_target_humidity(value)
             return
@@ -56,8 +56,8 @@ def execute_action(dev: miio.Device, action: str, params: dict[str, Any]) -> Non
         )
         return
 
-    if aliased == "set_temperature":
-        value = params.get("value")
+    if aliased in {"set_temperature", "set_target_temperature"}:
+        value = _first_present(params, ("value", "temperature", "target_temperature"))
         if hasattr(dev, "set_target_temperature"):
             dev.set_target_temperature(value)
             return
@@ -89,6 +89,13 @@ def execute_action(dev: miio.Device, action: str, params: dict[str, Any]) -> Non
         return
 
     dev.send(aliased, list(params.values()) if params else [])
+
+
+def _first_present(params: dict[str, Any], names: tuple[str, ...]) -> Any:
+    for name in names:
+        if name in params:
+            return params[name]
+    return None
 
 
 def _execute_mp5_command(dev: AirPurifierMiot, action: str, params: dict[str, Any]) -> bool:

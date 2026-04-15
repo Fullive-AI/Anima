@@ -893,6 +893,7 @@ class Brain:
             "You are Anima's scheduler-driven planner.\n"
             "Inspect the current device state, environment, user memory, and available skills.\n"
             "Break the cycle into small tasks. Tasks may refresh environment state, execute a device skill, or reply with no-op reasoning.\n\n"
+            "All user-visible text fields such as goal, reason, reply, and question MUST be written in Simplified Chinese.\n\n"
             f"Available skill summaries:\n{_j(skill_summaries)}\n\n"
             f"Planner hints:\n{planner_hints}\n\n"
             f"Current devices:\n{_j(device_summaries)}\n\n"
@@ -901,14 +902,14 @@ class Brain:
             "Return JSON only. Preferred schema:\n"
             "{\n"
             '  "task_plan_items": [\n'
-            '    {"kind": "refresh_environment", "reason": "need latest sensor state", "priority": 5},\n'
-            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "raise humidity", "reason": "why now", "priority": 10},\n'
-            '    {"kind": "reply", "reply": "当前环境已经很舒适，无需操作。", "priority": 20}\n'
+            '    {"kind": "refresh_environment", "reason": "需要最新传感器状态", "priority": 5},\n'
+            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "开启加湿器并把目标湿度维持在50%", "reason": "当前室内湿度低于用户确认的舒适阈值", "priority": 10},\n'
+            '    {"kind": "reply", "reply": "当前环境已经舒适，不需要执行操作。", "priority": 20}\n'
             "  ]\n"
             "}\n"
             "Legacy schema is still accepted:\n"
             "[\n"
-            '  {"skill_name": "humidifier", "goal": "raise humidity", "reason": "why now", "priority": 10}\n'
+            '  {"skill_name": "humidifier", "goal": "提高室内湿度", "reason": "当前湿度低于舒适阈值", "priority": 10}\n'
             "]\n"
             "Rules:\n"
             "- All user-facing reply text MUST be in Chinese (中文).\n"
@@ -968,14 +969,15 @@ class Brain:
 
         return "".join(parts) + (
             "Output JSON only with this schema:\n"
+            "All user-visible text fields such as reply, goal, reason, and question MUST be written in Simplified Chinese.\n"
             "{\n"
             '  "reply": "string",\n'
             '  "should_execute": true,\n'
             '  "task_plan_items": [\n'
             '    {"kind": "ask_user", "question": "你想调节哪个房间？", "reason": "scope ambiguous", "priority": 5},\n'
-            '    {"kind": "refresh_environment", "reason": "need latest state before acting", "priority": 8},\n'
-            '    {"kind": "system_action", "system_skill": "device_discovery", "system_action": "scan_local_devices", "params": {}, "reason": "user asked to scan", "priority": 10},\n'
-            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "raise humidity", "reason": "why", "priority": 20},\n'
+            '    {"kind": "refresh_environment", "reason": "执行前需要获取最新状态", "priority": 8},\n'
+            '    {"kind": "system_action", "system_skill": "device_discovery", "system_action": "scan_local_devices", "params": {}, "reason": "用户要求扫描设备", "priority": 10},\n'
+            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "提高室内湿度", "reason": "当前湿度低于舒适阈值", "priority": 20},\n'
             '    {"kind": "reply", "reply": "我已经处理完成。", "priority": 30}\n'
             "  ]\n"
             "}\n"
@@ -1265,9 +1267,15 @@ class Brain:
             knowledge=skill.knowledge,
         )
         if not planner_goal and not planner_reason:
-            return base_prompt
+            return (
+                f"{base_prompt}\n\n"
+                "## Language Rule\n"
+                "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST be written in Simplified Chinese.\n"
+            )
         return (
             f"{base_prompt}\n\n"
+            "## Language Rule\n"
+            "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST be written in Simplified Chinese.\n\n"
             "## Planner Intent\n"
             f"Goal: {planner_goal or '(none)'}\n"
             f"Reason: {planner_reason or '(none)'}\n"
@@ -1430,10 +1438,8 @@ class Brain:
                     device_id=device_id,
                     action=command_action,
                     params=action.get("params", {}) if isinstance(action.get("params"), dict) else {},
-                    reason=str(action.get("reason", "")),
-                    expected_state=action.get("expected_state", {})
-                    if isinstance(action.get("expected_state"), dict)
-                    else {},
+                    reason=self._localize_user_visible_text(str(action.get("reason", ""))),
+                    expected_state=action.get("expected_state", {}) if isinstance(action.get("expected_state"), dict) else {},
                 )
             )
         return normalized
@@ -1862,11 +1868,50 @@ class Brain:
             action=action,
             params=params,
             source="brain",
-            reason=str(data.get("reason", "")),
+            reason=self._localize_user_visible_text(str(data.get("reason", ""))),
             confidence=self._parse_confidence(data.get("confidence")),
-            expected_outcome=str(data.get("expected_outcome", "")),
+            expected_outcome=self._localize_user_visible_text(str(data.get("expected_outcome", ""))),
             should_wait_seconds=self._parse_wait_seconds(data.get("should_wait_seconds")),
         )
+
+    @staticmethod
+    def _localize_user_visible_text(text: str) -> str:
+        """Best-effort cleanup for user-facing strings emitted by LLM skill decisions."""
+        if not text:
+            return ""
+        localized = text
+        localized = re.sub(
+            r"Current indoor humidity is ([\d.]+)%?,?\s+which is below (?:the |user )?confirmed ([\d.]+)% comfort humidity threshold,?",
+            r"当前室内湿度为 \1%，低于用户确认的 \2% 舒适湿度阈值，",
+            localized,
+            flags=re.IGNORECASE,
+        )
+        localized = re.sub(
+            r"the humidifier is online and currently powered off,?\s*",
+            "加湿器在线且当前处于关闭状态，",
+            localized,
+            flags=re.IGNORECASE,
+        )
+        localized = re.sub(
+            r"automatic activation aligns with the user's\s*",
+            "自动开启符合用户的",
+            localized,
+            flags=re.IGNORECASE,
+        )
+        localized = re.sub(
+            r"comfort-first policy",
+            "舒适优先策略",
+            localized,
+            flags=re.IGNORECASE,
+        )
+        localized = re.sub(
+            r"permission for automatic adjustment when humidity drops below ([\d.]+)%",
+            r"湿度低于 \1% 时允许自动调节的偏好",
+            localized,
+            flags=re.IGNORECASE,
+        )
+        localized = re.sub(r"([，。；])\s+", r"\1", localized)
+        return localized.strip(" ,，")
 
     def _sanitize_command_for_device(self, command: DeviceCommand, device: Device) -> DeviceCommand | None:
         capability = self._find_matching_capability(device, command.action)
@@ -1974,7 +2019,24 @@ class Brain:
             return {"brightness": command.params["value"]}
         if action == "set_color_temp" and "kelvin" in command.params:
             return {"color_temp": command.params["kelvin"]}
+        if action in {"set_humidity", "set_target_humidity"}:
+            value = self._first_present_param(command.params, ("value", "humidity", "target_humidity", "relative_humidity"))
+            if value is not None:
+                return {"target_humidity": value}
+        if action in {"set_temperature", "set_target_temperature"}:
+            value = self._first_present_param(command.params, ("value", "temperature", "target_temperature"))
+            if value is not None:
+                return {"target_temperature": value}
+        if action == "set_mode" and "mode" in command.params:
+            return {"mode": command.params["mode"]}
         return {}
+
+    @staticmethod
+    def _first_present_param(params: dict[str, Any], names: tuple[str, ...]) -> Any:
+        for name in names:
+            if name in params:
+                return params[name]
+        return None
 
     def _observe_expected_state(self, device: Device, expected_state: dict[str, Any]) -> dict[str, Any]:
         observed: dict[str, Any] = {}

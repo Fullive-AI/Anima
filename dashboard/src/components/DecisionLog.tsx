@@ -25,6 +25,19 @@ export interface AgentEvent {
   execution_results?: ChatExecutionResult[]
 }
 
+interface BrainEvent {
+  type: string
+  timestamp?: string
+  skill?: string
+  goal?: string
+  reason?: string
+  device_id?: string
+  action?: string
+  params?: Record<string, unknown>
+  verification_passed?: boolean | null
+  final_status?: string
+}
+
 interface ConversationTurn {
   id: string
   timestamp: string
@@ -221,9 +234,31 @@ function formatActionSummary(action: string, skillName: string, deviceId: string
   if (action === 'set_brightness') return `已调节亮度 → ${params.value ?? params.brightness}%`
   if (action === 'set_color_temp') return `已调节色温 → ${params.kelvin ?? params.value}K`
   if (action === 'set_mode') return `已切换模式 → ${params.mode}`
-  if (action === 'set_humidity' || action === 'set_target_humidity') return `已设置湿度 → ${params.value}%`
-  if (action === 'set_temperature' || action === 'set_target_temperature') return `已设置温度 → ${params.value}°C`
+  if (action === 'set_humidity' || action === 'set_target_humidity') {
+    const value = params.value ?? params.humidity ?? params.target_humidity ?? params.relative_humidity
+    return value == null ? `已设置目标湿度` : `已设置目标湿度 → ${value}%`
+  }
+  if (action === 'set_temperature' || action === 'set_target_temperature') {
+    const value = params.value ?? params.temperature ?? params.target_temperature
+    return value == null ? `已设置温度` : `已设置温度 → ${value}°C`
+  }
   return `${skillName}: ${action} → ${device}`
+}
+
+function normalizeAutoText(text?: string) {
+  if (!text) return ''
+  return text
+    .replace(/Turn on ([\w\s-]+) and maintain (\d+)% target humidity in auto mode/i, '已开启$1，并以自动模式维持目标湿度 $2%')
+    .replace(/Current indoor humidity is ([\d.]+)%?,?\s+which is below (?:the |user )?confirmed ([\d.]+)% comfort humidity threshold,?/i, '当前室内湿度为 $1%，低于用户确认的 $2% 舒适湿度阈值，')
+    .replace(/the humidifier is online and currently powered off,?\s*/i, '加湿器在线且当前处于关闭状态，')
+    .replace(/The humidifier is currently powered off, online, and automatic activation aligns with the user's comfort-first policy and permission for automatic adjustment when humidity drops below (\d+)%\.?/i, '加湿器当前在线且处于关闭状态；自动开启符合用户的舒适优先策略，以及湿度低于 $1% 时允许自动调节的偏好。')
+    .replace(/automatic activation aligns with the user's\s*/i, '自动开启符合用户的')
+    .replace(/Mijia Smart Anti-bacterial Humidifier 2/gi, '米家智能除菌加湿器 2')
+    .replace(/comfort-first policy/gi, '舒适优先策略')
+    .replace(/confirmed ([\d.]+)% comfort humidity threshold/gi, '用户确认的 $1% 舒适湿度阈值')
+    .replace(/target humidity/gi, '目标湿度')
+    .replace(/auto mode/gi, '自动模式')
+    .replace(/([，。；])\s+/g, '$1')
 }
 
 export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessageRef }: DecisionLogProps) {
@@ -237,13 +272,20 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
     const es = new EventSource('/api/brain/events')
     es.onmessage = (e) => {
       try {
-        const data = JSON.parse(e.data) as { type: string; skill?: string; goal?: string; reason?: string }
-        if (data.type === 'proactive_action' && data.goal) {
+        const data = JSON.parse(e.data) as BrainEvent
+        if (data.type === 'proactive_action' && (data.goal || data.action)) {
           const turnId = `brain-${Date.now()}`
-          const reply = `**自动执行**：${data.goal}${data.reason ? `\n\n> ${data.reason}` : ''}`
+          const title = data.action && data.device_id
+            ? formatActionSummary(data.action, data.skill || 'system', data.device_id, data.params || {})
+            : normalizeAutoText(data.goal) || '系统自动执行'
+          const reason = normalizeAutoText(data.reason)
+          const status = data.final_status
+            ? `\n\n状态：\`${data.final_status}\`${data.verification_passed === false ? '，未通过验证' : ''}`
+            : ''
+          const reply = `**自动执行**：${title}${reason ? `\n\n> ${reason}` : ''}${status}`
           setConversation(prev => [...prev, {
             id: turnId,
-            timestamp: new Date().toISOString(),
+            timestamp: data.timestamp || new Date().toISOString(),
             userMessage: '',
             result: { reply },
             trace: [],
