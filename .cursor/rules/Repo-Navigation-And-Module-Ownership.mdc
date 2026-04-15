@@ -1,0 +1,49 @@
+---
+alwaysApply: true
+---
+
+Before editing, orient yourself in the repository and identify the correct ownership boundary.
+
+## Required behavior
+
+For each task:
+
+1. Determine which module, package, app, service, or subsystem owns the change.
+2. Inspect the nearest relevant files before making edits.
+3. Follow local conventions in that part of the repo.
+4. Limit changes to the owning area unless downstream or upstream compatibility requires more.
+
+## Navigation principles
+
+- Start from the entry point most relevant to the request.
+- Trace usage through imports, calls, routes, handlers, adapters, and tests.
+- Prefer modifying the true owner of the behavior, not a random nearby consumer.
+- Avoid scattering a single concern across multiple modules.
+
+## Ownership rules
+
+- Put business logic in the business logic owner.
+- Put UI behavior in the UI owner.
+- Put integration glue in the integration owner.
+- Put protocol handling in the protocol owner.
+- Put tests next to or clearly aligned with the owning behavior.
+
+## Cross-module changes
+
+If multiple modules must change:
+
+1. Identify the dependency chain first.
+2. List the affected boundaries mentally before editing.
+3. Keep the interface between modules clear.
+4. Change only the modules necessary to complete the task safely.
+
+## Avoid
+
+- editing whichever file appears first in search results without understanding ownership
+- patching symptoms in consumers when the root cause belongs in a shared owner
+- creating shadow logic in a second module
+- spreading fixes across the repo without a clear dependency reason
+
+## Preferred mindset
+
+Understand where the change belongs before deciding how to implement it.

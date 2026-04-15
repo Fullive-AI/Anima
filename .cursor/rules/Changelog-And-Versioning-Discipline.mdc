@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+
+For user-visible changes, consider whether changelog, release notes, deprecation notes, or version-impact documentation should be updated.
+
+Document breaking changes, deprecations, and behavior changes clearly.
+Prefer backward-compatible evolution unless the task explicitly requires otherwise.

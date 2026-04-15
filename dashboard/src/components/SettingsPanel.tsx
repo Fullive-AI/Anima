@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Wifi, WifiOff, Brain, Eye, EyeOff, X, Check, Loader2, Plus, Monitor, Settings, Cpu, Trash2 } from 'lucide-react'
+import { Wifi, WifiOff, Brain, Eye, EyeOff, X, Check, Loader2, Plus, Monitor, Settings, Cpu } from 'lucide-react'
 import { api } from '../hooks/useApi'
 
 interface SettingsPanelProps {

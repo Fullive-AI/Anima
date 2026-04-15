@@ -7,9 +7,10 @@ dist/
 .env
 .ruff_cache/
 .pytest_cache/
-data/memory/users/*/history.json
-data/memory/users/*/learned.md
-data/config.json
+
+# Runtime data (persisted via Docker volume, never committed)
+data/
+
 node_modules/
 dashboard/dist/
 

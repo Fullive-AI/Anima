@@ -1,94 +1,146 @@
-[English](./README.md) | [中文](./README.zh-CN.md)
+<div align="center">
+
+<!-- LOGO_PLACEHOLDER: Replace with your Anima logo -->
+<!-- <img src="./assets/logo.png" alt="Anima Logo" width="200"> -->
 
 # Anima
 
-**Make Every Hardware Intelligent.**
+### Make Every Hardware Intelligent
 
-An open-source Agent OS that auto-discovers your hardware devices, empowers each one with AI Skills, and lets them autonomously sense, decide, and collaborate.
+An open-source **Agentic AI OS** for hardware — auto-discovers devices, gives each one an AI brain, and lets them autonomously sense, decide, and evolve.
 
-## What is Anima?
+[English](./README.md) | [中文](./README.zh-CN.md)
 
-**Anima** (Latin for "soul") breathes intelligence into every piece of hardware you own. Instead of asking "what sensors do you need?", Anima asks **"what do you have — I'll use it."**
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
+[![CI](https://github.com/fulai-tech/Anima/actions/workflows/ci.yml/badge.svg)](https://github.com/fulai-tech/Anima/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](./docker-compose.yml)
 
-- Zero configuration — auto-discovers devices on your local network
-- AI-driven decisions — LLM Brain loads domain knowledge and makes smart choices
-- Skill system — each device type gets specialized intelligence, not just on/off control
-- Learns your preferences — evolves over time based on your habits
-- Visual Dashboard — real-time device monitoring, AI decision stream, unified graph-based chat, and a memory debugger
+<!-- DEMO_GIF_PLACEHOLDER: Replace with a demo GIF or screenshot -->
+<!-- <img src="./assets/demo.gif" alt="Anima Dashboard Demo" width="800"> -->
 
-## 60 Seconds Quick Start
+**[Quick Start](#-quick-start)** · **[Documentation](#-documentation)** · **[Contributing](./CONTRIBUTING.md)** · **[Roadmap](#-roadmap)**
 
-```bash
-# Clone and enter project
-git clone https://github.com/fulai-tech/Anima.git
-cd Anima
+</div>
 
-# Install dependencies (frontend + backend, one command)
-pnpm install
+---
 
-# Configure
-cp .env.example .env      # Fill in ANIMA_LLM_API_KEY
+## Why Anima?
 
-# Start (MQTT Broker + Dashboard + Backend together)
-pnpm dev
-```
+Most smart-home systems are dumb remotes — they toggle switches and follow rigid schedules. Anima is different.
 
-Open **http://localhost:3000** — you'll see the Anima Dashboard.
+**Anima** (Latin for _"soul"_) breathes real intelligence into your hardware. Instead of asking _"what rules should I set?"_, Anima asks **_"what do you have? I'll figure it out."_**
 
-### After Launch: Connect Your Devices
+### Three Core Superpowers
 
-1. Click **⚙ Settings** (top-right gear icon)
-2. In **LLM Brain** section, enter your API Key and model config (or use .env)
-3. In **Xiaomi** section, click **Generate QR Code**
-4. Open **Mi Home app** on your phone and scan the QR code
-5. Done — all your Xiaomi devices and tokens are fetched automatically
+<table>
+<tr>
+<td width="33%" align="center">
+<h3>🧠 Skill-Driven AI Brain</h3>
+<p>Each device type gets <strong>specialized domain knowledge</strong> — not just on/off control. A humidifier knows about comfort ranges, seasonal adjustments, and AC interactions. A light understands circadian rhythms. The AI Brain loads these skills and makes autonomous decisions.</p>
+</td>
+<td width="33%" align="center">
+<h3>🔌 Zero-Config Discovery</h3>
+<p><strong>Plug in any device and Anima finds it.</strong> Auto-discovers devices via mDNS, identifies types, loads matching skills, and starts managing — no YAML configs, no manual setup. Works with Xiaomi/MIoT today, Matter and HomeAssistant bridges coming next.</p>
+</td>
+<td width="33%" align="center">
+<h3>🧬 Learns and Evolves</h3>
+<p>Anima <strong>remembers your preferences</strong> and evolves over time. It extracts patterns from your decisions, builds preference profiles per device type, and continuously refines its behavior. The more you use it, the smarter it gets.</p>
+</td>
+</tr>
+</table>
 
-> **Why QR scan?** Tokens are device control keys stored on Xiaomi's cloud servers. Local network scanning can find devices but cannot get tokens. QR login is the most reliable authentication method — no password input, no captcha issues.
-
-Click the **? Help** button (top-right) for a step-by-step guide inside the Dashboard.
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) >= 18 + [pnpm](https://pnpm.io/) >= 8
-- [uv](https://docs.astral.sh/uv/) (Python package manager, auto-installed by pnpm)
+---
 
 ## Architecture
 
 ```
-┌───────────────────────────────────────────┐
-│              Core (single process)         │
-│                                           │
-│  Discovery ──▶ EventBus ◀── Scheduler     │
-│                   │                       │
-│      Sensor / Chat ──▶ LLM Brain ◀── Memory │
-│                   │                       │
-│        Dashboard · Chat API · MQTT Client │
-└──────────────────┬────────────────────────┘
-                   │ MQTT
-            ┌──────┴──────┐
-            │  Mosquitto  │
-            └──┬─────┬────┘
-           MIoT    Matter   HA Bridge
-          Adapter  Adapter  (v0.2+)
+┌────────────────────────────────────────────────────────────────────┐
+│                        Anima Core (Single Process)                 │
+│                                                                    │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    │
+│  │Discovery │───▶│ EventBus │◀───│Scheduler │    │  Memory  │    │
+│  │Orchestr. │    │          │    │          │    │  System  │    │
+│  └──────────┘    └────┬─────┘    └──────────┘    └────┬─────┘    │
+│                       │                               │          │
+│  ┌────────────────────┴───────────────────────────────┘          │
+│  │                                                               │
+│  │         ┌──────────────────────────────┐                      │
+│  │         │        LLM Brain             │                      │
+│  │         │  ┌────────┐  ┌───────────┐   │                      │
+│  │         │  │Planner │  │ Executor  │   │                      │
+│  │         │  │(Skills)│  │(LangGraph)│   │                      │
+│  │         │  └────────┘  └───────────┘   │                      │
+│  │         └──────────────────────────────┘                      │
+│  │                                                               │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐            │
+│  │  │ REST API │  │   Chat   │  │    Dashboard     │            │
+│  │  │ (8080)   │  │  (WS)    │  │   (Vite/3000)   │            │
+│  │  └──────────┘  └──────────┘  └──────────────────┘            │
+│  └───────────────────────────────────────────────────────────────│
+└──────────────────────────┬─────────────────────────────────────────┘
+                           │ MQTT
+                    ┌──────┴──────┐
+                    │ MQTT Broker │
+                    └──┬─────┬───┘
+                       │     │
+              ┌────────┘     └────────┐
+              │                       │
+        ┌─────┴─────┐         ┌──────┴──────┐
+        │   MIoT    │         │   Virtual   │
+        │  Adapter  │         │   Adapter   │
+        └───────────┘         └─────────────┘
+        Xiaomi Devices         Demo/Testing
 ```
 
-## What's Included
+**Single async Python process** — EventBus + LLM Brain + Scheduler + Memory, all in one. No microservices overhead.
 
-| Module | Description |
-|--------|-------------|
-| **Dashboard** | React + Vite + Tailwind — device list, environment view, AI decision stream, chat bar, settings/help, and memory debugger |
-| **EventBus** | Async event system with wildcard subscriptions and error isolation |
-| **Rules Engine** | Kept in the codebase as an optional deterministic layer, but the current main runtime path routes sensor and chat input through the LLM Brain |
-| **LLM Brain** | Skill-driven LangGraph planner/executor — loads skill summaries, plans actions, executes skills, verifies device state, and also serves `/api/chat` |
-| **Memory System** | `preferences.md` + `history.json` + topic memories + normalized `learned.json` profiles, with incremental extraction and unified preference learning |
-| **Skill System** | Built-in device skills plus system skills such as device discovery and skill creation |
-| **Discovery** | Auto-scans local network via mDNS, registers devices, deduplicates |
-| **MIoT Adapter** | Xiaomi/Mi Home device discovery and control via python-miio |
-| **Scheduler** | Periodic device scanning, unified preference learning/memory extraction, and brain ticks |
-| **CLI** | Interactive Rich terminal: `devices`, `scan`, `status <id>`, `history` |
-| **REST API** | FastAPI server on port 8080 with device, chat, settings, environment, onboarding, and memory-debug endpoints |
+---
 
-## Configuration (.env)
+## Quick Start
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) >= 18 + [pnpm](https://pnpm.io/) >= 8
+- [Python](https://www.python.org/) >= 3.11 (uv is auto-installed by pnpm)
+
+### Install & Run
+
+```bash
+# Clone
+git clone https://github.com/fulai-tech/Anima.git
+cd Anima
+
+# Install all dependencies (frontend + backend)
+pnpm install
+
+# Configure your LLM API key
+cp .env.example .env
+# Edit .env and set ANIMA_LLM_API_KEY
+
+# Start everything (MQTT broker + backend + dashboard)
+pnpm dev
+```
+
+Open **http://localhost:3000** — the Anima Dashboard is live.
+
+> **No devices?** No problem — use the Dashboard to add virtual devices for a full demo experience. Click the Chat bar and ask Anima to create devices for you.
+
+### Docker Deployment
+
+```bash
+cp .env.example .env  # fill in your API key
+
+docker compose up -d
+```
+
+The backend runs on port **8080**. Mount `data/` and `skills/` for persistence.
+
+---
+
+## Configuration
+
+Anima uses environment variables with the `ANIMA_` prefix:
 
 ```env
 # Required: any OpenAI-compatible API key
@@ -100,153 +152,189 @@ ANIMA_LLM_MODEL=gpt-4o
 # Optional: custom endpoint for DeepSeek / Doubao / Ollama / etc.
 ANIMA_LLM_BASE_URL=https://api.deepseek.com/v1
 
-# Optional: disable deep thinking (required for Doubao)
+# Optional: disable deep thinking (required for some providers)
 ANIMA_LLM_DISABLE_THINKING=false
 ```
 
-**Supported LLM providers** (any OpenAI-compatible API):
+**Supported LLM Providers** (any OpenAI-compatible API):
 
-| Provider | ANIMA_LLM_MODEL | ANIMA_LLM_BASE_URL |
-|----------|-----------------|---------------------|
-| OpenAI | `gpt-4o` | *(leave empty)* |
-| Anthropic (via proxy) | `claude-sonnet-4-20250514` | your proxy URL |
+| Provider | Model | Base URL |
+|----------|-------|----------|
+| OpenAI | `gpt-4o` | _(leave empty)_ |
 | DeepSeek | `deepseek-chat` | `https://api.deepseek.com/v1` |
 | Doubao | `doubao-seed-2-0-lite-260215` | `https://ark.cn-beijing.volces.com/api/v3` |
+| Anthropic (via proxy) | `claude-sonnet-4-20250514` | your proxy URL |
 | Ollama (local) | `llama3` | `http://localhost:11434/v1` |
 
-## Development Scripts
-
-| Command | Description |
-|---------|-------------|
-| `pnpm install` | Install all dependencies (frontend + backend) |
-| `pnpm dev` | Start Dashboard (port 3000) + Backend (port 8080) together |
-| `pnpm dev:frontend` | Start Dashboard only |
-| `pnpm dev:backend` | Start Python backend only |
-| `pnpm build` | Build Dashboard for production |
-| `uv run pytest tests/ -v` | Run the full test suite |
-
-FastAPI Swagger docs are available at `http://localhost:8080/docs` when the backend is running in full mode.
-
-## REST API
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check |
-| GET | `/api/devices` | List all discovered devices |
-| GET | `/api/devices/{device_id}` | Get device details |
-| POST | `/api/devices/{device_id}/command` | Send command to a device |
-| POST | `/api/devices/add` | Add a manual MIoT device by IP + token |
-| POST | `/api/devices/{device_id}/activate` | Activate a discovered device with a token |
-| GET | `/api/rooms` | List rooms |
-| POST | `/api/chat` | Unified graph-based chat entry for reply, system operations, and skill execution |
-| GET | `/api/decisions` | Recent AI decision history |
-| GET | `/api/environment` | Aggregated environment snapshot |
-| POST | `/api/environment/refresh` | Refresh device states and return updated environment |
-| POST | `/api/scan` | Trigger device re-scan |
-| GET | `/api/memory` | View normalized learned profiles, topic memories, extraction state, and recent history |
-| GET | `/api/settings` | Read persisted dashboard settings |
-| GET | `/api/settings/xiaomi/status` | Xiaomi cloud connection status |
-| POST | `/api/settings/xiaomi/qr/start` | Start Xiaomi QR login flow |
-| POST | `/api/settings/xiaomi/qr/poll` | Poll Xiaomi QR login flow |
-| POST | `/api/settings/xiaomi/disconnect` | Clear Xiaomi cloud connection state |
-| GET | `/api/settings/llm/status` | Read current LLM configuration status |
-| POST | `/api/settings/llm/configure` | Save LLM configuration |
+---
 
 ## Skill System
 
-Each Skill teaches Anima **how a device type becomes autonomously intelligent** — not just how to toggle it on/off.
-
-Global planner policy can also be adjusted in [`core/brain/prompts/planner_hints.md`](./core/brain/prompts/planner_hints.md), which is loaded into the Brain's top-level planner prompt.
+Each Skill teaches Anima **how a device type becomes autonomously intelligent** — not just how to toggle it.
 
 ```
 skills/
-  system/               # Built-in skills maintained by Anima
+  system/              # Built-in skills shipped with Anima
     humidifier/
-      SKILL.md
-      references/
-        knowledge.md
-        decide.md
-        learn.md
+      SKILL.md          # Domain knowledge and decision logic
+      references/       # Supporting knowledge documents
       scripts/
-        actions.py
-  custom/               # User-added skills live here
-    <your-skill>/
-      SKILL.md
-      references/
-      scripts/
+        actions.py      # Executable skill actions
+  custom/              # Your custom skills go here
+    _template/          # Copy this to create a new skill
 ```
 
 ### Built-in Skills
 
-| Skill | Knowledge includes |
-|-------|-------------------|
-| **Humidifier** | Comfort ranges (40-60%), seasonal adjustments, AC interaction, water level alerts |
-| **Air Conditioner** | Energy optimization, circadian temperature, humidity coordination |
-| **Light** | Circadian lighting (2200K-5000K), time-of-day brightness, transition smoothness |
-| **Air Purifier** | Occupancy-aware purification, sleep-time quietness, air quality heuristics |
-| **Speaker** | Explicit playback-oriented behavior, quiet-hour protection, safe no-op defaults |
+| Skill | Intelligence |
+|-------|-------------|
+| **Humidifier** | Comfort ranges (40-60%), seasonal adjustments, AC coordination, water level alerts |
+| **Air Conditioner** | Energy optimization, circadian temperature curves, humidity coordination |
+| **Light** | Circadian lighting (2200K–5000K), time-based brightness, smooth transitions |
+| **Air Purifier** | Occupancy-aware purification, sleep-time quiet mode, AQI heuristics |
+| **Speaker** | Playback-oriented behavior, quiet-hour protection, safe defaults |
 | **Coordinator** | Cross-device orchestration — prevents conflicts, creates synergies |
-| **Device Discovery** | Xiaomi QR onboarding, local scan helpers, activation flows |
-| **Skill Creator** | Analysis-first custom skill creation and auto-generated system skills |
 
-## Memory Debugger
+### Write Your Own Skill
 
-The Dashboard now includes a Memory Debugger panel. It surfaces:
+```bash
+cp -r skills/custom/_template skills/custom/my-skill
+# Edit skills/custom/my-skill/SKILL.md
+# Restart Anima — it auto-discovers new skills
+```
 
-- `preferences.md`
-- normalized learned profiles per device type
-- extracted topic memories
-- memory extraction cursor/state
-- recent decision history used for learning
+---
 
-The same data is also available via `GET /api/memory`.
+## Dashboard
+
+The React Dashboard provides a complete control and monitoring experience:
+
+- **Device List** — live status of all discovered devices
+- **Environment View** — aggregated sensor data across rooms
+- **AI Decision Stream** — watch Anima's reasoning in real-time
+- **Unified Chat** — natural language control and queries
+- **Memory Debugger** — inspect learned preferences and decision history
+- **Settings** — LLM config, Xiaomi QR onboarding, device management
+
+---
+
+## Development
+
+| Command | Description |
+|---------|-------------|
+| `pnpm install` | Install all dependencies (frontend + backend) |
+| `pnpm dev` | Start broker + backend + dashboard together |
+| `pnpm dev:frontend` | Dashboard only (port 3000) |
+| `pnpm dev:backend` | Python backend only (port 8080) |
+| `pnpm dev:broker` | MQTT broker only (port 1883) |
+| `pnpm build` | Build dashboard for production |
+| `uv run pytest tests/ -v` | Run test suite |
+| `uv run ruff check .` | Lint Python code |
+
+### REST API
+
+FastAPI Swagger docs available at `http://localhost:8080/docs`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/api/devices` | List all devices |
+| `POST` | `/api/chat` | Unified chat entry |
+| `GET` | `/api/environment` | Aggregated sensor snapshot |
+| `GET` | `/api/decisions` | AI decision history |
+| `GET` | `/api/memory` | Learned preferences and profiles |
+| `POST` | `/api/scan` | Trigger device re-scan |
+
+<details>
+<summary><strong>Full API Reference</strong></summary>
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/devices/{device_id}` | Device details |
+| `POST` | `/api/devices/{device_id}/command` | Send command to device |
+| `POST` | `/api/devices/add` | Add manual MIoT device |
+| `POST` | `/api/devices/{device_id}/activate` | Activate with token |
+| `GET` | `/api/rooms` | List rooms |
+| `POST` | `/api/environment/refresh` | Refresh environment |
+| `GET` | `/api/settings` | Dashboard settings |
+| `GET` | `/api/settings/xiaomi/status` | Xiaomi cloud status |
+| `POST` | `/api/settings/xiaomi/qr/start` | Start QR login |
+| `POST` | `/api/settings/xiaomi/qr/poll` | Poll QR login |
+| `POST` | `/api/settings/xiaomi/disconnect` | Disconnect Xiaomi |
+| `GET` | `/api/settings/llm/status` | LLM config status |
+| `POST` | `/api/settings/llm/configure` | Save LLM config |
+
+</details>
+
+---
 
 ## Project Structure
 
 ```
 Anima/
-├── dashboard/                  # Frontend (React + Vite + Tailwind)
-│   └── src/components/         # DeviceList, DeviceCard, DecisionLog, ChatBar, Header
 ├── core/                       # Python backend
-│   ├── brain/                  # LLM decision engine + Skill loader
+│   ├── brain/                  # LLM Brain (planner + executor + skills)
 │   ├── events/                 # Async EventBus
-│   ├── rules/                  # Fast-path rules engine
-│   ├── memory/                 # User memory (markdown + JSON)
-│   ├── scheduler/              # Periodic job scheduler
-│   ├── api/                    # FastAPI REST endpoints
-│   └── main.py                 # Main entrypoint
+│   ├── memory/                 # Preference learning & storage
+│   ├── scheduler/              # Periodic jobs
+│   ├── api/                    # FastAPI REST + WebSocket
+│   ├── devices/                # Discovery orchestrator
+│   ├── llm/                    # LLM client
+│   └── main.py                 # Entry point
 ├── adapters/                   # Device protocol adapters
-│   └── miot/                   # Xiaomi MIoT adapter
+│   ├── miot/                   # Xiaomi MIoT
+│   └── virtual/                # Virtual devices (demo/testing)
 ├── skills/
-│   ├── system/                # Built-in skills shipped with Anima
-│   └── custom/                # User-created skills loaded from the same runtime
-├── tests/                      # automated test suite
-├── docs/plans/                 # Design doc + implementation plan
-├── package.json                # pnpm monorepo root
-├── pyproject.toml              # Python dependencies
-├── docker-compose.yml          # MQTT broker + core
-└── .env.example                # Configuration template
+│   ├── system/                 # Built-in AI skills
+│   └── custom/                 # User-created skills
+├── dashboard/                  # React + Vite + Tailwind frontend
+├── tests/                      # Pytest test suite
+├── docs/                       # Design documents
+├── docker-compose.yml          # Docker deployment
+├── pyproject.toml              # Python config
+└── package.json                # pnpm monorepo root
 ```
+
+---
 
 ## Roadmap
 
-| Version | Milestone | Key Features |
-|---------|-----------|-------------|
-| **v0.1** | "It's Alive" (current) | Core framework, MIoT adapter, Dashboard, LangGraph brain, memory learning, built-in/system skills, CLI + API, Docker |
-| v0.2 | "Getting Smarter" | Matter adapter, real-time WebSocket, preference learning, room management |
-| v0.3 | "Community Arrives" | Skill Store, adapter plugins, Telegram Bot, HA bridge |
-| v0.4 | "Getting Stronger" | Multi-user, Raspberry Pi image, security hardening |
+| Version | Milestone | Status |
+|---------|-----------|--------|
+| **v0.1** | **"It's Alive"** — Core framework, MIoT adapter, Dashboard, LLM Brain, memory learning, built-in skills, CLI + API, Docker | **Current** |
+| v0.2 | **"Getting Smarter"** — Matter adapter, real-time WebSocket, room management, advanced preference learning | Planned |
+| v0.3 | **"Community Arrives"** — Skill Store, adapter plugins, Telegram Bot, HomeAssistant bridge | Planned |
+| v0.4 | **"Getting Stronger"** — Multi-user, Raspberry Pi image, security hardening | Planned |
+
+---
 
 ## Contributing
 
-Anima is designed for easy contribution:
+We welcome contributions! The easiest ways to start:
 
-- **Write a Skill** — create a new folder under `skills/custom/` with `SKILL.md`, `references/`, and optional `scripts/`
-  Start from `skills/custom/_template/` and copy it to `skills/custom/<your-skill-name>/`.
-- **Write an Adapter** — 1 class, 3 methods: `discover()`, `subscribe()`, `execute()`
+- **Write a Skill** — teach Anima about a new device type
+- **Write an Adapter** — add support for a new device protocol (3 methods: `discover()`, `subscribe()`, `execute()`)
+- **Report bugs** or **suggest features** via [Issues](https://github.com/fulai-tech/Anima/issues)
 
-See [Design Document](docs/plans/2026-03-17-anima-design.md) for full architecture details.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for full guidelines.
+
+---
+
+## About
+
+Anima is built by [**Fullive.AI**](https://fullive.ai/) (福来数创), a Spatial Agentic AI company backed by Hillhouse Ventures, Mohua Tech, AGIBOT, Peking University Institute, and leading industry partners.
+
+> _We believe environments should proactively evolve to adapt to humans — that is the technological privilege humanity deserves._
+
+Fullive.AI builds Spatial Agentic AI that gives physical spaces the ability to autonomously perceive, decide, execute, and evolve — enabling a new paradigm of seamless human-environment interaction.
+
+---
 
 ## License
 
-[Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+[Apache License 2.0](./LICENSE) — Anima is free and open source.
+
+---
+
+<!-- STAR_HISTORY_PLACEHOLDER -->
+<!-- [![Star History Chart](https://api.star-history.com/svg?repos=fulai-tech/Anima&type=Date)](https://star-history.com/#fulai-tech/Anima&Date) -->

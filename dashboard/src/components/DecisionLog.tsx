@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { Brain, Loader2, Send, Sparkles, Wrench, Clock, ChevronDown, ChevronRight } from 'lucide-react'
-import { api, type ChatExecutionResult, type ChatResponse } from '../hooks/useApi'
+import { type ChatExecutionResult, type ChatResponse } from '../hooks/useApi'
 
 interface DecisionLogProps {
   onDevicesChanged: () => void

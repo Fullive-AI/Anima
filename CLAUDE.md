@@ -11,7 +11,7 @@ pnpm dev              # starts MQTT broker + backend (port 8080) + frontend (por
 # pnpm dev:frontend  — React dashboard only (port 3000)
 
 ## Test
-cd anima && uv run pytest tests/ -v
+uv run pytest tests/ -v
 
 ## Architecture
 Thin Core (single asyncio process) + MQTT device layer.

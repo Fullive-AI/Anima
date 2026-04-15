@@ -9,8 +9,6 @@ services:
 
   core:
     build: .
-    ports:
-      - "8080:8080"
     volumes:
       - ./data:/app/data
       - ./skills:/app/skills
@@ -19,9 +17,9 @@ services:
       - ANIMA_LLM_MODEL=${ANIMA_LLM_MODEL:-gpt-4o}
       - ANIMA_LLM_BASE_URL=${ANIMA_LLM_BASE_URL:-}
       - ANIMA_LLM_DISABLE_THINKING=${ANIMA_LLM_DISABLE_THINKING:-false}
-      - ANIMA_MQTT_HOST=mqtt
+      - ANIMA_MQTT_HOST=localhost
       - ANIMA_MQTT_PORT=1883
     depends_on:
       - mqtt
-    network_mode: host  # needed for mDNS device discovery on local network
+    network_mode: host
     restart: unless-stopped

@@ -6,20 +6,36 @@ interface VoiceOrbProps {
   disabled?: boolean
 }
 
-// Extend window for webkit prefix
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number
+  results: SpeechRecognitionResultList
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onstart: (() => void) | null
+  onresult: ((e: SpeechRecognitionEvent) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+  start(): void
+  stop(): void
+}
+
 declare global {
   interface Window {
-    webkitSpeechRecognition: new () => SpeechRecognition
-    SpeechRecognition: new () => SpeechRecognition
+    webkitSpeechRecognition: new () => SpeechRecognitionInstance
+    SpeechRecognition: new () => SpeechRecognitionInstance
   }
 }
 
 export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [finalText, setFinalText] = useState('')
+  const [, setFinalText] = useState('')
   const [supported, setSupported] = useState(true)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFinalRef = useRef('')
 
@@ -65,7 +81,7 @@ export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
 
     recognition.onstart = () => setListening(true)
 
-    recognition.onresult = (e: SpeechRecognitionEvent) => {
+    recognition.onresult = (e) => {
       let interim = ''
       let final = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
