@@ -1,4 +1,5 @@
 import { BrainCircuit, Clock3, Database, RefreshCw, ShieldCheck, X } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useMemoryDebug } from '../hooks/useApi'
 
 interface MemoryPanelProps {
@@ -15,6 +16,98 @@ function SectionTitle({ title, detail }: { title: string; detail?: string }) {
   )
 }
 
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const parts = text.split(/(`[^`]+`|\*\*.*?\*\*)/g)
+  return parts.filter(Boolean).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={index} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      return <code key={index} className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">{part.slice(1, -1)}</code>
+    }
+    return <span key={index}>{part}</span>
+  })
+}
+
+function MarkdownBlock({ content, emptyText = 'No content.' }: { content?: string; emptyText?: string }) {
+  const text = (content || '').trim()
+  if (!text) {
+    return <p className="text-sm text-slate-400">{emptyText}</p>
+  }
+
+  const lines = text.split('\n').map((line) => line.trimEnd())
+  const blocks: ReactNode[] = []
+  let listItems: string[] = []
+
+  const flushList = (key: string) => {
+    if (!listItems.length) return
+    blocks.push(
+      <ul key={key} className="ml-5 list-disc space-y-1 text-sm leading-6 text-slate-700">
+        {listItems.map((item, index) => (
+          <li key={`${key}-${index}`}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ul>,
+    )
+    listItems = []
+  }
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim()
+    if (!line) {
+      flushList(`list-${index}`)
+      return
+    }
+
+    const bulletMatch = line.match(/^[-*•]\s+(.*)$/)
+    const orderedMatch = line.match(/^\d+\.\s+(.*)$/)
+    if (bulletMatch || orderedMatch) {
+      listItems.push((bulletMatch || orderedMatch)?.[1] || '')
+      return
+    }
+
+    flushList(`list-${index}`)
+
+    if (line.startsWith('### ')) {
+      blocks.push(<h3 key={`h3-${index}`} className="text-sm font-semibold text-slate-900">{renderInlineMarkdown(line.slice(4))}</h3>)
+      return
+    }
+    if (line.startsWith('## ')) {
+      blocks.push(<h2 key={`h2-${index}`} className="text-base font-semibold text-slate-900">{renderInlineMarkdown(line.slice(3))}</h2>)
+      return
+    }
+    if (line.startsWith('# ')) {
+      blocks.push(<h1 key={`h1-${index}`} className="text-lg font-semibold text-slate-900">{renderInlineMarkdown(line.slice(2))}</h1>)
+      return
+    }
+
+    blocks.push(<p key={`p-${index}`} className="text-sm leading-6 text-slate-700">{renderInlineMarkdown(line)}</p>)
+  })
+
+  flushList('list-final')
+  return <div className="space-y-2">{blocks}</div>
+}
+
+function Tag({ children, tone = 'slate' }: { children: ReactNode; tone?: 'slate' | 'amber' | 'emerald' | 'violet' }) {
+  const classes = {
+    slate: 'bg-slate-100 text-slate-600 ring-slate-200',
+    amber: 'bg-amber-100 text-amber-700 ring-amber-200',
+    emerald: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+    violet: 'bg-violet-100 text-violet-700 ring-violet-200',
+  }
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${classes[tone]}`}>{children}</span>
+}
+
+function MarkdownListCard({ title, items, emptyText }: { title: string; items: string[]; emptyText: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-3">
+      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
+      <div className="mt-2">
+        <MarkdownBlock content={items.map((item) => `- ${item}`).join('\n')} emptyText={emptyText} />
+      </div>
+    </div>
+  )
+}
+
 export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
   const { memory, loading, refresh } = useMemoryDebug(open ? 5000 : 15000)
 
@@ -24,8 +117,8 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
   const topicMemories = memory ? Object.values(memory.extracted_memories) : []
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px]">
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-[#f3efe6] shadow-2xl ring-1 ring-black/5">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 px-6 py-8 backdrop-blur-[3px]">
+      <div className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] bg-[#f3efe6] shadow-2xl ring-1 ring-black/5">
         <div className="flex items-center justify-between border-b border-black/10 bg-[#1f2937] px-6 py-4 text-white">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-amber-300/20 p-2 text-amber-200">
@@ -83,9 +176,9 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
 
               <div className="rounded-2xl border border-black/10 bg-white/70 p-4 shadow-sm">
                 <SectionTitle title="Preferences.md" />
-                <pre className="mt-4 overflow-x-auto rounded-2xl bg-[#111827] p-4 text-xs leading-6 text-emerald-200">
-                  {memory?.preferences || (loading ? 'Loading preferences...' : 'No preferences yet.')}
-                </pre>
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                  <MarkdownBlock content={memory?.preferences} emptyText={loading ? 'Loading preferences...' : 'No preferences yet.'} />
+                </div>
               </div>
 
               <div className="rounded-2xl border border-black/10 bg-white/70 p-4 shadow-sm">
@@ -99,37 +192,17 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-sm font-semibold text-slate-800">{deviceType}</div>
-                            <div className="mt-1 text-xs text-slate-500">{profile.confidence_notes || 'No confidence notes yet.'}</div>
+                            <div className="mt-2">
+                              <MarkdownBlock content={profile.confidence_notes} emptyText="No confidence notes yet." />
+                            </div>
                           </div>
-                          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
-                            {(profile.metadata?.history_samples as number | undefined) ?? 0} history samples
-                          </div>
+                          <Tag>{(profile.metadata?.history_samples as number | undefined) ?? 0} history samples</Tag>
                         </div>
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
-                          <div className="rounded-xl bg-slate-50 p-3">
-                            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Stable Preferences</div>
-                            <ul className="mt-2 space-y-2 text-sm text-slate-700">
-                              {profile.stable_preferences.length ? profile.stable_preferences.map((item) => <li key={item}>• {item}</li>) : <li className="text-slate-400">No stable preferences yet.</li>}
-                            </ul>
-                          </div>
-                          <div className="rounded-xl bg-slate-50 p-3">
-                            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Time Patterns</div>
-                            <ul className="mt-2 space-y-2 text-sm text-slate-700">
-                              {profile.time_based_patterns.length ? profile.time_based_patterns.map((item) => <li key={item}>• {item}</li>) : <li className="text-slate-400">No time patterns yet.</li>}
-                            </ul>
-                          </div>
-                          <div className="rounded-xl bg-slate-50 p-3">
-                            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Seasonal Patterns</div>
-                            <ul className="mt-2 space-y-2 text-sm text-slate-700">
-                              {profile.seasonal_patterns.length ? profile.seasonal_patterns.map((item) => <li key={item}>• {item}</li>) : <li className="text-slate-400">No seasonal patterns yet.</li>}
-                            </ul>
-                          </div>
-                          <div className="rounded-xl bg-slate-50 p-3">
-                            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Weak Signals</div>
-                            <ul className="mt-2 space-y-2 text-sm text-slate-700">
-                              {profile.weak_signals.length ? profile.weak_signals.map((item) => <li key={item}>• {item}</li>) : <li className="text-slate-400">No weak signals yet.</li>}
-                            </ul>
-                          </div>
+                          <MarkdownListCard title="Stable Preferences" items={profile.stable_preferences} emptyText="No stable preferences yet." />
+                          <MarkdownListCard title="Time Patterns" items={profile.time_based_patterns} emptyText="No time patterns yet." />
+                          <MarkdownListCard title="Seasonal Patterns" items={profile.seasonal_patterns} emptyText="No seasonal patterns yet." />
+                          <MarkdownListCard title="Weak Signals" items={profile.weak_signals} emptyText="No weak signals yet." />
                         </div>
                       </div>
                     ))
@@ -149,11 +222,11 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-medium text-slate-800">{item.title}</div>
-                          <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">{item.category}</div>
+                          <div className="mt-2"><Tag tone="violet">{item.category}</Tag></div>
                         </div>
                         <Database className="mt-0.5 h-4 w-4 text-slate-400" />
                       </div>
-                      <p className="mt-2 text-sm text-slate-600">{item.summary}</p>
+                      <div className="mt-3"><MarkdownBlock content={item.summary} /></div>
                     </div>
                   )) : <p className="text-sm text-slate-500">{loading ? '正在加载...' : '还没有 manifest topics'}</p>}
                 </div>
@@ -166,24 +239,29 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                     <p className="text-sm text-slate-500">{loading ? '正在加载...' : '还没有长期记忆 topic'}</p>
                   ) : (
                     topicMemories.map((memoryItem) => (
-                      <div key={memoryItem.topic} className="rounded-2xl bg-[#111827] p-4 text-slate-100">
+                      <div key={memoryItem.topic} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-sm font-semibold">{memoryItem.title}</div>
-                            <div className="mt-1 text-xs uppercase tracking-wide text-slate-400">{memoryItem.category} · {memoryItem.confidence}</div>
+                            <div className="text-sm font-semibold text-slate-900">{memoryItem.title}</div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Tag tone="violet">{memoryItem.category}</Tag>
+                              <Tag tone={memoryItem.confidence === 'high' ? 'emerald' : memoryItem.confidence === 'medium' ? 'amber' : 'slate'}>
+                                {memoryItem.confidence}
+                              </Tag>
+                            </div>
                           </div>
-                          <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                          <ShieldCheck className="h-4 w-4 text-emerald-500" />
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-slate-300">{memoryItem.summary}</p>
+                        <div className="mt-3"><MarkdownBlock content={memoryItem.summary} /></div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {memoryItem.device_types.map((deviceType) => (
-                            <span key={deviceType} className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-slate-200">{deviceType}</span>
+                            <Tag key={deviceType}>{deviceType}</Tag>
                           ))}
                         </div>
                         {memoryItem.details.length ? (
-                          <ul className="mt-3 space-y-1 text-sm text-slate-300">
-                            {memoryItem.details.map((detail) => <li key={detail}>• {detail}</li>)}
-                          </ul>
+                          <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                            <MarkdownBlock content={memoryItem.details.map((detail) => `- ${detail}`).join('\n')} />
+                          </div>
                         ) : null}
                       </div>
                     ))

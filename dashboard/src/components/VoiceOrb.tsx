@@ -61,7 +61,6 @@ export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
     if (!trimmed) return
     stopListening()
     setTranscript('')
-    setFinalText('')
     lastFinalRef.current = ''
     onSend(`[语音输入] ${trimmed}`, true)
   }, [onSend, stopListening])
@@ -92,7 +91,6 @@ export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
       }
       if (final) {
         lastFinalRef.current += final
-        setFinalText(lastFinalRef.current)
       }
       setTranscript(lastFinalRef.current + interim)
 
@@ -140,7 +138,7 @@ export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
           </span>
           {transcript && (
             <button
-              onClick={() => { setTranscript(''); setFinalText(''); lastFinalRef.current = '' }}
+              onClick={() => { setTranscript(''); lastFinalRef.current = '' }}
               className="text-slate-400 hover:text-slate-600 flex-shrink-0"
             >
               <X className="w-3.5 h-3.5" />
