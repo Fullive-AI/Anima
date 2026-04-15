@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import math
@@ -145,7 +146,7 @@ class Brain:
         self._memory_extractor.schedule(user_id)
 
     async def run_cycle(self) -> BrainCycleResult:
-        user_memory = await self._memory.get_full_context()
+        user_memory = await self._memory.get_planner_context()
         devices = self._get_environment_devices(None)
         environment_state = self.get_environment_state()
         lightweight_skills = self._skill_loader.list_executable_skill_summaries()
@@ -423,10 +424,11 @@ class Brain:
 
         user_memory = context.get("user_memory")
         if not isinstance(user_memory, dict):
-            user_memory = await self._memory.get_full_context()
+            user_memory = await self._memory.get_skill_context(
+                device_type=plan_item.device_type,
+            )
 
-        actions: list[SkillActionSpec] = []
-        for device in devices:
+        async def _decide_for_device(device: Device) -> SkillActionSpec | None:
             prompt = self._build_prompt_context(
                 skill=loaded_skill,
                 device=device,
@@ -437,20 +439,27 @@ class Brain:
             content = await self._invoke_llm_text(prompt, temperature=0.2, max_tokens=900)
             command = self._parse_llm_response(content, device.device_id)
             if not command:
-                continue
+                return None
             command = self._sanitize_command_for_device(command, device)
             if not command:
-                continue
-            actions.append(
-                SkillActionSpec(
-                    skill_name=skill_name,
-                    device_id=command.device_id,
-                    action=command.action,
-                    params=command.params,
-                    reason=command.reason,
-                    expected_state=self._derive_expected_state(command),
-                )
+                return None
+            return SkillActionSpec(
+                skill_name=skill_name,
+                device_id=command.device_id,
+                action=command.action,
+                params=command.params,
+                reason=command.reason,
+                expected_state=self._derive_expected_state(command),
             )
+
+        results = await asyncio.gather(
+            *[_decide_for_device(device) for device in devices],
+            return_exceptions=True,
+        )
+        actions: list[SkillActionSpec] = [
+            r for r in results
+            if isinstance(r, SkillActionSpec)
+        ]
 
         return actions
 
@@ -616,7 +625,7 @@ class Brain:
         context = {
             "brain": self,
             "memory": self._memory,
-            "user_memory": await self._memory.get_full_context(),
+            "user_memory": await self._memory.get_planner_context(),
             "environment_state": self.get_environment_state(),
             "discovery": app_state["discovery"],
             "settings": app_state["settings"],
@@ -681,10 +690,21 @@ class Brain:
         actions = self._normalize_action_specs(raw_actions)
 
         result = SkillExecutionResult(plan_item=plan_item, actions=actions)
-        for action_spec in actions:
+
+        async def _run_action(action_spec: SkillActionSpec) -> ActionVerificationResult:
             verification = await self._execute_action_with_retry(action_spec, context["discovery"])
-            result.verifications.append(verification)
             await self._record_execution_history(plan_item, action_spec, verification)
+            return verification
+
+        verifications = await asyncio.gather(
+            *[_run_action(a) for a in actions],
+            return_exceptions=True,
+        )
+        for v in verifications:
+            if isinstance(v, ActionVerificationResult):
+                result.verifications.append(v)
+            elif isinstance(v, BaseException):
+                logger.exception("Action execution failed: %s", v)
         return result
 
     async def _execute_action_with_retry(
@@ -883,7 +903,7 @@ class Brain:
             '  "task_plan_items": [\n'
             '    {"kind": "refresh_environment", "reason": "need latest sensor state", "priority": 5},\n'
             '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "raise humidity", "reason": "why now", "priority": 10},\n'
-            '    {"kind": "reply", "reply": "No action needed because the environment is already comfortable.", "priority": 20}\n'
+            '    {"kind": "reply", "reply": "当前环境已经很舒适，无需操作。", "priority": 20}\n'
             "  ]\n"
             "}\n"
             "Legacy schema is still accepted:\n"
@@ -891,6 +911,7 @@ class Brain:
             '  {"skill_name": "humidifier", "goal": "raise humidity", "reason": "why now", "priority": 10}\n'
             "]\n"
             "Rules:\n"
+            "- All user-facing reply text MUST be in Chinese (中文).\n"
             "- Allowed task kinds for scheduler are refresh_environment, execute_skill, and reply.\n"
             "- Only choose skill_name values from the available skill summaries.\n"
             "- Prefer no output over redundant actions.\n"
@@ -929,11 +950,21 @@ class Brain:
             env_signals = environment_state.get("signals", {})
             parts.append(f"Devices:\n{_j(device_summaries)}\n\nEnvironment signals:\n{_j(env_signals)}\n\n")
 
-        prefs = user_memory.get("preferences", "")
-        history = user_memory.get("history", [])
-        if isinstance(history, list):
-            history = history[-3:]
-        parts.append(f"User preferences:\n{prefs}\n\nRecent history:\n{_j(history)}\n\n")
+        prefs = user_memory.get("preferences_summary", user_memory.get("preferences", ""))
+        # L2 目录: 展示可用偏好档案和记忆主题
+        profile_types = user_memory.get("learned_profile_types", [])
+        memory_topics = user_memory.get("memory_topics", [])
+        memory_dir_parts: list[str] = []
+        if profile_types:
+            memory_dir_parts.append(f"Learned profiles: {','.join(profile_types)}")
+        if memory_topics:
+            titles = [t.get("title", t.get("topic", "")) for t in memory_topics[:6]]
+            memory_dir_parts.append(f"Memory topics: {','.join(titles)}")
+        memory_dir = "; ".join(memory_dir_parts) if memory_dir_parts else ""
+
+        parts.append(f"User preferences:\n{prefs}\n\n")
+        if memory_dir:
+            parts.append(f"Available memory (for reference, not action):\n{memory_dir}\n\n")
 
         return "".join(parts) + (
             "Output JSON only with this schema:\n"
@@ -949,6 +980,7 @@ class Brain:
             "  ]\n"
             "}\n"
             "Rules:\n"
+            "- All user-facing text (reply, question in ask_user) MUST be in Chinese (中文).\n"
             "- Use task_plan_items for multi-step planning.\n"
             "- Use ask_user when the request is ambiguous or missing critical information.\n"
             "- Use refresh_environment before acting when current state may be stale or must be confirmed.\n"
@@ -1215,15 +1247,20 @@ class Brain:
             if sensor.value is not None
         }
         caps_summary = [{"name": cap.name, **cap.params} for cap in device.capabilities]
-        learned_profiles = user_memory.get("learned_profiles", {})
-        learned_profile = learned_profiles.get(device.type) or user_memory.get("learned", "")
+        # 兼容新旧格式: 新格式使用 learned_profile (单个), 旧格式使用 learned_profiles (dict)
+        learned_profile = user_memory.get("learned_profile", "")
+        if not learned_profile:
+            learned_profiles = user_memory.get("learned_profiles", {})
+            learned_profile = learned_profiles.get(device.type) or user_memory.get("learned", "")
+        # 偏好: 新格式 preferences_summary (压缩一行), 旧格式 preferences (完整MD)
+        preferences = user_memory.get("preferences_summary", user_memory.get("preferences", ""))
         environment_state = self._build_environment_state(device)
         base_prompt = skill.decide_prompt.format(
             current_data=json.dumps(sensor_summary, indent=2),
             capabilities=json.dumps(caps_summary, indent=2),
             environment_state=json.dumps(environment_state, ensure_ascii=False, indent=2),
-            user_preferences=user_memory.get("preferences", ""),
-            recent_history=json.dumps(user_memory.get("history", [])[-5:], indent=2),
+            user_preferences=preferences,
+            recent_history="[]",
             learned_profile=learned_profile or "(none)",
             knowledge=skill.knowledge,
         )

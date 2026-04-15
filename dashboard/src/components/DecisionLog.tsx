@@ -15,7 +15,7 @@ export interface LiveTrace {
 }
 
 export interface AgentEvent {
-  type: 'chunk' | 'action' | 'observation' | 'reply' | 'error' | 'thought'
+  type: 'chunk' | 'action' | 'observation' | 'reply' | 'status' | 'error' | 'thought'
   content?: string
   tool?: string
   args?: Record<string, unknown>
@@ -34,6 +34,7 @@ interface ConversationTurn {
   qrImage?: string
   qrPolling?: boolean
   isProactive?: boolean
+  statusText?: string
 }
 
 function formatTime(ts?: string) {
@@ -323,12 +324,21 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
           try {
             const parsed = JSON.parse(raw) as AgentEvent & { done?: boolean; reply?: string; error?: string }
 
-            // chitchat streaming chunk
+            // Streaming text chunks (chitchat or ReAct final reply)
             if (parsed.type === 'chunk' && parsed.content) {
               streamedReply += parsed.content
               updateConversation(turnId, (turn) => ({
                 ...turn,
                 result: { ...turn.result, reply: streamedReply },
+                statusText: undefined,
+              }))
+            }
+
+            // Status update — show progress to user
+            if (parsed.type === 'status' && parsed.content) {
+              updateConversation(turnId, (turn) => ({
+                ...turn,
+                statusText: parsed.content,
               }))
             }
 
@@ -349,6 +359,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
                   reply: parsed.content || streamedReply || '',
                   execution_results: execResults.length ? execResults : undefined,
                 },
+                statusText: undefined,
               }))
               onChatResult?.(text, { reply: parsed.content || streamedReply || '' })
             }
@@ -477,6 +488,7 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
   const hasExecution = execResults.length > 0
   const hasTrace = turn.trace.length > 0
   const hasReply = Boolean(turn.result.reply)
+  const hasStatus = Boolean(turn.statusText)
 
   // Proactive brain action — no user bubble, special header
   if (turn.isProactive) {
@@ -510,6 +522,16 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
         </div>
       </div>
 
+      {/* Status indicator — real-time progress */}
+      {hasStatus && (
+        <div className="flex mb-2">
+          <div className="rounded-[18px] rounded-tl-sm border border-amber-100 bg-amber-50/60 px-4 py-2.5 flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500" />
+            <span className="text-xs text-amber-600 font-medium">{turn.statusText}</span>
+          </div>
+        </div>
+      )}
+
       {/* Agent trace — collapsible */}
       {hasTrace && <AgentTrace trace={turn.trace} />}
 
@@ -541,13 +563,13 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
             )}
           </div>
         </div>
-      ) : turn.result.reply === '' && !hasExecution && !hasTrace ? (
+      ) : turn.result.reply === '' && !hasExecution && !hasTrace && !hasStatus ? (
         <div className="flex mb-2">
           <div className="rounded-[18px] rounded-tl-sm border border-slate-100 bg-slate-50 px-4 py-3">
             <Loader2 className="h-4 w-4 animate-spin text-slate-300" />
           </div>
         </div>
-      ) : turn.result.reply === '' && hasTrace ? (
+      ) : turn.result.reply === '' && hasTrace && !hasStatus ? (
         <div className="flex mb-2">
           <div className="rounded-[18px] rounded-tl-sm border border-violet-100 bg-violet-50/60 px-4 py-3 flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />

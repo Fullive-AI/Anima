@@ -26,6 +26,11 @@ class Scheduler:
     def remove_job(self, name: str) -> None:
         self.jobs.pop(name, None)
 
+    def update_job_interval(self, name: str, interval_seconds: float) -> None:
+        job = self.jobs.get(name)
+        if job:
+            job.interval_seconds = interval_seconds
+
     def stop(self) -> None:
         self._running = False
 

@@ -588,21 +588,114 @@ class MemoryStore:
         if path.exists():
             path.unlink()
 
-    # ── Full Context (for LLM) ──
+    # ── Three-Layer Memory Context (for LLM) ──
+    #
+    # L1 常驻层: 每次请求必带，极度精简 (~200 tokens)
+    #   - 偏好摘要（一句话版）、在家状态、最近1条历史
+    # L2 摘要层: 放在初始上下文，agent 可按需深入
+    #   - 学习档案目录（仅名称列表）+ 记忆清单（仅 topic/title）
+    # L3 按需层: 仅在 agent 调用工具时才加载
+    #   - 完整学习档案、历史记录、记忆详情
+
+    async def get_core_identity(self, user_id: str = "default") -> dict[str, Any]:
+        """L1 常驻层: 每次必带的极致精简上下文。"""
+        prefs = await self.get_preferences(user_id)
+        # 压缩偏好为关键参数摘要
+        compact_prefs = self._compress_preferences(prefs)
+        # 仅最近1条历史给出对话延续感
+        history = await self.get_history(user_id, limit=1)
+        return {
+            "preferences_summary": compact_prefs,
+            "last_interaction": history[0] if history else None,
+        }
+
+    async def get_memory_directory(self, user_id: str = "default") -> dict[str, Any]:
+        """L2 摘要层: 供 agent 了解有哪些记忆可用，按需深入。"""
+        profiles = self._load_learned_profiles(user_id)
+        profile_index = list(profiles.keys())  # 仅设备类型名列表
+        manifest = await self.get_memory_manifest(user_id)
+        # 极度压缩: 仅 topic + title
+        memory_index = [
+            {"topic": m["topic"], "title": m["title"]}
+            for m in manifest
+        ]
+        return {
+            "learned_profile_types": profile_index,
+            "memory_topics": memory_index,
+        }
+
+    async def get_memory_detail(
+        self,
+        user_id: str = "default",
+        *,
+        profile_type: str = "",
+        memory_topic: str = "",
+        history_limit: int = 10,
+    ) -> dict[str, Any]:
+        """L3 按需层: agent 主动调用才加载的完整记忆详情。"""
+        result: dict[str, Any] = {}
+        if profile_type:
+            result["learned_profile"] = await self.get_learned_for_skill(user_id, profile_type)
+        if memory_topic:
+            memories = await self.get_extracted_memories(user_id)
+            slug = self._slugify_topic(memory_topic)
+            result["memory_detail"] = memories.get(slug, {})
+        if history_limit > 0:
+            result["history"] = await self.get_history(user_id, limit=history_limit)
+        return result
+
+    @staticmethod
+    def _compress_preferences(prefs_md: str) -> str:
+        """将 Markdown 偏好压缩为单行关键参数。"""
+        key_lines: list[str] = []
+        for line in prefs_md.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("- ") and ":" in stripped:
+                # "- 温度: 24°C（...）" → "温度:24°C"
+                key, _, val = stripped[2:].partition(":")
+                val = val.strip()
+                # 截取括号前的核心值
+                for sep in ("（", "(", "，", ","):
+                    if sep in val:
+                        val = val[:val.index(sep)]
+                        break
+                if val and val != "未设置":
+                    key_lines.append(f"{key.strip()}:{val.strip()}")
+        return "; ".join(key_lines) if key_lines else "无特殊偏好"
+
+    # ── Legacy & Compatibility Contexts ──
 
     async def get_full_context(self, user_id: str = "default") -> dict[str, Any]:
+        """完整版上下文(仅供后台任务/偏好学习/测试使用，禁止在 LLM 对话中直接调用)。"""
         return {
             "preferences": await self.get_preferences(user_id),
-            "history": await self.get_history(user_id, limit=20),
-            "learned": await self.get_learned(user_id),
+            "history": await self.get_history(user_id, limit=10),
             "learned_profiles": await self.get_learned_profiles(user_id),
             "memory_manifest": await self.get_memory_manifest(user_id),
-            "extracted_memories": await self.get_extracted_memories(user_id),
         }
 
     async def get_planner_context(self, user_id: str = "default") -> dict[str, Any]:
-        """Lightweight context for chat planner — omits heavy learned profiles and extracted memories."""
+        """供定时调度器/chat planner 使用: L1 常驻 + L2 目录。"""
+        core = await self.get_core_identity(user_id)
+        directory = await self.get_memory_directory(user_id)
         return {
-            "preferences": await self.get_preferences(user_id),
-            "history": await self.get_history(user_id, limit=5),
+            **core,
+            **directory,
+        }
+
+    async def get_skill_context(
+        self,
+        user_id: str = "default",
+        device_type: str = "",
+    ) -> dict[str, Any]:
+        """供 skill 决策使用: L1 常驻 + 该设备的 L3 学习档案（按需加载）。"""
+        core = await self.get_core_identity(user_id)
+
+        learned_profile = ""
+        if device_type:
+            learned_profile = await self.get_learned_for_skill(user_id, device_type)
+
+        return {
+            **core,
+            "learned_profile": learned_profile,
         }
