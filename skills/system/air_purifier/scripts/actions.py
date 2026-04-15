@@ -7,8 +7,7 @@ async def execute(context: dict, plan_item: SkillPlanItem):
         action_name = _resolve_intent_action(plan_item)
         if action_name:
             devices = [
-                device for device in discovery.get_devices_by_type("air_purifier")
-                if getattr(device, "online", True)
+                device for device in discovery.get_devices_by_type("air_purifier") if getattr(device, "online", True)
             ] or discovery.get_devices_by_type("air_purifier")
 
             actions = []

@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: uv sync --extra dev --python ${{ matrix.python-version }}
 
       - name: Lint (Ruff)
@@ -51,8 +51,8 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install frontend dependencies
-        run: pnpm --filter dashboard install
+      - name: Install dependencies
+        run: pnpm install --ignore-scripts
 
       - name: Lint frontend
         run: pnpm --filter dashboard lint

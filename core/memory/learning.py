@@ -90,7 +90,8 @@ class PreferenceLearningService:
             prompt = self._build_profile_prompt(
                 base_prompt=skill.learn_prompt,
                 relevant_history=relevant_history,
-                current_profile=current_profile or json.dumps(
+                current_profile=current_profile
+                or json.dumps(
                     MemoryStore.parse_learned_profile(""),
                     ensure_ascii=False,
                     indent=2,

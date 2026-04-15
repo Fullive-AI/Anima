@@ -3,14 +3,13 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
-import logging
 
-from core.runtime.config import settings as env_settings
 from core.llm.openai_text_client import OpenAITextClient
-
+from core.runtime.config import settings as env_settings
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +165,7 @@ def _system_spec_from_device(device: Any) -> dict[str, Any]:
         ],
     }
 
+
 REQUIRED_FILES = [
     "SKILL.md",
     "references/knowledge.md",
@@ -265,7 +265,9 @@ def _coerce_bool(value: Any, *, default: bool) -> bool:
     return bool(value)
 
 
-def _default_request_analysis(request: str, *, mode: str, device_context: dict[str, Any] | None = None) -> dict[str, Any]:
+def _default_request_analysis(
+    request: str, *, mode: str, device_context: dict[str, Any] | None = None
+) -> dict[str, Any]:
     device_context = device_context or {}
     device_types = _string_list(device_context.get("device_types"))
     target_name = device_types[0] if device_types else "device"
@@ -306,7 +308,9 @@ def _default_request_analysis(request: str, *, mode: str, device_context: dict[s
     return {
         "summary": summary,
         "goal": device_context.get("domain_summary", "") or f"Create a reusable {mode} skill from the user's request.",
-        "trigger_description": f"Use when the user or runtime needs this {target_name}-related workflow." if target_name else "Use when this workflow is needed.",
+        "trigger_description": f"Use when the user or runtime needs this {target_name}-related workflow."
+        if target_name
+        else "Use when this workflow is needed.",
         "primary_steps": primary_steps,
         "success_criteria": success_criteria,
         "constraints": constraints,
@@ -317,7 +321,9 @@ def _default_request_analysis(request: str, *, mode: str, device_context: dict[s
     }
 
 
-def _validate_request_analysis(data: dict[str, Any], *, request: str, mode: str) -> tuple[dict[str, Any] | None, list[str]]:
+def _validate_request_analysis(
+    data: dict[str, Any], *, request: str, mode: str
+) -> tuple[dict[str, Any] | None, list[str]]:
     errors: list[str] = []
     summary = str(data.get("summary", "")).strip() or request.strip()
     goal = str(data.get("goal", "")).strip()
@@ -494,12 +500,11 @@ def _render_simple_skill_package(request: str, *, spec: dict[str, Any]) -> dict[
         ]
         for action in supported_actions:
             name = action["name"]
-            params = action.get("params", [])
             if name == "set_position":
                 chunks.extend(
                     [
                         "",
-                        f"def {name}(device_id: str, value: float, reason: str = \"\") -> DeviceCommand:",
+                        f'def {name}(device_id: str, value: float, reason: str = "") -> DeviceCommand:',
                         "    return DeviceCommand(",
                         "        device_id=device_id,",
                         f'        action="{name}",',
@@ -513,7 +518,7 @@ def _render_simple_skill_package(request: str, *, spec: dict[str, Any]) -> dict[
                 chunks.extend(
                     [
                         "",
-                        f"def {name}(device_id: str, reason: str = \"\") -> DeviceCommand:",
+                        f'def {name}(device_id: str, reason: str = "") -> DeviceCommand:',
                         f'    return DeviceCommand(device_id=device_id, action="{name}", source="brain", reason=reason)',
                     ]
                 )
@@ -624,9 +629,7 @@ def _validate_generated_spec(
     if not isinstance(raw_device_types, list):
         raw_device_types = device_context.get("device_types", [])
     device_types = [
-        _normalize_slug(str(item), str(item))
-        for item in raw_device_types
-        if isinstance(item, str) and item.strip()
+        _normalize_slug(str(item), str(item)) for item in raw_device_types if isinstance(item, str) and item.strip()
     ]
     device_types = [item for item in device_types if item]
 
@@ -641,7 +644,9 @@ def _validate_generated_spec(
     if not device_types:
         errors.append("Spec must include at least one `device_types` entry.")
 
-    domain_summary = str(data.get("domain_summary", "")).strip() or str(device_context.get("domain_summary", "")).strip()
+    domain_summary = (
+        str(data.get("domain_summary", "")).strip() or str(device_context.get("domain_summary", "")).strip()
+    )
     if not domain_summary:
         domain_summary = f"This skill handles the automation request: {request}"
 
@@ -651,9 +656,13 @@ def _validate_generated_spec(
         result = [str(item).strip() for item in value if str(item).strip()]
         return result or fallback
 
-    knowledge_points = _string_list_with_fallback(data.get("knowledge_points"), list(device_context.get("knowledge_points", [])))
+    knowledge_points = _string_list_with_fallback(
+        data.get("knowledge_points"), list(device_context.get("knowledge_points", []))
+    )
     hard_rules = _string_list_with_fallback(data.get("hard_rules"), list(device_context.get("hard_rules", [])))
-    learning_focus = _string_list_with_fallback(data.get("learning_focus"), list(device_context.get("learning_focus", [])))
+    learning_focus = _string_list_with_fallback(
+        data.get("learning_focus"), list(device_context.get("learning_focus", []))
+    )
     supported_actions = _normalize_supported_actions(data.get("supported_actions"))
     if not supported_actions:
         supported_actions = _normalize_supported_actions(device_context.get("supported_actions"))
@@ -794,7 +803,14 @@ def _validate_generated_file(file_path: str, content: str) -> list[str]:
         lowered = stripped.lower()
         if "`none`" not in stripped and '"none"' not in lowered and " none" not in lowered:
             errors.append("`references/decide.md` must explicitly allow `none`.")
-        for placeholder in ("{current_data}", "{capabilities}", "{user_preferences}", "{learned_profile}", "{recent_history}", "{knowledge}"):
+        for placeholder in (
+            "{current_data}",
+            "{capabilities}",
+            "{user_preferences}",
+            "{learned_profile}",
+            "{recent_history}",
+            "{knowledge}",
+        ):
             if placeholder not in stripped:
                 errors.append(f"`references/decide.md` must include `{placeholder}`.")
     elif file_path == "references/learn.md":
@@ -862,7 +878,9 @@ Return only the raw file content for `{file_path}`. Do not wrap it in JSON. Do n
     return None, last_errors
 
 
-def _validate_generated_package(data: dict[str, Any], *, request: str, skill_name_hint: str) -> tuple[dict[str, Any] | None, list[str]]:
+def _validate_generated_package(
+    data: dict[str, Any], *, request: str, skill_name_hint: str
+) -> tuple[dict[str, Any] | None, list[str]]:
     errors: list[str] = []
     files = data.get("files")
     if not isinstance(files, dict):
@@ -882,7 +900,12 @@ def _validate_generated_package(data: dict[str, Any], *, request: str, skill_nam
     decide_md = files.get("references/decide.md", "")
     if isinstance(decide_md, str):
         lowered_decide = decide_md.lower()
-        if "`none`" not in decide_md and "| none" not in lowered_decide and '"none"' not in lowered_decide and " none" not in lowered_decide:
+        if (
+            "`none`" not in decide_md
+            and "| none" not in lowered_decide
+            and '"none"' not in lowered_decide
+            and " none" not in lowered_decide
+        ):
             errors.append("`references/decide.md` must explicitly allow `none`.")
 
     actions_py = files.get("scripts/actions.py", "")
@@ -984,7 +1007,9 @@ async def create_custom_skill(
     base_dir = _custom_root(skill_loader)
     base_dir.mkdir(parents=True, exist_ok=True)
 
-    existing_custom_skills = [path.name for path in base_dir.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))]
+    existing_custom_skills = [
+        path.name for path in base_dir.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))
+    ]
     simple_skill_spec = _guess_simple_device_skill(request)
     if simple_skill_spec is not None:
         package = _render_simple_skill_package(request, spec=simple_skill_spec)
@@ -1152,7 +1177,9 @@ async def ensure_system_skills_for_devices(
             mode="system",
             request=f"Auto-generated system skill for discovered device type `{device_type}`.",
             skill_name_hint=system_spec["skill_name"],
-            existing_names=[path.name for path in target_root.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))],
+            existing_names=[
+                path.name for path in target_root.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))
+            ],
             device_context=system_spec,
         )
         if not package:
@@ -1169,7 +1196,8 @@ async def ensure_system_skills_for_devices(
         skill_loader.discover()
 
     return {
-        "reply": reply or (f"已自动补齐 system skill：{', '.join(created)}" if created else "没有需要补齐的 system skill。"),
+        "reply": reply
+        or (f"已自动补齐 system skill：{', '.join(created)}" if created else "没有需要补齐的 system skill。"),
         "action": "ensure_system_skills_for_devices",
         "status": "created" if created else "noop",
         "created_skills": created,

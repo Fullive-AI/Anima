@@ -5,7 +5,7 @@ import logging
 import math
 import re
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -206,30 +206,36 @@ class Brain:
                 if self._air_purifier_startup_bootstrap_pending:
                     self._air_purifier_startup_bootstrap_pending = False
                     if power_value is not True:
-                        tasks.append(TaskPlanItem(
-                            kind="execute_skill",
-                            skill_name="air_purifier",
-                            goal="系统启动，已帮主人开启空气净化器，保持室内空气清新",
-                            reason="启动自动化：空气净化器开机引导",
-                            priority=1,
-                        ))
+                        tasks.append(
+                            TaskPlanItem(
+                                kind="execute_skill",
+                                skill_name="air_purifier",
+                                goal="系统启动，已帮主人开启空气净化器，保持室内空气清新",
+                                reason="启动自动化：空气净化器开机引导",
+                                priority=1,
+                            )
+                        )
                 elif aqi_value is not None:
                     if aqi_value > AIR_PURIFIER_AQI_THRESHOLD and power_value is not True:
-                        tasks.append(TaskPlanItem(
-                            kind="execute_skill",
-                            skill_name="air_purifier",
-                            goal=f"室内 AQI 已达 {aqi_value}，空气有点差，已帮主人开启净化器",
-                            reason=f"空气质量自动化：AQI {aqi_value} > 阈值 {AIR_PURIFIER_AQI_THRESHOLD}",
-                            priority=1,
-                        ))
+                        tasks.append(
+                            TaskPlanItem(
+                                kind="execute_skill",
+                                skill_name="air_purifier",
+                                goal=f"室内 AQI 已达 {aqi_value}，空气有点差，已帮主人开启净化器",
+                                reason=f"空气质量自动化：AQI {aqi_value} > 阈值 {AIR_PURIFIER_AQI_THRESHOLD}",
+                                priority=1,
+                            )
+                        )
                     elif aqi_value <= AIR_PURIFIER_AQI_THRESHOLD and power_value is True:
-                        tasks.append(TaskPlanItem(
-                            kind="execute_skill",
-                            skill_name="air_purifier",
-                            goal=f"室内空气已恢复清新（AQI {aqi_value}），已帮主人关闭净化器",
-                            reason=f"空气质量自动化：AQI {aqi_value} ≤ 阈值 {AIR_PURIFIER_AQI_THRESHOLD}",
-                            priority=1,
-                        ))
+                        tasks.append(
+                            TaskPlanItem(
+                                kind="execute_skill",
+                                skill_name="air_purifier",
+                                goal=f"室内空气已恢复清新（AQI {aqi_value}），已帮主人关闭净化器",
+                                reason=f"空气质量自动化：AQI {aqi_value} ≤ 阈值 {AIR_PURIFIER_AQI_THRESHOLD}",
+                                priority=1,
+                            )
+                        )
             else:
                 self._air_purifier_startup_bootstrap_pending = False
 
@@ -245,21 +251,25 @@ class Brain:
                 if temp_value is None:
                     continue
                 if temp_value >= AC_HIGH_TEMP_THRESHOLD and power_value is not True:
-                    tasks.append(TaskPlanItem(
-                        kind="execute_skill",
-                        skill_name="air_conditioner",
-                        goal=f"室内温度已达 {temp_value}°C，有点热了，帮主人开启空调降温到舒适温度（约24°C）",
-                        reason=f"温度自动化：当前 {temp_value}°C ≥ 阈值 {AC_HIGH_TEMP_THRESHOLD}°C",
-                        priority=2,
-                    ))
+                    tasks.append(
+                        TaskPlanItem(
+                            kind="execute_skill",
+                            skill_name="air_conditioner",
+                            goal=f"室内温度已达 {temp_value}°C，有点热了，帮主人开启空调降温到舒适温度（约24°C）",
+                            reason=f"温度自动化：当前 {temp_value}°C ≥ 阈值 {AC_HIGH_TEMP_THRESHOLD}°C",
+                            priority=2,
+                        )
+                    )
                 elif temp_value <= AC_LOW_TEMP_THRESHOLD and power_value is True:
-                    tasks.append(TaskPlanItem(
-                        kind="execute_skill",
-                        skill_name="air_conditioner",
-                        goal=f"室内温度已降至 {temp_value}°C，已帮主人关闭空调",
-                        reason=f"温度自动化：当前 {temp_value}°C ≤ 阈值 {AC_LOW_TEMP_THRESHOLD}°C",
-                        priority=2,
-                    ))
+                    tasks.append(
+                        TaskPlanItem(
+                            kind="execute_skill",
+                            skill_name="air_conditioner",
+                            goal=f"室内温度已降至 {temp_value}°C，已帮主人关闭空调",
+                            reason=f"温度自动化：当前 {temp_value}°C ≤ 阈值 {AC_LOW_TEMP_THRESHOLD}°C",
+                            priority=2,
+                        )
+                    )
 
         # ── Humidifier humidity automation ───────────────────────────────────
         if "humidifier" in skill_names:
@@ -272,21 +282,25 @@ class Brain:
                 if hum_value is None:
                     continue
                 if hum_value < HUMIDIFIER_LOW_HUMIDITY_THRESHOLD and power_value is not True:
-                    tasks.append(TaskPlanItem(
-                        kind="execute_skill",
-                        skill_name="humidifier",
-                        goal=f"室内湿度只有 {hum_value}%，有点干燥，已帮主人开启加湿器",
-                        reason=f"湿度自动化：当前 {hum_value}% < 阈值 {HUMIDIFIER_LOW_HUMIDITY_THRESHOLD}%",
-                        priority=2,
-                    ))
+                    tasks.append(
+                        TaskPlanItem(
+                            kind="execute_skill",
+                            skill_name="humidifier",
+                            goal=f"室内湿度只有 {hum_value}%，有点干燥，已帮主人开启加湿器",
+                            reason=f"湿度自动化：当前 {hum_value}% < 阈值 {HUMIDIFIER_LOW_HUMIDITY_THRESHOLD}%",
+                            priority=2,
+                        )
+                    )
                 elif hum_value > HUMIDIFIER_HIGH_HUMIDITY_THRESHOLD and power_value is True:
-                    tasks.append(TaskPlanItem(
-                        kind="execute_skill",
-                        skill_name="humidifier",
-                        goal=f"室内湿度已达 {hum_value}%，湿度够了，已帮主人关闭加湿器",
-                        reason=f"湿度自动化：当前 {hum_value}% > 阈值 {HUMIDIFIER_HIGH_HUMIDITY_THRESHOLD}%",
-                        priority=2,
-                    ))
+                    tasks.append(
+                        TaskPlanItem(
+                            kind="execute_skill",
+                            skill_name="humidifier",
+                            goal=f"室内湿度已达 {hum_value}%，湿度够了，已帮主人关闭加湿器",
+                            reason=f"湿度自动化：当前 {hum_value}% > 阈值 {HUMIDIFIER_HIGH_HUMIDITY_THRESHOLD}%",
+                            priority=2,
+                        )
+                    )
 
         return tasks
 
@@ -337,6 +351,7 @@ class Brain:
     async def handle_chat_message_stream(self, message: str, app_state: dict[str, Any]):
         """Streaming variant: yields SSE chunks via ReAct agentic loop."""
         from core.brain.react_agent import ReActAgent
+
         text = message.strip()
         if not text:
             yield 'data: {"reply":"请先输入你的需求。","done":true}\n\n'
@@ -375,10 +390,7 @@ class Brain:
         extra_body: dict[str, Any] = {}
         if self._llm_disable_thinking:
             extra_body["thinking"] = {"type": "disabled"}
-        prompt = (
-            "你是 Anima，一个智能家居助手。用简短友好的中文回复用户。\n"
-            f"用户说：{message}"
-        )
+        prompt = f"你是 Anima，一个智能家居助手。用简短友好的中文回复用户。\n用户说：{message}"
         stream = await self._llm.chat.completions.create(
             model=self._llm_model,
             messages=[{"role": "user", "content": prompt}],
@@ -405,10 +417,7 @@ class Brain:
             return []
 
         discovery = context["discovery"]
-        devices = [
-            device for device in discovery.get_devices_by_type(plan_item.device_type)
-            if device.online
-        ]
+        devices = [device for device in discovery.get_devices_by_type(plan_item.device_type) if device.online]
         if not devices:
             devices = discovery.get_devices_by_type(plan_item.device_type)
 
@@ -854,11 +863,11 @@ class Brain:
             }
             for device in devices
         ]
-        skill_summaries = [
-            {"name": skill.name, "description": skill.description}
-            for skill in lightweight_skills
-        ]
-        _j = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+        skill_summaries = [{"name": skill.name, "description": skill.description} for skill in lightweight_skills]
+
+        def _j(o: object) -> str:
+            return json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+
         planner_hints = self._load_planner_hints()
         return (
             "You are Anima's scheduler-driven planner.\n"
@@ -899,7 +908,9 @@ class Brain:
         skill_summaries: list[SkillSummary],
         intent: str = "general",
     ) -> str:
-        _j = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+        def _j(o: object) -> str:
+            return json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+
         skills = [{"name": s.name, "description": s.description} for s in skill_summaries]
 
         parts = [
@@ -912,8 +923,7 @@ class Brain:
 
         if intent in ("device_control", "env_query", "general"):
             device_summaries = [
-                {"id": d.device_id, "name": d.name, "type": d.type, "online": d.online}
-                for d in devices
+                {"id": d.device_id, "name": d.name, "type": d.type, "online": d.online} for d in devices
             ]
             # Compact environment: only signal values
             env_signals = environment_state.get("signals", {})
@@ -943,7 +953,7 @@ class Brain:
             "- Use ask_user when the request is ambiguous or missing critical information.\n"
             "- Use refresh_environment before acting when current state may be stale or must be confirmed.\n"
             "- Use system_action for Xiaomi QR onboarding, LAN scan, or creating a custom skill.\n"
-            "- For `system_skill: \"skill_creator\"`, the only valid creation action is `create_custom_skill`.\n"
+            '- For `system_skill: "skill_creator"`, the only valid creation action is `create_custom_skill`.\n'
             "- Never invent action names such as `generate_new_skill_package`.\n"
             "- Use execute_skill for device control or home intelligence actions.\n"
             "- If the user asks to play music or audio on a speaker, use the `speaker` skill.\n"
@@ -991,9 +1001,29 @@ class Brain:
         r"(我回来了|我到家了|我回家了|我在家了|到家了|回来了)",
     )
     _DEVICE_KEYWORDS = (
-        "开", "关", "调", "设置", "控制", "打开", "关闭", "启动", "停止",
-        "温度", "湿度", "亮度", "音量", "模式", "净化", "加湿", "空调", "灯",
-        "turn", "set", "control", "adjust", "switch",
+        "开",
+        "关",
+        "调",
+        "设置",
+        "控制",
+        "打开",
+        "关闭",
+        "启动",
+        "停止",
+        "温度",
+        "湿度",
+        "亮度",
+        "音量",
+        "模式",
+        "净化",
+        "加湿",
+        "空调",
+        "灯",
+        "turn",
+        "set",
+        "control",
+        "adjust",
+        "switch",
     )
 
     def _classify_intent(self, message: str) -> str:
@@ -1078,11 +1108,7 @@ class Brain:
             return follow_up_message
         if not follow_up_message:
             return base_request
-        return (
-            f"{base_request}\n\n"
-            "Additional clarification from the user:\n"
-            f"{follow_up_message}"
-        )
+        return f"{base_request}\n\nAdditional clarification from the user:\n{follow_up_message}"
 
     def _build_system_chat_route_prompt(
         self,
@@ -1105,7 +1131,11 @@ class Brain:
             if isinstance(device, Device)
         ]
         existing_custom_skills = self._skill_loader.list_custom_skill_names()
-        xiaomi_connected = bool(settings_store.get("xiaomi_cloud_devices", [])) if settings_store is not None and hasattr(settings_store, "get") else False
+        xiaomi_connected = (
+            bool(settings_store.get("xiaomi_cloud_devices", []))
+            if settings_store is not None and hasattr(settings_store, "get")
+            else False
+        )
 
         return skill.chat_prompt.format(
             user_message=message,
@@ -1364,7 +1394,9 @@ class Brain:
                     action=command_action,
                     params=action.get("params", {}) if isinstance(action.get("params"), dict) else {},
                     reason=str(action.get("reason", "")),
-                    expected_state=action.get("expected_state", {}) if isinstance(action.get("expected_state"), dict) else {},
+                    expected_state=action.get("expected_state", {})
+                    if isinstance(action.get("expected_state"), dict)
+                    else {},
                 )
             )
         return normalized
@@ -1469,10 +1501,7 @@ class Brain:
 
         if task.kind == "execute_skill":
             summary = next(
-                (
-                    item for item in self._skill_loader.list_executable_skill_summaries()
-                    if item.name == task.skill_name
-                ),
+                (item for item in self._skill_loader.list_executable_skill_summaries() if item.name == task.skill_name),
                 None,
             )
             if not summary or not summary.device_type:
@@ -1550,10 +1579,7 @@ class Brain:
 
         if task.kind == "execute_skill":
             summary = next(
-                (
-                    item for item in self._skill_loader.list_executable_skill_summaries()
-                    if item.name == task.skill_name
-                ),
+                (item for item in self._skill_loader.list_executable_skill_summaries() if item.name == task.skill_name),
                 None,
             )
             if not summary or not summary.device_type:
@@ -1648,8 +1674,12 @@ class Brain:
                         system_action=str(item.get("system_action", "")),
                         question=question,
                         params=params,
-                        target_device_ids=[str(device_id) for device_id in target_device_ids if isinstance(device_id, str)],
-                        expected_state=item.get("expected_state", {}) if isinstance(item.get("expected_state"), dict) else {},
+                        target_device_ids=[
+                            str(device_id) for device_id in target_device_ids if isinstance(device_id, str)
+                        ],
+                        expected_state=item.get("expected_state", {})
+                        if isinstance(item.get("expected_state"), dict)
+                        else {},
                     )
                 )
 
@@ -1713,7 +1743,7 @@ class Brain:
                 )
 
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "current_device_id": current_device_id,
             "current_device_type": current_device_type,
             "devices": device_snapshots,
@@ -1917,11 +1947,7 @@ class Brain:
         return observed
 
     def _snapshot_device_sensors(self, device: Device) -> dict[str, Any]:
-        return {
-            sensor.name: sensor.value
-            for sensor in device.sensors
-            if sensor.value is not None
-        }
+        return {sensor.name: sensor.value for sensor in device.sensors if sensor.value is not None}
 
     @staticmethod
     def _coerce_priority(value: Any) -> int:

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-
 ALLOWED_AUDIO_EXTENSIONS = {
     ".wav",
     ".mp3",

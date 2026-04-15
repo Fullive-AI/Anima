@@ -1,4 +1,4 @@
-from .config import settings
-from .settings_store import SettingsStore
-from .mqtt import MQTTClient
-from .cli import interactive_cli
+from .cli import interactive_cli as interactive_cli
+from .config import settings as settings
+from .mqtt import MQTTClient as MQTTClient
+from .settings_store import SettingsStore as SettingsStore

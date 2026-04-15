@@ -1,10 +1,7 @@
-import pytest
-from core.models import Sensor
-from unittest.mock import AsyncMock
+from adapters.base import BaseAdapter
 from core.devices.discovery import DiscoveryOrchestrator
 from core.events.bus import EventBus
-from core.models import Device, Event, EventType
-from adapters.base import BaseAdapter
+from core.models import Device, Event, EventType, Sensor
 
 
 class MockAdapter(BaseAdapter):

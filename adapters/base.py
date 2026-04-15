@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 from typing import Any
 
-from core.models import Device, ActionResult
+from core.models import ActionResult, Device
 
 
 class BaseAdapter(abc.ABC):
@@ -24,10 +24,8 @@ class BaseAdapter(abc.ABC):
         """Execute a control command on a device."""
         ...
 
-    async def start(self) -> None:
+    async def start(self) -> None:  # noqa: B027
         """Called once when adapter starts."""
-        pass
 
-    async def stop(self) -> None:
+    async def stop(self) -> None:  # noqa: B027
         """Called once when adapter stops."""
-        pass

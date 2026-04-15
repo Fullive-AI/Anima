@@ -1,5 +1,4 @@
-from core.models import DeviceCommand
-from core.models import SkillPlanItem
+from core.models import DeviceCommand, SkillPlanItem
 
 
 async def execute(context: dict, plan_item: SkillPlanItem):

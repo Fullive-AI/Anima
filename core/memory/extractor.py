@@ -193,7 +193,7 @@ class MemoryExtractionService:
             "Return JSON only with this schema:\n"
             "{\n"
             '  "memories": [\n'
-            '    {\n'
+            "    {\n"
             '      "topic": "stable_snake_case_topic",\n'
             '      "title": "Short title",\n'
             '      "category": "preference | routine | constraint | context",\n'
@@ -358,11 +358,7 @@ class MemoryExtractionService:
     def _tokenize_text(text: str) -> set[str]:
         normalized = text.lower().replace("_", " ")
         tokens = re.findall(r"[a-z]+|\d+|[\u4e00-\u9fff]+", normalized)
-        return {
-            token
-            for token in tokens
-            if token and token not in CUSTOM_SKILL_TOKEN_STOPWORDS
-        }
+        return {token for token in tokens if token and token not in CUSTOM_SKILL_TOKEN_STOPWORDS}
 
     def _resolve_custom_skill_link(
         self,

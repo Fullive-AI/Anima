@@ -1,9 +1,8 @@
-import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.media.xiaomi_speaker import MINA_PLAY_MUSIC_HARDWARES, XiaomiSpeakerPlayer
 from adapters.miot.adapter import MIoTAdapter
+from core.media.xiaomi_speaker import MINA_PLAY_MUSIC_HARDWARES, XiaomiSpeakerPlayer
 from core.models import Device, Sensor
 
 
@@ -14,7 +13,6 @@ class TestMIoTAdapter:
 
     @patch("adapters.miot.adapter.miio.Discovery")
     async def test_discover_returns_devices(self, mock_discovery_cls):
-        mock_listener = MagicMock()
         mock_info = MagicMock()
         mock_info.ip = "192.168.1.100"
         mock_info.token = "aabbccdd" * 4
@@ -147,7 +145,10 @@ class TestMIoTAdapter:
 
     async def test_execute_play_audio_file_uses_speaker_player(self):
         speaker_player = AsyncMock()
-        speaker_player.play_file.return_value = {"url": "http://127.0.0.1:8080/api/audio/token", "status": {"data": {"info": "{\"status\":1}"}}}
+        speaker_player.play_file.return_value = {
+            "url": "http://127.0.0.1:8080/api/audio/token",
+            "status": {"data": {"info": '{"status":1}'}},
+        }
         adapter = MIoTAdapter(speaker_player=speaker_player)
         adapter._device_infos["speaker_01"] = {
             "ip": "192.168.1.10",
@@ -166,7 +167,7 @@ class TestMIoTAdapter:
         speaker_player.play_random_file.return_value = {
             "path": "/tmp/library/song.wav",
             "url": "http://127.0.0.1:8080/api/audio/token",
-            "status": {"data": {"info": "{\"status\":1}"}},
+            "status": {"data": {"info": '{"status":1}'}},
         }
         adapter = MIoTAdapter(speaker_player=speaker_player)
         adapter._device_infos["speaker_01"] = {
@@ -205,11 +206,15 @@ class TestMIoTAdapter:
 
         adapter = MIoTAdapter(settings_store=FakeSettings())
 
-        with patch.object(adapter, "_load_manual_devices", return_value=[]), patch.object(
-            adapter,
-            "_discover_cloud",
-            return_value=[],
-        ), patch.object(adapter, "_discover_local", return_value=[]):
+        with (
+            patch.object(adapter, "_load_manual_devices", return_value=[]),
+            patch.object(
+                adapter,
+                "_discover_cloud",
+                return_value=[],
+            ),
+            patch.object(adapter, "_discover_local", return_value=[]),
+        ):
             devices = await adapter.discover()
 
         assert len(devices) == 1

@@ -1,6 +1,6 @@
-import pytest
 from pathlib import Path
-from core.brain.skill_loader import SkillLoader, LoadedSkill
+
+from core.brain.skill_loader import SkillLoader
 
 
 class TestSkillLoader:

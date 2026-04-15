@@ -1,4 +1,3 @@
-import pytest
 from core.events.bus import EventBus
 from core.models import Event, EventType
 

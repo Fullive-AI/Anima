@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -362,7 +362,7 @@ class MemoryStore:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, list):
             return []
-        sliced = data[max(start_index, 0):]
+        sliced = data[max(start_index, 0) :]
         if limit is not None:
             sliced = sliced[:limit]
         return [item for item in sliced if isinstance(item, dict)]
@@ -381,7 +381,7 @@ class MemoryStore:
         data = []
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
-        entry["timestamp"] = datetime.now(timezone.utc).isoformat()
+        entry["timestamp"] = datetime.now(UTC).isoformat()
         data.append(entry)
         # Keep last 1000 entries
         if len(data) > 1000:
@@ -495,11 +495,7 @@ class MemoryStore:
 
         metadata = data.get("metadata", {})
         if isinstance(metadata, dict):
-            normalized_metadata = {
-                str(key): value
-                for key, value in metadata.items()
-                if str(key).strip()
-            }
+            normalized_metadata = {str(key): value for key, value in metadata.items() if str(key).strip()}
         else:
             normalized_metadata = {}
 
@@ -542,7 +538,7 @@ class MemoryStore:
         payload = {
             "history_cursor": max(history_cursor, 0),
             "last_batch_size": max(last_batch_size, 0),
-            "last_extracted_at": datetime.now(timezone.utc).isoformat(),
+            "last_extracted_at": datetime.now(UTC).isoformat(),
         }
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -582,7 +578,7 @@ class MemoryStore:
         path = self._memories_dir(user_id) / f"{slug}.json"
         payload = dict(content)
         payload.setdefault("topic", slug)
-        payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+        payload["updated_at"] = datetime.now(UTC).isoformat()
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return slug
 

@@ -6,6 +6,7 @@ from typing import Any
 try:
     import miio
     from miio.integrations.airpurifier.zhimi.airpurifier_miot import AirPurifierMiot
+
     MIIO_AVAILABLE = True
 except ImportError:
     miio = None  # type: ignore[assignment]
@@ -239,8 +240,10 @@ class MIoTAdapter(BaseAdapter):
                     else:
                         self._device_infos[device_id] = {**base_info, "needs_token": True}
 
-                    logger.info("Local scan: ip=%s did=%d token=%s", ip, did, "available" if has_token else "needs_setup")
-                except socket.timeout:
+                    logger.info(
+                        "Local scan: ip=%s did=%d token=%s", ip, did, "available" if has_token else "needs_setup"
+                    )
+                except TimeoutError:
                     break
 
             sock.close()
@@ -457,7 +460,9 @@ class MIoTAdapter(BaseAdapter):
                 if not path:
                     raise ValueError("Missing required parameter: path")
                 result = await self._speaker_player.play_file(info, path)
-                return ActionResult(device_id=device_id, action=action, success=True, message=str(result.get("url", "")))
+                return ActionResult(
+                    device_id=device_id, action=action, success=True, message=str(result.get("url", ""))
+                )
 
             if action == "play_audio_url":
                 url = str(params.get("url", "")).strip()

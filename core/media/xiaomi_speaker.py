@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import base64
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -306,7 +306,8 @@ class XiaomiSpeakerPlayer:
     async def play_random_file(self, device_info: dict[str, Any]) -> dict[str, Any]:
         library_dir = self._resolve_audio_library_dir()
         candidates = [
-            path for path in library_dir.rglob("*")
+            path
+            for path in library_dir.rglob("*")
             if path.is_file() and path.suffix.lower() in ALLOWED_AUDIO_EXTENSIONS
         ]
         if not candidates:
@@ -438,11 +439,13 @@ class XiaomiSpeakerPlayer:
         candidates = []
         if configured:
             candidates.append(Path(configured).expanduser())
-        candidates.extend([
-            Path.cwd().parent / "music",
-            Path.cwd() / "music",
-            Path.home() / "Music",
-        ])
+        candidates.extend(
+            [
+                Path.cwd().parent / "music",
+                Path.cwd() / "music",
+                Path.home() / "Music",
+            ]
+        )
 
         for candidate in candidates:
             resolved = candidate.resolve()

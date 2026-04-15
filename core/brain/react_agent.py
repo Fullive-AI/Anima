@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -94,9 +95,7 @@ TOOLS: list[dict[str, Any]] = [
             "description": "向用户发送最终回复并结束对话。",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "text": {"type": "string", "description": "回复内容"}
-                },
+                "properties": {"text": {"type": "string", "description": "回复内容"}},
                 "required": ["text"],
             },
         },
@@ -183,10 +182,20 @@ class ReActAgent:
                 return
 
             # Process tool calls
-            messages.append({"role": "assistant", "content": msg.content, "tool_calls": [
-                {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
-                for tc in msg.tool_calls
-            ]})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                        }
+                        for tc in msg.tool_calls
+                    ],
+                }
+            )
 
             for tc in msg.tool_calls:
                 tool_name = tc.function.name
@@ -215,11 +224,13 @@ class ReActAgent:
 
                 yield AgentEvent(type="observation", tool=tool_name, result=obs, step=step)
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": obs,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": obs,
+                    }
+                )
 
         # Max steps reached
         yield AgentEvent(
@@ -261,13 +272,15 @@ class ReActAgent:
         result = []
         for d in devices:
             sensors = {s.name: s.value for s in d.sensors if s.value is not None}
-            result.append({
-                "device_id": d.device_id,
-                "name": d.name,
-                "type": d.type,
-                "online": d.online,
-                "sensors": sensors,
-            })
+            result.append(
+                {
+                    "device_id": d.device_id,
+                    "name": d.name,
+                    "type": d.type,
+                    "online": d.online,
+                    "sensors": sensors,
+                }
+            )
         return json.dumps(result, ensure_ascii=False)
 
     def _tool_get_skill(self, args: dict[str, Any]) -> str:
@@ -298,7 +311,11 @@ class ReActAgent:
             compact: dict[str, Any] = {}
             for sig_name, readings in signals.items():
                 if readings:
-                    compact[sig_name] = readings[0].get("value") if isinstance(readings[0], dict) else getattr(readings[0], "value", None)
+                    compact[sig_name] = (
+                        readings[0].get("value")
+                        if isinstance(readings[0], dict)
+                        else getattr(readings[0], "value", None)
+                    )
             return json.dumps(compact, ensure_ascii=False) if compact else "暂无环境数据"
         return "暂无环境数据"
 
@@ -346,7 +363,9 @@ class ReActAgent:
             result = await brain._execute_skill_plan_item(plan_item, context)
             actions = [a.__dict__ if hasattr(a, "__dict__") else dict(a) for a in result.actions]
             verifications = [v.__dict__ if hasattr(v, "__dict__") else dict(v) for v in result.verifications]
-            success = any(v.get("verified") or v.get("success") for v in verifications) if verifications else bool(actions)
+            success = (
+                any(v.get("verified") or v.get("success") for v in verifications) if verifications else bool(actions)
+            )
             obs = "执行成功" if success else "执行失败或无法验证"
             exec_result = {
                 "plan_item": plan_item.model_dump(),

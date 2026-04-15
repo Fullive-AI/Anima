@@ -1,2 +1,5 @@
-from .audio_registry import LocalAudioRegistry, ALLOWED_AUDIO_EXTENSIONS, RegisteredAudio
-from .xiaomi_speaker import XiaomiSpeakerPlayer, MINA_PLAY_MUSIC_HARDWARES
+from .audio_registry import ALLOWED_AUDIO_EXTENSIONS as ALLOWED_AUDIO_EXTENSIONS
+from .audio_registry import LocalAudioRegistry as LocalAudioRegistry
+from .audio_registry import RegisteredAudio as RegisteredAudio
+from .xiaomi_speaker import MINA_PLAY_MUSIC_HARDWARES as MINA_PLAY_MUSIC_HARDWARES
+from .xiaomi_speaker import XiaomiSpeakerPlayer as XiaomiSpeakerPlayer

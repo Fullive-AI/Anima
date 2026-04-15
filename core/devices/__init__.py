@@ -1,1 +1,1 @@
-from .discovery import DiscoveryOrchestrator
+from .discovery import DiscoveryOrchestrator as DiscoveryOrchestrator

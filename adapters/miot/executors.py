@@ -49,15 +49,17 @@ def execute_action(dev: miio.Device, action: str, params: dict[str, Any]) -> Non
     if aliased == "set_humidity":
         value = params.get("value")
         if hasattr(dev, "set_target_humidity"):
-            getattr(dev, "set_target_humidity")(value)
+            dev.set_target_humidity(value)
             return
-        _send_with_fallbacks(dev, [("set_target_humidity", [value]), ("set_humidity", [value]), ("set_limit_hum", [value])])
+        _send_with_fallbacks(
+            dev, [("set_target_humidity", [value]), ("set_humidity", [value]), ("set_limit_hum", [value])]
+        )
         return
 
     if aliased == "set_temperature":
         value = params.get("value")
         if hasattr(dev, "set_target_temperature"):
-            getattr(dev, "set_target_temperature")(value)
+            dev.set_target_temperature(value)
             return
         _send_with_fallbacks(dev, [("set_target_temperature", [value]), ("set_temperature", [value])])
         return
@@ -65,7 +67,7 @@ def execute_action(dev: miio.Device, action: str, params: dict[str, Any]) -> Non
     if aliased == "set_brightness":
         value = params.get("value")
         if hasattr(dev, "set_brightness"):
-            getattr(dev, "set_brightness")(value)
+            dev.set_brightness(value)
             return
         _send_with_fallbacks(dev, [("set_bright", [value]), ("set_brightness", [value])])
         return
@@ -73,7 +75,7 @@ def execute_action(dev: miio.Device, action: str, params: dict[str, Any]) -> Non
     if aliased == "set_color_temp":
         kelvin = params.get("kelvin")
         if hasattr(dev, "set_color_temp"):
-            getattr(dev, "set_color_temp")(kelvin)
+            dev.set_color_temp(kelvin)
             return
         _send_with_fallbacks(dev, [("set_ct_abx", [kelvin, "smooth", 500])])
         return
@@ -81,7 +83,7 @@ def execute_action(dev: miio.Device, action: str, params: dict[str, Any]) -> Non
     if aliased == "set_mode":
         mode = params.get("mode")
         if hasattr(dev, "set_mode"):
-            getattr(dev, "set_mode")(mode)
+            dev.set_mode(mode)
             return
         _send_with_fallbacks(dev, [("set_mode", [mode])])
         return

@@ -1,4 +1,3 @@
-import pytest
 import json
 import tempfile
 from pathlib import Path
@@ -25,12 +24,15 @@ class TestMemoryStore:
         assert "23°C" in prefs
 
     async def test_append_history(self):
-        await self.store.append_history("default", {
-            "action": "set_humidity",
-            "device": "humidifier_01",
-            "value": 55,
-            "reason": "user prefers 55%",
-        })
+        await self.store.append_history(
+            "default",
+            {
+                "action": "set_humidity",
+                "device": "humidifier_01",
+                "value": 55,
+                "reason": "user prefers 55%",
+            },
+        )
         history = await self.store.get_history("default", limit=10)
         assert len(history) == 1
         assert history[0]["action"] == "set_humidity"
@@ -113,8 +115,12 @@ class TestMemoryStore:
         assert memories["sleep_lighting_preference"]["category"] == "preference"
 
     async def test_memory_extractor_writes_topic_files_and_advances_cursor(self, monkeypatch):
-        await self.store.append_history("default", {"action": "turn_on", "device_type": "light", "reason": "evening routine"})
-        await self.store.append_history("default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}})
+        await self.store.append_history(
+            "default", {"action": "turn_on", "device_type": "light", "reason": "evening routine"}
+        )
+        await self.store.append_history(
+            "default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}}
+        )
 
         monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
         extractor = MemoryExtractionService(self.store)
@@ -184,7 +190,9 @@ class TestMemoryStore:
         assert changed is False
         assert "user_custom_curtain_control_skill" not in memories
 
-    async def test_memory_extractor_keeps_custom_skill_memory_only_when_matching_real_custom_skill_exists(self, monkeypatch):
+    async def test_memory_extractor_keeps_custom_skill_memory_only_when_matching_real_custom_skill_exists(
+        self, monkeypatch
+    ):
         await self.store.append_history(
             "default",
             {"action": "plan.reply", "params": {"reply": "工作日早上8点起床提醒技能已创建并激活。"}},
@@ -235,7 +243,10 @@ class TestMemoryStore:
         memories = await self.store.get_extracted_memories("default")
 
         assert changed is True
-        assert memories["user_custom_8am_workday_wake_up_reminder_skill"]["linked_custom_skill_name"] == "Workday 8AM Smart Speaker Wakeup"
+        assert (
+            memories["user_custom_8am_workday_wake_up_reminder_skill"]["linked_custom_skill_name"]
+            == "Workday 8AM Smart Speaker Wakeup"
+        )
 
     async def test_memory_extractor_cleans_up_existing_invalid_custom_skill_memories_without_llm(self):
         await self.store.upsert_extracted_memory(
@@ -272,9 +283,15 @@ class TestMemoryStore:
         assert "user_custom_curtain_control_skill" not in memories
 
     async def test_preference_learner_updates_skill_profile_from_history_and_memories(self, monkeypatch):
-        await self.store.append_history("default", {"action": "turn_on", "device_type": "light", "reason": "evening routine"})
-        await self.store.append_history("default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}})
-        await self.store.append_history("default", {"action": "set_color_temp", "device_type": "light", "params": {"value": 2700}})
+        await self.store.append_history(
+            "default", {"action": "turn_on", "device_type": "light", "reason": "evening routine"}
+        )
+        await self.store.append_history(
+            "default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}}
+        )
+        await self.store.append_history(
+            "default", {"action": "set_color_temp", "device_type": "light", "params": {"value": 2700}}
+        )
 
         monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
         extractor = MemoryExtractionService(self.store)

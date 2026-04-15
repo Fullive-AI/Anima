@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import re
-import logging
 import importlib.util
+import logging
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -89,10 +89,7 @@ class SkillLoader:
         return sorted(skill_dirs)
 
     def _should_skip_dir(self, path: Path) -> bool:
-        return any(
-            part.startswith(".") or part.startswith("_") or part == "__pycache__"
-            for part in path.parts
-        )
+        return any(part.startswith(".") or part.startswith("_") or part == "__pycache__" for part in path.parts)
 
     def _load_skill(self, skill_dir: Path) -> LoadedSkill:
         skill_md_path = skill_dir / "SKILL.md"
@@ -259,11 +256,7 @@ class SkillLoader:
         if not self._cache_by_name:
             self.discover()
 
-        return sorted(
-            skill.meta.name
-            for skill in self._cache_by_name.values()
-            if "custom" in skill.path.parts
-        )
+        return sorted(skill.meta.name for skill in self._cache_by_name.values() if "custom" in skill.path.parts)
 
     def list_system_device_skill_summaries(self) -> list[SkillSummary]:
         if not self._cache_by_name:
@@ -314,9 +307,7 @@ class SkillLoader:
             self.discover()
 
         items = [
-            self._to_inventory_item(skill)
-            for skill in self._cache_by_name.values()
-            if "system" in skill.path.parts
+            self._to_inventory_item(skill) for skill in self._cache_by_name.values() if "system" in skill.path.parts
         ]
         return sorted(items, key=lambda item: item.name)
 
@@ -325,9 +316,7 @@ class SkillLoader:
             self.discover()
 
         items = [
-            self._to_inventory_item(skill)
-            for skill in self._cache_by_name.values()
-            if "custom" in skill.path.parts
+            self._to_inventory_item(skill) for skill in self._cache_by_name.values() if "custom" in skill.path.parts
         ]
         return sorted(items, key=lambda item: item.name)
 

@@ -12,7 +12,16 @@ def default_sensors(device_type: str, *, include_generic: bool = False) -> list[
     type_sensors = {
         "humidifier": [("humidity", "%"), ("temperature", "°C"), ("water_level", "%")],
         "air_conditioner": [("temperature", "°C")],
-        "air_purifier": [("pm2_5", "µg/m3"), ("aqi", "AQI"), ("average_aqi", "AQI"), ("pm10", "µg/m3"), ("tvoc", "ppb"), ("co2", "ppm"), ("temperature", "°C"), ("humidity", "%")],
+        "air_purifier": [
+            ("pm2_5", "µg/m3"),
+            ("aqi", "AQI"),
+            ("average_aqi", "AQI"),
+            ("pm10", "µg/m3"),
+            ("tvoc", "ppb"),
+            ("co2", "ppm"),
+            ("temperature", "°C"),
+            ("humidity", "%"),
+        ],
         "light": [("brightness", "%"), ("color_temp", "K")],
     }
     sensors = [("power", "on/off"), *type_sensors.get(device_type, [])]
@@ -78,10 +87,7 @@ def _read_air_purifier_status(status: Any) -> dict[str, Any]:
         or _read_status_field(status, "aqi_pm2_5")
         or aqi
     )
-    pm10 = (
-        _read_status_field(status, "pm10_density")
-        or _read_status_field(status, "pm10")
-    )
+    pm10 = _read_status_field(status, "pm10_density") or _read_status_field(status, "pm10")
     tvoc = (
         _read_status_field(status, "tvoc")
         or _read_status_field(status, "tvoc_index")

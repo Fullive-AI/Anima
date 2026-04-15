@@ -47,16 +47,18 @@ class RulesEngine:
             Rule(
                 name="emergency_high_temp",
                 condition=Condition(sensor="temperature", operator=">", threshold=35),
-                action=DeviceCommand(device_id="*", action="turn_on", source="rules",
-                                     reason="Emergency: temperature > 35°C"),
+                action=DeviceCommand(
+                    device_id="*", action="turn_on", source="rules", reason="Emergency: temperature > 35°C"
+                ),
                 device_type="air_conditioner",
                 cooldown_seconds=300,
             ),
             Rule(
                 name="emergency_low_humidity",
                 condition=Condition(sensor="humidity", operator="<", threshold=20),
-                action=DeviceCommand(device_id="*", action="turn_on", source="rules",
-                                     reason="Emergency: humidity < 20%"),
+                action=DeviceCommand(
+                    device_id="*", action="turn_on", source="rules", reason="Emergency: humidity < 20%"
+                ),
                 device_type="humidifier",
                 cooldown_seconds=300,
             ),

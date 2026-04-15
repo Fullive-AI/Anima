@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -57,14 +57,14 @@ class ActionResult(BaseModel):
     action: str
     success: bool
     message: str = ""
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Event(BaseModel):
     type: EventType
     device_id: str | None = None
     data: dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class RoomInfo(BaseModel):
@@ -122,7 +122,7 @@ class SkillExecutionResult(BaseModel):
 
 class BrainCycleResult(BaseModel):
     plan_items: list[SkillPlanItem] = Field(default_factory=list)
-    task_plan_items: list["TaskPlanItem"] = Field(default_factory=list)
+    task_plan_items: list[TaskPlanItem] = Field(default_factory=list)
     execution_results: list[SkillExecutionResult] = Field(default_factory=list)
 
 
@@ -133,7 +133,7 @@ class ChatPlan(BaseModel):
     system_skill: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
     skill_plan_items: list[SkillPlanItem] = Field(default_factory=list)
-    task_plan_items: list["TaskPlanItem"] = Field(default_factory=list)
+    task_plan_items: list[TaskPlanItem] = Field(default_factory=list)
 
 
 class TaskPlanItem(BaseModel):

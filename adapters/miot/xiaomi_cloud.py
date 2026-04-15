@@ -5,6 +5,7 @@ Adapted from xiaomi-token-extractor. Supports:
 - Password login (may be blocked by captcha/2FA)
 - Device list + token fetching via encrypted API
 """
+
 from __future__ import annotations
 
 import base64
@@ -13,10 +14,8 @@ import json
 import logging
 import os
 import random
-import re
 import time
 from typing import Any
-from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -73,8 +72,10 @@ class XiaomiCloudConnector:
     def get_devices(self, country: str, home_id: Any, owner_id: Any) -> Any:
         url = self._get_api_url(country) + "/v2/home/home_device_list"
         params = {
-            "data": '{"home_owner": ' + str(owner_id)
-            + ',"home_id": ' + str(home_id)
+            "data": '{"home_owner": '
+            + str(owner_id)
+            + ',"home_id": '
+            + str(home_id)
             + ', "limit": 200, "get_split_device": true, "support_smart_home": true}'
         }
         return self._execute_encrypted(url, params)
@@ -155,16 +156,23 @@ class XiaomiCloudConnector:
 
     @staticmethod
     def _generate_enc_params(
-        url: str, method: str, signed_nonce: str, nonce: str, params: dict[str, str], ssecurity: str,
+        url: str,
+        method: str,
+        signed_nonce: str,
+        nonce: str,
+        params: dict[str, str],
+        ssecurity: str,
     ) -> dict[str, str]:
         params["rc4_hash__"] = XiaomiCloudConnector._generate_enc_signature(url, method, signed_nonce, params)
         for k, v in list(params.items()):
             params[k] = _encrypt_rc4(signed_nonce, v)
-        params.update({
-            "signature": XiaomiCloudConnector._generate_enc_signature(url, method, signed_nonce, params),
-            "ssecurity": ssecurity,
-            "_nonce": nonce,
-        })
+        params.update(
+            {
+                "signature": XiaomiCloudConnector._generate_enc_signature(url, method, signed_nonce, params),
+                "ssecurity": ssecurity,
+                "_nonce": nonce,
+            }
+        )
         return params
 
     @staticmethod
@@ -275,7 +283,8 @@ class QrLoginFlow:
         if not self._location:
             return False
         r = self.connector._session.get(
-            self._location, headers={"content-type": "application/x-www-form-urlencoded"},
+            self._location,
+            headers={"content-type": "application/x-www-form-urlencoded"},
         )
         if r.status_code != 200:
             return False
@@ -313,15 +322,17 @@ def fetch_all_devices(connector: XiaomiCloudConnector, region: str) -> list[dict
         for d in info_list:
             if not isinstance(d, dict):
                 continue
-            rows.append({
-                "name": str(d.get("name", "") or ""),
-                "model": str(d.get("model", "") or ""),
-                "did": str(d.get("did", "") or ""),
-                "mac": str(d.get("mac", "") or ""),
-                "localip": str(d.get("localip", "") or ""),
-                "token": str(d.get("token", "") or ""),
-                "isOnline": d.get("isOnline"),
-            })
+            rows.append(
+                {
+                    "name": str(d.get("name", "") or ""),
+                    "model": str(d.get("model", "") or ""),
+                    "did": str(d.get("did", "") or ""),
+                    "mac": str(d.get("mac", "") or ""),
+                    "localip": str(d.get("localip", "") or ""),
+                    "token": str(d.get("token", "") or ""),
+                    "isOnline": d.get("isOnline"),
+                }
+            )
 
     logger.info("Fetched %d devices from Xiaomi Cloud (region=%s)", len(rows), region)
     return rows

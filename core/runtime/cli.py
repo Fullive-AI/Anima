@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.table import Table
 
 if TYPE_CHECKING:
-    from core.devices.discovery import DiscoveryOrchestrator
     from core.brain.engine import Brain
+    from core.devices.discovery import DiscoveryOrchestrator
 
 console = Console()
 
 
 async def interactive_cli(
-    discovery: "DiscoveryOrchestrator",
-    brain: "Brain",
+    discovery: DiscoveryOrchestrator,
+    brain: Brain,
 ) -> None:
     console.print("\n[bold cyan]Anima CLI[/bold cyan] — Make Every Hardware Intelligent")
     console.print("Type [bold]help[/bold] for commands, [bold]quit[/bold] to exit.\n")
@@ -24,7 +23,8 @@ async def interactive_cli(
     while True:
         try:
             user_input = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: input("anima> "),
+                None,
+                lambda: input("anima> "),
             )
         except (EOFError, KeyboardInterrupt):
             break
@@ -59,12 +59,14 @@ async def interactive_cli(
         elif cmd == "history":
             history = await brain._memory.get_history("default", limit=10)
             for entry in history:
-                console.print(f"  [{entry.get('timestamp', '?')}] {entry.get('action', '?')} on {entry.get('device_id', '?')} — {entry.get('reason', '')}")
+                console.print(
+                    f"  [{entry.get('timestamp', '?')}] {entry.get('action', '?')} on {entry.get('device_id', '?')} — {entry.get('reason', '')}"
+                )
         else:
             console.print(f"[red]Unknown command: {cmd}[/red]. Type 'help' for available commands.")
 
 
-def _print_devices(discovery: "DiscoveryOrchestrator") -> None:
+def _print_devices(discovery: DiscoveryOrchestrator) -> None:
     devices = discovery.get_all_devices()
     if not devices:
         console.print("[yellow]No devices discovered yet.[/yellow]")

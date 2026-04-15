@@ -1,5 +1,5 @@
-import pytest
 import asyncio
+
 from core.scheduler.scheduler import Scheduler
 
 

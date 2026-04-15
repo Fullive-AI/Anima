@@ -2,23 +2,23 @@
 Integration test: verify the full pipeline works end-to-end.
 Uses mock adapter (no real Xiaomi devices needed).
 """
-import pytest
+
 import shutil
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from core.api.routes import create_app
-from core.media.audio_registry import LocalAudioRegistry
-from core.events.bus import EventBus
-from core.devices.discovery import DiscoveryOrchestrator
-from core.rules.engine import RulesEngine
-from core.memory.store import MemoryStore
-from core.brain.skill_loader import SkillLoader
-from core.brain.engine import Brain
-from core.models import Device, Sensor, Capability, Event, EventType, ActionResult
 from adapters.base import BaseAdapter
+from core.api.routes import create_app
+from core.brain.engine import Brain
+from core.brain.skill_loader import SkillLoader
+from core.devices.discovery import DiscoveryOrchestrator
+from core.events.bus import EventBus
+from core.media.audio_registry import LocalAudioRegistry
+from core.memory.store import MemoryStore
+from core.models import ActionResult, Capability, Device, Sensor
+from core.rules.engine import RulesEngine
 
 
 def fake_generated_package(name: str, device_type: str) -> dict:
@@ -36,7 +36,7 @@ def fake_generated_package(name: str, device_type: str) -> dict:
             "references/knowledge.md": "# Knowledge\n",
             "references/decide.md": "Return `none` when no action is needed.\n## Current Data\n{current_data}\n## Device Capabilities\n{capabilities}\n## User Preferences\n{user_preferences}\n## Learned Profile\n{learned_profile}\n## Recent Decision History\n{recent_history}\n## Domain Knowledge\n{knowledge}\n",
             "references/learn.md": "Return structured JSON.\n## History\n{history}\n## Current Learned Profile\n{current_profile}\n",
-            "scripts/actions.py": "from core.models import DeviceCommand\n\ndef turn_on(device_id: str, reason: str = \"\") -> DeviceCommand:\n    return DeviceCommand(device_id=device_id, action=\"turn_on\", source=\"brain\", reason=reason)\n",
+            "scripts/actions.py": 'from core.models import DeviceCommand\n\ndef turn_on(device_id: str, reason: str = "") -> DeviceCommand:\n    return DeviceCommand(device_id=device_id, action="turn_on", source="brain", reason=reason)\n',
         },
     }
 
@@ -82,22 +82,24 @@ class FakeHumidifierAdapter(BaseAdapter):
         self.last_action = None
 
     async def discover(self):
-        return [Device(
-            device_id="fake_hum_01",
-            name="Test Humidifier",
-            adapter="fake",
-            type="humidifier",
-            capabilities=[
-                Capability(name="set_humidity", params={"min": 30, "max": 80}),
-                Capability(name="turn_on"),
-                Capability(name="turn_off"),
-            ],
-            sensors=[
-                Sensor(name="power", unit="on/off", value=False),
-                Sensor(name="humidity", unit="%", value=25.0),
-                Sensor(name="water_level", unit="%", value=80.0),
-            ],
-        )]
+        return [
+            Device(
+                device_id="fake_hum_01",
+                name="Test Humidifier",
+                adapter="fake",
+                type="humidifier",
+                capabilities=[
+                    Capability(name="set_humidity", params={"min": 30, "max": 80}),
+                    Capability(name="turn_on"),
+                    Capability(name="turn_off"),
+                ],
+                sensors=[
+                    Sensor(name="power", unit="on/off", value=False),
+                    Sensor(name="humidity", unit="%", value=25.0),
+                    Sensor(name="water_level", unit="%", value=80.0),
+                ],
+            )
+        ]
 
     async def subscribe(self, device):
         if self.last_action in {"turn_on", "on"}:
@@ -158,9 +160,14 @@ class TestIntegrationPipeline:
         prefs = await store.get_preferences("default")
         assert "24°C" in prefs
 
-        await store.append_history("default", {
-            "device_id": "test_01", "action": "turn_on", "reason": "test",
-        })
+        await store.append_history(
+            "default",
+            {
+                "device_id": "test_01",
+                "action": "turn_on",
+                "reason": "test",
+            },
+        )
         history = await store.get_history("default")
         assert len(history) == 1
 
@@ -294,18 +301,22 @@ class TestIntegrationPipeline:
         discovery.devices[device.device_id] = device
         brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
 
-        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
-            "anima_skill_skill_creator._generate_skill_spec_with_llm",
-            return_value=(fake_generated_spec("fan", "fan"), []),
-        ), patch(
-            "anima_skill_skill_creator._generate_file_with_llm",
-            side_effect=[
-                (fake_generated_package("fan", "fan")["files"]["SKILL.md"], []),
-                (fake_generated_package("fan", "fan")["files"]["references/knowledge.md"], []),
-                (fake_generated_package("fan", "fan")["files"]["references/decide.md"], []),
-                (fake_generated_package("fan", "fan")["files"]["references/learn.md"], []),
-                (fake_generated_package("fan", "fan")["files"]["scripts/actions.py"], []),
-            ],
+        with (
+            patch("anima_skill_skill_creator._build_llm", return_value=object()),
+            patch(
+                "anima_skill_skill_creator._generate_skill_spec_with_llm",
+                return_value=(fake_generated_spec("fan", "fan"), []),
+            ),
+            patch(
+                "anima_skill_skill_creator._generate_file_with_llm",
+                side_effect=[
+                    (fake_generated_package("fan", "fan")["files"]["SKILL.md"], []),
+                    (fake_generated_package("fan", "fan")["files"]["references/knowledge.md"], []),
+                    (fake_generated_package("fan", "fan")["files"]["references/decide.md"], []),
+                    (fake_generated_package("fan", "fan")["files"]["references/learn.md"], []),
+                    (fake_generated_package("fan", "fan")["files"]["scripts/actions.py"], []),
+                ],
+            ),
         ):
             result = await actions_module.ensure_system_skills_for_devices(
                 context={"discovery": discovery, "brain": brain, "settings": {}},
@@ -331,13 +342,17 @@ class TestIntegrationPipeline:
 
         brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
 
-        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
-            "anima_skill_skill_creator._analyze_request_with_llm",
-            return_value=(fake_request_analysis(clarification=True), []),
-        ), patch(
-            "anima_skill_skill_creator._generate_package_with_llm",
-            new_callable=AsyncMock,
-        ) as generate_package_mock:
+        with (
+            patch("anima_skill_skill_creator._build_llm", return_value=object()),
+            patch(
+                "anima_skill_skill_creator._analyze_request_with_llm",
+                return_value=(fake_request_analysis(clarification=True), []),
+            ),
+            patch(
+                "anima_skill_skill_creator._generate_package_with_llm",
+                new_callable=AsyncMock,
+            ) as generate_package_mock,
+        ):
             result = await actions_module.create_custom_skill(
                 context={"brain": brain, "settings": {}},
                 params={"request": "做个自动化 skill"},
@@ -361,15 +376,19 @@ class TestIntegrationPipeline:
 
         brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
 
-        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
-            "anima_skill_skill_creator._analyze_request_with_llm",
-            new_callable=AsyncMock,
-            return_value=(fake_request_analysis(clarification=True), []),
-        ) as analyze_mock, patch(
-            "anima_skill_skill_creator._generate_package_with_llm",
-            new_callable=AsyncMock,
-            return_value=(fake_generated_package("wake_up_reminder", "reminder"), []),
-        ) as generate_package_mock:
+        with (
+            patch("anima_skill_skill_creator._build_llm", return_value=object()),
+            patch(
+                "anima_skill_skill_creator._analyze_request_with_llm",
+                new_callable=AsyncMock,
+                return_value=(fake_request_analysis(clarification=True), []),
+            ) as analyze_mock,
+            patch(
+                "anima_skill_skill_creator._generate_package_with_llm",
+                new_callable=AsyncMock,
+                return_value=(fake_generated_package("wake_up_reminder", "reminder"), []),
+            ) as generate_package_mock,
+        ):
             result = await actions_module.create_custom_skill(
                 context={"brain": brain, "settings": {}},
                 params={
@@ -402,10 +421,13 @@ class TestIntegrationPipeline:
 
         brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
 
-        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
-            "anima_skill_skill_creator._analyze_request_with_llm",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("llm upstream 502"),
+        with (
+            patch("anima_skill_skill_creator._build_llm", return_value=object()),
+            patch(
+                "anima_skill_skill_creator._analyze_request_with_llm",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("llm upstream 502"),
+            ),
         ):
             result = await actions_module.create_custom_skill(
                 context={"brain": brain, "settings": {}},
@@ -429,24 +451,29 @@ class TestIntegrationPipeline:
 
         brain = Brain(bus=EventBus(), skill_loader=loader, memory=MemoryStore(base_dir=str(tmp_path / "memory")))
 
-        with patch("anima_skill_skill_creator._build_llm", return_value=object()), patch(
-            "anima_skill_skill_creator._analyze_request_with_llm",
-            new_callable=AsyncMock,
-            return_value=(fake_request_analysis(clarification=False), []),
-        ), patch(
-            "anima_skill_skill_creator._generate_skill_spec_with_llm",
-            new_callable=AsyncMock,
-            return_value=(fake_sparse_generated_spec("wake_up_reminder", "reminder"), []),
-        ), patch(
-            "anima_skill_skill_creator._generate_file_with_llm",
-            new_callable=AsyncMock,
-            side_effect=[
-                (fake_generated_package("wake_up_reminder", "reminder")["files"]["SKILL.md"], []),
-                (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/knowledge.md"], []),
-                (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/decide.md"], []),
-                (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/learn.md"], []),
-                (fake_generated_package("wake_up_reminder", "reminder")["files"]["scripts/actions.py"], []),
-            ],
+        with (
+            patch("anima_skill_skill_creator._build_llm", return_value=object()),
+            patch(
+                "anima_skill_skill_creator._analyze_request_with_llm",
+                new_callable=AsyncMock,
+                return_value=(fake_request_analysis(clarification=False), []),
+            ),
+            patch(
+                "anima_skill_skill_creator._generate_skill_spec_with_llm",
+                new_callable=AsyncMock,
+                return_value=(fake_sparse_generated_spec("wake_up_reminder", "reminder"), []),
+            ),
+            patch(
+                "anima_skill_skill_creator._generate_file_with_llm",
+                new_callable=AsyncMock,
+                side_effect=[
+                    (fake_generated_package("wake_up_reminder", "reminder")["files"]["SKILL.md"], []),
+                    (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/knowledge.md"], []),
+                    (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/decide.md"], []),
+                    (fake_generated_package("wake_up_reminder", "reminder")["files"]["references/learn.md"], []),
+                    (fake_generated_package("wake_up_reminder", "reminder")["files"]["scripts/actions.py"], []),
+                ],
+            ),
         ):
             result = await actions_module.create_custom_skill(
                 context={"brain": brain, "settings": {}},
@@ -506,12 +533,14 @@ class TestIntegrationPipeline:
         )
         discovery.devices[ac.device_id] = ac
 
-        app = create_app({
-            "discovery": discovery,
-            "brain": brain,
-            "memory": memory,
-            "settings": FakeSettings(),
-        })
+        app = create_app(
+            {
+                "discovery": discovery,
+                "brain": brain,
+                "memory": memory,
+                "settings": FakeSettings(),
+            }
+        )
         client = TestClient(app)
 
         response = client.get("/api/environment")
@@ -555,12 +584,14 @@ class TestIntegrationPipeline:
         await memory.update_memory_extraction_state("default", history_cursor=3, last_batch_size=3)
         await memory.append_history("default", {"action": "set_brightness", "device_type": "light"})
 
-        app = create_app({
-            "discovery": discovery,
-            "brain": brain,
-            "memory": memory,
-            "settings": FakeSettings(),
-        })
+        app = create_app(
+            {
+                "discovery": discovery,
+                "brain": brain,
+                "memory": memory,
+                "settings": FakeSettings(),
+            }
+        )
         client = TestClient(app)
 
         response = client.get("/api/memory")
@@ -592,12 +623,14 @@ class TestIntegrationPipeline:
 
         adapter.subscribe = fake_subscribe
 
-        app = create_app({
-            "discovery": discovery,
-            "brain": brain,
-            "memory": memory,
-            "settings": FakeSettings(),
-        })
+        app = create_app(
+            {
+                "discovery": discovery,
+                "brain": brain,
+                "memory": memory,
+                "settings": FakeSettings(),
+            }
+        )
         client = TestClient(app)
 
         response = client.post("/api/environment/refresh")
@@ -653,12 +686,14 @@ class TestIntegrationPipeline:
         memory = MemoryStore(base_dir=str(tmp_path / "memory"))
         brain = Brain(bus=EventBus(), skill_loader=loader, memory=memory)
 
-        app = create_app({
-            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
-            "brain": brain,
-            "memory": memory,
-            "settings": FakeSettings(),
-        })
+        app = create_app(
+            {
+                "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+                "brain": brain,
+                "memory": memory,
+                "settings": FakeSettings(),
+            }
+        )
         client = TestClient(app)
 
         response = client.get("/api/skills")
@@ -697,7 +732,9 @@ class TestIntegrationPipeline:
             encoding="utf-8",
         )
         (custom_skill_dir / "references").mkdir()
-        (custom_skill_dir / "references" / "knowledge.md").write_text("Curtains should close after dark.", encoding="utf-8")
+        (custom_skill_dir / "references" / "knowledge.md").write_text(
+            "Curtains should close after dark.", encoding="utf-8"
+        )
         (custom_skill_dir / "references" / "decide.md").write_text("Return none with {current_data}.", encoding="utf-8")
 
         loader = SkillLoader(skills_dir=str(skills_dir))
@@ -705,12 +742,14 @@ class TestIntegrationPipeline:
         memory = MemoryStore(base_dir=str(tmp_path / "memory"))
         brain = Brain(bus=EventBus(), skill_loader=loader, memory=memory)
 
-        app = create_app({
-            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
-            "brain": brain,
-            "memory": memory,
-            "settings": FakeSettings(),
-        })
+        app = create_app(
+            {
+                "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+                "brain": brain,
+                "memory": memory,
+                "settings": FakeSettings(),
+            }
+        )
         client = TestClient(app)
 
         detail = client.get("/api/skills/custom/night_curtain")
@@ -744,8 +783,12 @@ class TestIntegrationPipeline:
         assert "description: close curtains at 10 PM" in updated_skill_md
         assert "## Trigger\nAt 10 PM every day." in updated_skill_md
         assert "## Action\nClose bedroom curtains." in updated_skill_md
-        assert (custom_skill_dir / "references" / "knowledge.md").read_text(encoding="utf-8") == "Keep curtains closed overnight."
-        assert (custom_skill_dir / "references" / "decide.md").read_text(encoding="utf-8") == "Return an action when the time condition is met."
+        assert (custom_skill_dir / "references" / "knowledge.md").read_text(
+            encoding="utf-8"
+        ) == "Keep curtains closed overnight."
+        assert (custom_skill_dir / "references" / "decide.md").read_text(
+            encoding="utf-8"
+        ) == "Return an action when the time condition is met."
 
     async def test_audio_file_endpoint_serves_registered_local_audio(self, tmp_path):
         audio_file = tmp_path / "sample.wav"
@@ -753,13 +796,19 @@ class TestIntegrationPipeline:
         registry = LocalAudioRegistry(port=8080)
         token = registry.register_file(audio_file)
 
-        app = create_app({
-            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
-            "brain": Brain(bus=EventBus(), skill_loader=SkillLoader(skills_dir="skills"), memory=MemoryStore(base_dir=str(tmp_path / "memory"))),
-            "memory": MemoryStore(base_dir=str(tmp_path / "memory")),
-            "settings": FakeSettings(),
-            "audio_registry": registry,
-        })
+        app = create_app(
+            {
+                "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+                "brain": Brain(
+                    bus=EventBus(),
+                    skill_loader=SkillLoader(skills_dir="skills"),
+                    memory=MemoryStore(base_dir=str(tmp_path / "memory")),
+                ),
+                "memory": MemoryStore(base_dir=str(tmp_path / "memory")),
+                "settings": FakeSettings(),
+                "audio_registry": registry,
+            }
+        )
         client = TestClient(app)
 
         response = client.get(f"/api/audio/{token}")
@@ -768,16 +817,18 @@ class TestIntegrationPipeline:
         assert response.content == b"RIFFdemoWAVE"
 
     async def test_chat_endpoint_returns_structured_error_when_brain_raises(self, tmp_path):
-        app = create_app({
-            "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
-            "brain": type(
-                "BrokenBrain",
-                (),
-                {"handle_chat_message": staticmethod(AsyncMock(side_effect=RuntimeError("boom")))}
-            )(),
-            "memory": MemoryStore(base_dir=str(tmp_path / "memory")),
-            "settings": FakeSettings(),
-        })
+        app = create_app(
+            {
+                "discovery": DiscoveryOrchestrator(bus=EventBus(), adapters=[]),
+                "brain": type(
+                    "BrokenBrain",
+                    (),
+                    {"handle_chat_message": staticmethod(AsyncMock(side_effect=RuntimeError("boom")))},
+                )(),
+                "memory": MemoryStore(base_dir=str(tmp_path / "memory")),
+                "settings": FakeSettings(),
+            }
+        )
         client = TestClient(app)
 
         response = client.post("/api/chat", json={"message": "新增一个技能"})

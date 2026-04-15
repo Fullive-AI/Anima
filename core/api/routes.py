@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -150,6 +150,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.get("/api/devices")
     async def list_devices():
         from adapters.miot.adapter import MIoTAdapter
+
         discovery = app_state["discovery"]
         miot = next((a for a in discovery._adapters if isinstance(a, MIoTAdapter)), None)
 
@@ -192,7 +193,9 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     async def send_command(device_id: str, command: DeviceCommand):
         discovery = app_state["discovery"]
         result = await discovery.execute_command(
-            device_id, command.action, command.params,
+            device_id,
+            command.action,
+            command.params,
         )
         return result.model_dump()
 
@@ -205,6 +208,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     async def create_room(req: RoomRequest):
         store = app_state["settings"]
         import uuid
+
         rooms = store.get("rooms", [])
         room = {"room_id": str(uuid.uuid4()), "name": req.name.strip()}
         rooms.append(room)
@@ -251,8 +255,9 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
     @app.post("/api/admin/virtual-devices")
     async def create_virtual_device(req: VirtualDeviceRequest):
-        from adapters.virtual.adapter import VirtualAdapter
         import uuid
+
+        from adapters.virtual.adapter import VirtualAdapter
         from core.models import Event, EventType
 
         discovery = app_state["discovery"]
@@ -269,11 +274,13 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         discovery.devices[device_id] = device
         discovery._adapter_map[device_id] = virtual
 
-        await discovery._bus.emit(Event(
-            type=EventType.DEVICE_DISCOVERED,
-            device_id=device_id,
-            data=device.model_dump(),
-        ))
+        await discovery._bus.emit(
+            Event(
+                type=EventType.DEVICE_DISCOVERED,
+                device_id=device_id,
+                data=device.model_dump(),
+            )
+        )
 
         # Persist
         virtual_devices = store.get("virtual_devices", [])
@@ -325,11 +332,13 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                 sensor.value = req.sensors[sensor.name]
 
         # Emit SENSOR_UPDATED to trigger brain cycle
-        await discovery._bus.emit(Event(
-            type=EventType.SENSOR_UPDATED,
-            device_id=device_id,
-            data=dict(state),
-        ))
+        await discovery._bus.emit(
+            Event(
+                type=EventType.SENSOR_UPDATED,
+                device_id=device_id,
+                data=dict(state),
+            )
+        )
 
         return {"success": True, "device_id": device_id, "updated": req.sensors}
 
@@ -352,6 +361,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.delete("/api/devices/{device_id}")
     async def delete_device(device_id: str):
         from adapters.virtual.adapter import VirtualAdapter
+
         discovery = app_state["discovery"]
         store = app_state["settings"]
         device = discovery.get_device(device_id)
@@ -376,18 +386,19 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     async def brain_events():
         """SSE stream for proactive brain notifications."""
         import asyncio
+
         queue: asyncio.Queue[str] = asyncio.Queue()
         app_state.setdefault("_brain_event_queues", []).append(queue)
 
         async def generate():
             try:
-                yield "data: {\"type\":\"connected\"}\n\n"
+                yield 'data: {"type":"connected"}\n\n'
                 while True:
                     try:
                         msg = await asyncio.wait_for(queue.get(), timeout=25.0)
                         yield f"data: {msg}\n\n"
-                    except asyncio.TimeoutError:
-                        yield "data: {\"type\":\"ping\"}\n\n"
+                    except TimeoutError:
+                        yield 'data: {"type":"ping"}\n\n'
             finally:
                 queues = app_state.get("_brain_event_queues", [])
                 if queue in queues:
@@ -447,8 +458,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         preferences = await memory.get_preferences("default")
         learned_profiles_raw = await memory.get_learned_profiles("default")
         learned_profiles = {
-            skill_type: memory.parse_learned_profile(content)
-            for skill_type, content in learned_profiles_raw.items()
+            skill_type: memory.parse_learned_profile(content) for skill_type, content in learned_profiles_raw.items()
         }
         extracted_memories = await memory.get_extracted_memories("default")
         extraction_state = await memory.get_memory_extraction_state("default")
@@ -467,14 +477,8 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         skill_loader = app_state["brain"]._skill_loader
         skill_loader.discover()
         return {
-            "system_skills": [
-                item.__dict__
-                for item in skill_loader.list_system_skills_with_meta()
-            ],
-            "custom_skills": [
-                item.__dict__
-                for item in skill_loader.list_custom_skills_with_meta()
-            ],
+            "system_skills": [item.__dict__ for item in skill_loader.list_system_skills_with_meta()],
+            "custom_skills": [item.__dict__ for item in skill_loader.list_custom_skills_with_meta()],
         }
 
     @app.get("/api/skills/custom/{folder_name}")
@@ -515,8 +519,12 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             },
             "content": {
                 "skill_md": skill_md,
-                "knowledge_md": (custom_skill.path / "references" / "knowledge.md").read_text(encoding="utf-8") if (custom_skill.path / "references" / "knowledge.md").exists() else "",
-                "decide_md": (custom_skill.path / "references" / "decide.md").read_text(encoding="utf-8") if (custom_skill.path / "references" / "decide.md").exists() else "",
+                "knowledge_md": (custom_skill.path / "references" / "knowledge.md").read_text(encoding="utf-8")
+                if (custom_skill.path / "references" / "knowledge.md").exists()
+                else "",
+                "decide_md": (custom_skill.path / "references" / "decide.md").read_text(encoding="utf-8")
+                if (custom_skill.path / "references" / "decide.md").exists()
+                else "",
             },
             "structured": {
                 "trigger_text": _extract_markdown_section(body, "Trigger"),
@@ -578,7 +586,10 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         if body.decide_md.strip():
             decide_path.write_text(body.decide_md, encoding="utf-8")
         elif not decide_path.exists():
-            decide_path.write_text("Use {current_data}, {capabilities}, {user_preferences}, {learned_profile}, {recent_history}, and {knowledge} to decide whether to return `none` or an action.", encoding="utf-8")
+            decide_path.write_text(
+                "Use {current_data}, {capabilities}, {user_preferences}, {learned_profile}, {recent_history}, and {knowledge} to decide whether to return `none` or an action.",
+                encoding="utf-8",
+            )
 
         skill_loader.discover()
         updated_skill = next(
@@ -639,6 +650,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         model = "manual"
         try:
             import miio
+
             dev = miio.Device(ip=req.ip, token=req.token)
             info = dev.info()
             model = info.model or "manual"
@@ -664,20 +676,27 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         if device_id not in discovery.devices:
             discovery.devices[device_id] = device
             discovery._adapter_map[device_id] = miot
-            await discovery._bus.emit(Event(
-                type=EventType.DEVICE_DISCOVERED,
-                device_id=device_id,
-                data=device.model_dump(),
-            ))
+            await discovery._bus.emit(
+                Event(
+                    type=EventType.DEVICE_DISCOVERED,
+                    device_id=device_id,
+                    data=device.model_dump(),
+                )
+            )
 
         # Save to persistent config
         manual_devices = store.get("manual_devices", [])
         # Avoid duplicates
         manual_devices = [d for d in manual_devices if d.get("ip") != req.ip]
-        manual_devices.append({
-            "ip": req.ip, "token": req.token, "name": name,
-            "device_type": device_type, "model": model,
-        })
+        manual_devices.append(
+            {
+                "ip": req.ip,
+                "token": req.token,
+                "name": name,
+                "device_type": device_type,
+                "model": model,
+            }
+        )
         store.set("manual_devices", manual_devices)
 
         ensure_system_skills = app_state.get("ensure_system_skills")
@@ -695,8 +714,9 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.post("/api/devices/{device_id}/activate")
     async def activate_device(device_id: str, req: ActivateDeviceRequest):
         """Activate a discovered device by providing its token."""
-        from adapters.miot.adapter import MIoTAdapter
         import miio as miio_lib
+
+        from adapters.miot.adapter import MIoTAdapter
 
         discovery = app_state["discovery"]
         store = app_state["settings"]
@@ -727,7 +747,9 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
         # Update device info
         miot._device_infos[device_id] = {
-            "ip": ip, "token": req.token, "model": model,
+            "ip": ip,
+            "token": req.token,
+            "model": model,
             "did": info.get("did", ""),
         }
 
@@ -740,10 +762,15 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         # Save as manual device for persistence
         manual_devices = store.get("manual_devices", [])
         manual_devices = [d for d in manual_devices if d.get("ip") != ip]
-        manual_devices.append({
-            "ip": ip, "token": req.token, "name": device.name,
-            "device_type": device_type, "model": model,
-        })
+        manual_devices.append(
+            {
+                "ip": ip,
+                "token": req.token,
+                "name": device.name,
+                "device_type": device_type,
+                "model": model,
+            }
+        )
         store.set("manual_devices", manual_devices)
 
         ensure_system_skills = app_state.get("ensure_system_skills")
@@ -786,6 +813,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     async def xiaomi_qr_start():
         """Start QR code login flow."""
         from adapters.miot.xiaomi_cloud import QrLoginFlow
+
         flow = QrLoginFlow()
         result = flow.start()
         if result["status"] == "error":
@@ -799,17 +827,17 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         }
 
     @app.post("/api/settings/xiaomi/qr/poll")
-    async def xiaomi_qr_poll(body: dict = {}):
+    async def xiaomi_qr_poll(body: dict | None = None):
         """Poll QR login status."""
-        from adapters.miot.xiaomi_cloud import fetch_all_devices
         from adapters.miot.adapter import MIoTAdapter
-        from core.models import Device, Event, EventType
+        from adapters.miot.xiaomi_cloud import fetch_all_devices
+        from core.models import Device
 
         flow = app_state.get("_xiaomi_qr_flow")
         if not flow:
             return {"status": "error", "error": "没有进行中的扫码登录"}
 
-        region = body.get("country", "cn") or "cn"
+        region = (body or {}).get("country", "cn") or "cn"
         result = flow.poll()
 
         if result["status"] == "qr_pending":
@@ -872,7 +900,10 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                         device.capabilities = miot._build_capabilities(model, has_token=True)
                         device.sensors = miot._default_sensors(device_type)
                     miot._device_infos[existing_id] = {
-                        "ip": ip, "token": token, "model": model, "did": did,
+                        "ip": ip,
+                        "token": token,
+                        "model": model,
+                        "did": did,
                         "needs_token": not has_token,
                     }
                     updated += 1
@@ -889,7 +920,10 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                         sensors=miot._default_sensors(device_type) if has_token else [],
                     )
                     miot._device_infos[device_id] = {
-                        "ip": ip, "token": token, "model": model, "did": did,
+                        "ip": ip,
+                        "token": token,
+                        "model": model,
+                        "did": did,
                         "needs_token": not has_token,
                     }
                     if device_id not in discovery.devices:
@@ -919,6 +953,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.get("/api/settings/llm/status")
     async def llm_status():
         from core.runtime.config import settings as env_settings
+
         store = app_state["settings"]
         api_key = store.get("llm_api_key", "") or env_settings.llm_api_key
         # Mask key for display: show first 8 chars + ***
@@ -936,12 +971,14 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
     @app.post("/api/settings/llm/configure")
     async def llm_configure(req: LLMConfigRequest):
         store = app_state["settings"]
-        store.update({
-            "llm_api_key": req.api_key,
-            "llm_model": req.model,
-            "llm_base_url": req.base_url,
-            "llm_disable_thinking": req.disable_thinking,
-        })
+        store.update(
+            {
+                "llm_api_key": req.api_key,
+                "llm_model": req.model,
+                "llm_base_url": req.base_url,
+                "llm_disable_thinking": req.disable_thinking,
+            }
+        )
         return {"success": True, "model": req.model}
 
     return app

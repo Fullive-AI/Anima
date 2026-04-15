@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import signal
-import sys
-from pathlib import Path
 
 import uvicorn
 
+from adapters.miot.adapter import MIIO_AVAILABLE as _MIOT_AVAILABLE
+
+# Adapters
+from adapters.miot.adapter import MIoTAdapter
+from adapters.virtual.adapter import VirtualAdapter
 from core.api.routes import create_app
 from core.brain.engine import Brain
 from core.brain.skill_loader import SkillLoader
@@ -18,17 +20,13 @@ from core.media.xiaomi_speaker import XiaomiSpeakerPlayer
 from core.memory.extractor import MemoryExtractionService
 from core.memory.learning import PreferenceLearningService
 from core.memory.store import MemoryStore
+from core.models import Event, EventType
 from core.rules.engine import RulesEngine
 from core.runtime.cli import interactive_cli
 from core.runtime.config import settings
 from core.runtime.mqtt import MQTTClient
 from core.runtime.settings_store import SettingsStore
 from core.scheduler.scheduler import Scheduler
-from core.models import Event, EventType
-
-# Adapters
-from adapters.miot.adapter import MIoTAdapter, MIIO_AVAILABLE as _MIOT_AVAILABLE
-from adapters.virtual.adapter import VirtualAdapter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,7 +68,11 @@ class Anima:
         self._brain_cycle_task: asyncio.Task[None] | None = None
 
         # Adapters
-        adapters = [MIoTAdapter(settings_store=self.settings_store, speaker_player=self.speaker_player)] if _MIOT_AVAILABLE else []
+        adapters = (
+            [MIoTAdapter(settings_store=self.settings_store, speaker_player=self.speaker_player)]
+            if _MIOT_AVAILABLE
+            else []
+        )
         self.virtual_adapter = VirtualAdapter(bus=self.bus)
         adapters.append(self.virtual_adapter)
         self.discovery = DiscoveryOrchestrator(bus=self.bus, adapters=adapters)
@@ -224,13 +226,16 @@ class Anima:
         if not device:
             return
 
-        await self._ensure_system_skills_for_devices({
-            "discovery": self.discovery,
-            "brain": self.brain,
-            "memory": self.memory,
-            "bus": self.bus,
-            "settings": self.settings_store,
-        }, devices=[device])
+        await self._ensure_system_skills_for_devices(
+            {
+                "discovery": self.discovery,
+                "brain": self.brain,
+                "memory": self.memory,
+                "bus": self.bus,
+                "settings": self.settings_store,
+            },
+            devices=[device],
+        )
         await self._ensure_cold_start_profiles()
 
     async def _ensure_system_skills_for_devices(
@@ -312,6 +317,7 @@ class Anima:
 
     async def _push_brain_events(self, result: object) -> None:
         import json
+
         queues = getattr(self, "_app_state", {}).get("_brain_event_queues", [])
         if not queues:
             return
@@ -320,12 +326,15 @@ class Anima:
             goal = getattr(item, "goal", "")
             if not goal:
                 continue
-            msg = json.dumps({
-                "type": "proactive_action",
-                "skill": getattr(item, "skill_name", ""),
-                "goal": goal,
-                "reason": getattr(item, "reason", ""),
-            }, ensure_ascii=False)
+            msg = json.dumps(
+                {
+                    "type": "proactive_action",
+                    "skill": getattr(item, "skill_name", ""),
+                    "goal": goal,
+                    "reason": getattr(item, "reason", ""),
+                },
+                ensure_ascii=False,
+            )
             for q in list(queues):
                 await q.put(msg)
 
@@ -356,9 +365,14 @@ class Anima:
 
 def cli_entry():
     import argparse
+
     parser = argparse.ArgumentParser(description="Anima — Make Every Hardware Intelligent")
-    parser.add_argument("--mode", choices=["full", "cli"], default="full",
-                        help="Run mode: 'full' (API + scheduler) or 'cli' (interactive)")
+    parser.add_argument(
+        "--mode",
+        choices=["full", "cli"],
+        default="full",
+        help="Run mode: 'full' (API + scheduler) or 'cli' (interactive)",
+    )
     args = parser.parse_args()
 
     anima = Anima()

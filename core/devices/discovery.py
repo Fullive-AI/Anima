@@ -5,7 +5,7 @@ from typing import Any
 
 from adapters.base import BaseAdapter
 from core.events.bus import EventBus
-from core.models import Device, Event, EventType, ActionResult
+from core.models import ActionResult, Device, Event, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -34,22 +34,28 @@ class DiscoveryOrchestrator:
 
                     if is_new_device:
                         newly_found.append(device)
-                        await self._bus.emit(Event(
-                            type=EventType.DEVICE_DISCOVERED,
-                            device_id=device.device_id,
-                            data=device.model_dump(),
-                        ))
+                        await self._bus.emit(
+                            Event(
+                                type=EventType.DEVICE_DISCOVERED,
+                                device_id=device.device_id,
+                                data=device.model_dump(),
+                            )
+                        )
                         logger.info(
                             "Discovered: %s (%s) via %s",
-                            device.name, device.device_id, adapter.name,
+                            device.name,
+                            device.device_id,
+                            adapter.name,
                         )
 
                     if changed_sensors:
-                        await self._bus.emit(Event(
-                            type=EventType.SENSOR_UPDATED,
-                            device_id=device.device_id,
-                            data=changed_sensors,
-                        ))
+                        await self._bus.emit(
+                            Event(
+                                type=EventType.SENSOR_UPDATED,
+                                device_id=device.device_id,
+                                data=changed_sensors,
+                            )
+                        )
             except Exception:
                 logger.exception("Adapter %s scan failed", adapter.name)
 
@@ -80,38 +86,45 @@ class DiscoveryOrchestrator:
                 changed_sensors = await self._refresh_device_snapshot(device, adapter)
                 refreshed += 1
                 if changed_sensors:
-                    await self._bus.emit(Event(
-                        type=EventType.SENSOR_UPDATED,
-                        device_id=device_id,
-                        data=changed_sensors,
-                    ))
+                    await self._bus.emit(
+                        Event(
+                            type=EventType.SENSOR_UPDATED,
+                            device_id=device_id,
+                            data=changed_sensors,
+                        )
+                    )
             except Exception:
                 failed += 1
                 logger.exception("Adapter %s refresh failed for %s", adapter.name, device_id)
 
         return {"refreshed": refreshed, "failed": failed}
 
-    async def execute_command(
-        self, device_id: str, action: str, params: dict[str, Any]
-    ) -> ActionResult:
+    async def execute_command(self, device_id: str, action: str, params: dict[str, Any]) -> ActionResult:
         adapter = self._adapter_map.get(device_id)
         if not adapter:
             return ActionResult(
-                device_id=device_id, action=action, success=False,
+                device_id=device_id,
+                action=action,
+                success=False,
                 message=f"No adapter found for device {device_id}",
             )
         try:
             result = await adapter.execute(device_id, action, params)
-            await self._bus.emit(Event(
-                type=EventType.ACTION_EXECUTED,
-                device_id=device_id,
-                data={"action": action, "params": params, "success": result.success},
-            ))
+            await self._bus.emit(
+                Event(
+                    type=EventType.ACTION_EXECUTED,
+                    device_id=device_id,
+                    data={"action": action, "params": params, "success": result.success},
+                )
+            )
             return result
         except Exception as e:
             logger.exception("Execute failed: %s.%s", device_id, action)
             return ActionResult(
-                device_id=device_id, action=action, success=False, message=str(e),
+                device_id=device_id,
+                action=action,
+                success=False,
+                message=str(e),
             )
 
     def update_device_sensors(self, device_id: str, sensor_data: dict[str, Any]) -> None:
@@ -124,10 +137,7 @@ class DiscoveryOrchestrator:
 
     @staticmethod
     def _snapshot_sensor_values(device: Device) -> dict[str, Any]:
-        return {
-            sensor.name: sensor.value
-            for sensor in device.sensors
-        }
+        return {sensor.name: sensor.value for sensor in device.sensors}
 
     async def _refresh_device_snapshot(self, device: Device, adapter: BaseAdapter) -> dict[str, Any]:
         before = self._snapshot_sensor_values(device)

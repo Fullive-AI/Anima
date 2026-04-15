@@ -13,7 +13,6 @@ from core.models import Capability
 
 from .resolver import resolve_device_path
 
-
 GENERIC_REFLECTION_CAPABILITIES = [
     Capability(
         name="miot_get_property",

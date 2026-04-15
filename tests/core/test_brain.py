@@ -127,7 +127,9 @@ class TestBrain:
             devices=[],
             environment_state={},
             user_memory={},
-            lightweight_skills=[SkillSummary(name="humidifier", description="humidity control", device_type="humidifier")],
+            lightweight_skills=[
+                SkillSummary(name="humidifier", description="humidity control", device_type="humidifier")
+            ],
         )
         assert "below 50%" in prompt
         assert "humidifier" in prompt
@@ -178,7 +180,19 @@ class TestBrain:
     def test_normalize_chat_tasks_preserves_new_task_items(self):
         brain = Brain.__new__(Brain)
         task = TaskPlanItem(kind="ask_user", question="请确认目标房间", priority=5)
-        tasks = brain._normalize_chat_tasks(type("Plan", (), {"task_plan_items": [task], "system_action": "none", "system_skill": "", "params": {}, "skill_plan_items": []})())
+        tasks = brain._normalize_chat_tasks(
+            type(
+                "Plan",
+                (),
+                {
+                    "task_plan_items": [task],
+                    "system_action": "none",
+                    "system_skill": "",
+                    "params": {},
+                    "skill_plan_items": [],
+                },
+            )()
+        )
         assert tasks == [task]
 
     def test_sanitize_command_with_capability_limits(self):
@@ -380,7 +394,9 @@ class TestBrain:
     async def test_handle_chat_message_routes_device_discovery_before_unified_planner(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         class FakeDiscovery:
@@ -426,7 +442,9 @@ class TestBrain:
     async def test_handle_chat_message_routes_skill_creation_before_unified_planner(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         class FakeDiscovery:
@@ -452,7 +470,14 @@ class TestBrain:
         with patch.object(
             actions_module,
             "create_custom_skill",
-            AsyncMock(return_value={"reply": "已创建", "action": "create_custom_skill", "status": "created", "folder_name": "curtain"}),
+            AsyncMock(
+                return_value={
+                    "reply": "已创建",
+                    "action": "create_custom_skill",
+                    "status": "created",
+                    "folder_name": "curtain",
+                }
+            ),
         ) as create_mock:
             result = await brain.handle_chat_message(
                 "帮我新增一个控制窗帘的技能",
@@ -467,7 +492,9 @@ class TestBrain:
     async def test_handle_chat_message_does_not_route_environment_query_to_skill_creator(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         class FakeDiscovery:
@@ -511,7 +538,9 @@ class TestBrain:
     async def test_handle_chat_message_resumes_pending_skill_creation_after_clarification(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         class FakeDiscovery:
@@ -574,7 +603,9 @@ class TestBrain:
     async def test_handle_chat_message_can_cancel_pending_skill_creation(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
         brain._pending_skill_creation = {
             "request": "新增一个起床提醒技能",
@@ -583,7 +614,15 @@ class TestBrain:
 
         result = await brain.handle_chat_message(
             "算了，先取消",
-            {"discovery": object(), "settings": type("Settings", (), {"get": lambda self, key, default=None: "sk-test" if key == "llm_api_key" else default})(), "brain": brain},
+            {
+                "discovery": object(),
+                "settings": type(
+                    "Settings",
+                    (),
+                    {"get": lambda self, key, default=None: "sk-test" if key == "llm_api_key" else default},
+                )(),
+                "brain": brain,
+            },
         )
 
         assert result["reply"] == "已取消上一次技能创建请求。"
@@ -592,7 +631,9 @@ class TestBrain:
     async def test_handle_chat_message_runs_speaker_skill_for_random_playback(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         speaker = Device(
@@ -648,7 +689,9 @@ class TestBrain:
     async def test_handle_chat_message_returns_question_for_ask_user_task(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         class FakeDiscovery:
@@ -708,15 +751,17 @@ class TestBrain:
         (scripts_dir / "actions.py").write_text(
             (
                 "from core.models import DeviceCommand\n\n"
-                "def open(device_id: str, reason: str = \"\") -> DeviceCommand:\n"
-                "    return DeviceCommand(device_id=device_id, action=\"open\", source=\"brain\", reason=reason)\n"
+                'def open(device_id: str, reason: str = "") -> DeviceCommand:\n'
+                '    return DeviceCommand(device_id=device_id, action="open", source="brain", reason=reason)\n'
             ),
             encoding="utf-8",
         )
 
         loader = SkillLoader(skills_dir=str(skills_dir))
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         curtain = Device(
@@ -776,7 +821,9 @@ class TestBrain:
     async def test_handle_chat_message_maps_legacy_skill_creator_action_alias(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         class FakeDiscovery:
@@ -815,7 +862,9 @@ class TestBrain:
     async def test_handle_chat_message_refreshes_environment_before_running_skill(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")
         loader.discover()
-        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(base_dir=str(tmp_path / "memory"))
+        memory = __import__("core.memory.store", fromlist=["MemoryStore"]).MemoryStore(
+            base_dir=str(tmp_path / "memory")
+        )
         brain = Brain(bus=object(), skill_loader=loader, memory=memory)
 
         speaker = Device(

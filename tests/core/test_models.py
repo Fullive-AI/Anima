@@ -1,8 +1,11 @@
-import pytest
-from datetime import datetime
 from core.models import (
-    Device, Capability, Sensor, DeviceCommand, Event, EventType,
-    SkillMeta, RoomInfo, ActionResult,
+    Capability,
+    Device,
+    DeviceCommand,
+    Event,
+    EventType,
+    RoomInfo,
+    Sensor,
 )
 
 
