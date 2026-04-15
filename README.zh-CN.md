@@ -129,7 +129,11 @@ cp .env.example .env  # 填入 API 密钥
 docker compose up -d
 ```
 
-后端运行在 **8080** 端口。挂载 `data/` 和 `skills/` 实现数据持久化。
+这将启动 **MQTT Broker** 和 **Python 后端**，监听 **8080** 端口（API + Swagger 文档在 `/docs`）。`data/` 和 `skills/` 目录已挂载用于数据持久化。
+
+> **注意：** Docker Compose 仅运行后端。如需 Dashboard，请单独执行 `pnpm build` 构建前端，然后用任意静态文件服务器托管 `dashboard/dist/`，或在本地运行 `pnpm dev:frontend`。
+>
+> `docker-compose.yml` 中默认的 `network_mode: host` 仅在 **Linux** 上有效。macOS/Windows 用户需替换为显式端口映射。
 
 ---
 

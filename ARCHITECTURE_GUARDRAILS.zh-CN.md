@@ -26,7 +26,7 @@ Anima 不是一个普通 Web 后端，它是一个面向智能硬件的运行时
 
 ## 标准运行时结构
 
-主运行时组装点在 [core/main.py](C:/Users/kprig/fulai/Anima/core/main.py)。
+主运行时组装点在 [core/main.py](./core/main.py)。
 
 预期的运行时组成如下：
 

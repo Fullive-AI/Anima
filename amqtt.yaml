@@ -3,8 +3,6 @@ listeners:
     type: tcp
     bind: 0.0.0.0:1883
 
-sys_interval: 0
-auth:
-  allow-anonymous: true
-
-plugins: []
+plugins:
+  amqtt.plugins.authentication.AnonymousAuthPlugin:
+    allow_anonymous: true

@@ -5,8 +5,8 @@ WORKDIR /app
 # Install uv for faster dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Copy project files
-COPY pyproject.toml .
+# Copy project files and lockfile for reproducible installs
+COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --no-install-project
 
 COPY . .

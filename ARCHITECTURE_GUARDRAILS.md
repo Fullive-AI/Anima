@@ -26,7 +26,7 @@ Any change that weakens or bypasses this chain should be treated as an architect
 
 ## Canonical Runtime Shape
 
-The main runtime is assembled in [core/main.py](C:/Users/kprig/fulai/Anima/core/main.py).
+The main runtime is assembled in [core/main.py](./core/main.py).
 
 The intended composition is:
 

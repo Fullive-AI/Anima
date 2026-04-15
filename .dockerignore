@@ -17,10 +17,12 @@ data/memory/users/*/learned.md
 data/config.json
 tests
 docs
+assets
 *.md
 !README.md
 LICENSE
 .pre-commit-config.yaml
+.editorconfig
 .ralph
 .ralphrc
 .claude

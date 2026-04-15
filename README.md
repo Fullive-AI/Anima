@@ -133,7 +133,11 @@ cp .env.example .env  # fill in your API key
 docker compose up -d
 ```
 
-The backend runs on port **8080**. Mount `data/` and `skills/` for persistence.
+This starts the **MQTT broker** and **Python backend** on port **8080** (API + Swagger at `/docs`). The `data/` and `skills/` directories are mounted for persistence.
+
+> **Note:** Docker Compose runs the backend only. To serve the dashboard, build it separately with `pnpm build` and host `dashboard/dist/` with any static file server, or run `pnpm dev:frontend` locally.
+>
+> The default `network_mode: host` in `docker-compose.yml` works on **Linux only**. On macOS/Windows, replace it with explicit port mappings.
 
 ---
 

@@ -32,7 +32,7 @@ pnpm dev
 
 - [Node.js](https://nodejs.org/) >= 18 + [pnpm](https://pnpm.io/) >= 8
 - [Python](https://www.python.org/) >= 3.11
-- [uv](https://docs.astral.sh/uv/) (auto-installed via `pnpm install`)
+- [uv](https://docs.astral.sh/uv/) (install first — `pnpm install` runs `uv sync` automatically)
 
 ### Running Tests
 
@@ -80,7 +80,7 @@ Add support for a new device protocol:
 
 ### Suggest Features
 
-- Open a [GitHub Discussion](https://github.com/fulai-tech/Anima/discussions) or Issue
+- Open a [GitHub Issue](https://github.com/fulai-tech/Anima/issues)
 - Describe the use case and expected behavior
 
 ## Pull Request Guidelines
