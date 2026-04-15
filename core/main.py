@@ -57,7 +57,7 @@ class Anima:
         )
         self.brain.set_preference_learner(self.preference_learner)
         self.scheduler = Scheduler()
-        self.audio_registry = LocalAudioRegistry(port=8080)
+        self.audio_registry = LocalAudioRegistry(port=settings.api_port)
         self.speaker_player = XiaomiSpeakerPlayer(
             settings_store=self.settings_store,
             audio_registry=self.audio_registry,
@@ -120,7 +120,7 @@ class Anima:
             # Run API server + scheduler
             app = create_app(app_state)
 
-            config = uvicorn.Config(app, host="0.0.0.0", port=8080, log_level="info")
+            config = uvicorn.Config(app, host=settings.api_host, port=settings.api_port, log_level="info")
             server = uvicorn.Server(config)
 
             await asyncio.gather(

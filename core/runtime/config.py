@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_disable_thinking: bool = False
 
+    # API server
+    api_host: str = "0.0.0.0"
+    api_port: int = 8080
+
     # MQTT
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
