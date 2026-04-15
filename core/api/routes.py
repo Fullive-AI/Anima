@@ -425,7 +425,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         except Exception as exc:
             logger.exception("Chat request failed")
             return {
-                "reply": f"聊天请求执行失败：{exc}",
+                "reply": f"Chat request failed: {exc}",
                 "error": "chat_request_failed",
             }
 
@@ -723,7 +723,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
         device = discovery.get_device(device_id)
         if not device:
-            return {"success": False, "error": "设备未找到"}
+            return {"success": False, "error": "Device not found"}
 
         miot = next((a for a in discovery._adapters if isinstance(a, MIoTAdapter)), None)
         if not miot:
@@ -732,7 +732,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         info = miot._device_infos.get(device_id, {})
         ip = info.get("ip", "")
         if not ip:
-            return {"success": False, "error": "设备 IP 未知"}
+            return {"success": False, "error": "Device IP unknown"}
 
         # Try to probe device with the provided token
         model = "xiaomi.device"
@@ -743,7 +743,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             model = dev_info.model or model
             device_type = miot._guess_device_type(model)
         except Exception as e:
-            return {"success": False, "error": f"Token 验证失败: {e}"}
+            return {"success": False, "error": f"Token verification failed: {e}"}
 
         # Update device info
         miot._device_infos[device_id] = {
@@ -835,7 +835,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
         flow = app_state.get("_xiaomi_qr_flow")
         if not flow:
-            return {"status": "error", "error": "没有进行中的扫码登录"}
+            return {"status": "error", "error": "No QR login in progress"}
 
         region = (body or {}).get("country", "cn") or "cn"
         result = flow.poll()
@@ -845,7 +845,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         if result["status"] in ("error", "qr_expired"):
             app_state.pop("_xiaomi_qr_flow", None)
             app_state.pop("_xiaomi_qr_image_b64", None)
-            return {"status": "error", "error": result.get("error", "登录失败")}
+            return {"status": "error", "error": result.get("error", "Login failed")}
         if result["status"] != "ok":
             return {"status": "error", "error": "未知状态"}
 
@@ -856,7 +856,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             logger.exception("Failed to fetch devices after QR login")
             app_state.pop("_xiaomi_qr_flow", None)
             app_state.pop("_xiaomi_qr_image_b64", None)
-            return {"status": "error", "error": f"获取设备列表失败: {e}"}
+            return {"status": "error", "error": f"Failed to fetch device list: {e}"}
 
         app_state.pop("_xiaomi_qr_flow", None)
         app_state.pop("_xiaomi_qr_image_b64", None)

@@ -1,6 +1,5 @@
 <div align="center">
 
-<!-- LOGO_PLACEHOLDER: 替换为 Anima Logo -->
 <!-- <img src="./assets/logo.png" alt="Anima Logo" width="200"> -->
 
 # Anima
@@ -15,11 +14,11 @@
 [![CI](https://github.com/fulai-tech/Anima/actions/workflows/ci.yml/badge.svg)](https://github.com/fulai-tech/Anima/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](./docker-compose.yml)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fulai-tech/Anima)
 
-<!-- DEMO_GIF_PLACEHOLDER: 替换为演示 GIF 或截图 -->
 <!-- <img src="./assets/demo.gif" alt="Anima Dashboard Demo" width="800"> -->
 
-**[快速开始](#-快速开始)** · **[文档](#-开发)** · **[贡献指南](./CONTRIBUTING.md)** · **[路线图](#-路线图)**
+**[快速开始](#-快速开始)** · **[架构](#架构)** · **[技能系统](#技能系统)** · **[贡献指南](./CONTRIBUTING.md)** · **[路线图](#-路线图)** · **[更新日志](./CHANGELOG.md)**
 
 </div>
 
@@ -205,6 +204,18 @@ cp -r skills/custom/_template skills/custom/my-skill
 
 ---
 
+## 文档
+
+| 资源 | 链接 |
+|------|------|
+| 架构设计文档 | [`docs/plans/2026-03-17-anima-design.md`](./docs/plans/2026-03-17-anima-design.md) |
+| API 参考 (Swagger) | `http://localhost:8080/docs`（运行时访问） |
+| 贡献指南 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
+| 安全策略 | [`SECURITY.md`](./SECURITY.md) |
+| 更新日志 | [`CHANGELOG.md`](./CHANGELOG.md) |
+
+---
+
 ## 贡献
 
 欢迎贡献！最简单的参与方式：
@@ -233,5 +244,4 @@ Fullive.AI 以空间 Agentic AI 架构为核心，赋予物理空间自主感知
 
 ---
 
-<!-- STAR_HISTORY_PLACEHOLDER -->
 <!-- [![Star History Chart](https://api.star-history.com/svg?repos=fulai-tech/Anima&type=Date)](https://star-history.com/#fulai-tech/Anima&Date) -->

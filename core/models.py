@@ -24,7 +24,7 @@ class Capability(BaseModel):
 class Sensor(BaseModel):
     name: str
     unit: str = ""
-    value: float | str | bool | None = None
+    value: float | int | str | bool | None = None
 
 
 class Device(BaseModel):

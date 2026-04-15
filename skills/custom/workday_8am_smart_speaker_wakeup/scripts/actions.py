@@ -1,13 +1,13 @@
 from core.models import DeviceCommand
 
 
-def activate_wakeup_alarm(alarm_time: str) -> DeviceCommand:
+def activate_wakeup_alarm(device_id: str, alarm_time: str) -> DeviceCommand:
     return DeviceCommand(
-        device_type="smart_speaker",
-        command="play_wakeup_alarm",
-        payload={"alarm_time": alarm_time, "trigger_source": "workday_alarm_skill"},
+        device_id=device_id,
+        action="play_wakeup_alarm",
+        params={"alarm_time": alarm_time, "trigger_source": "workday_alarm_skill"},
     )
 
 
-def skip_scheduled_alarm() -> DeviceCommand:
-    return DeviceCommand(device_type="smart_speaker", command="skip_scheduled_alarm", payload={})
+def skip_scheduled_alarm(device_id: str) -> DeviceCommand:
+    return DeviceCommand(device_id=device_id, action="skip_scheduled_alarm", params={})

@@ -19,7 +19,8 @@ See docs/plans/2026-03-17-anima-design.md for full design.
 
 ## Key Directories
 - core/          — Core process (brain, events, rules, memory, scheduler, api)
-- adapters/      — Device adapters (miot, matter, homeassistant)
-- skills/        — AI Skill packages (humidifier, air_conditioner, light)
+- adapters/      — Device adapters (miot, virtual)
+- skills/        — AI Skill packages (system: humidifier, air_conditioner, light, air_purifier, speaker, coordinator; custom: user-created)
+- dashboard/     — React + Vite + Tailwind frontend (port 3000)
 - data/          — Runtime data (memory, config) — persisted via Docker volume
-- tests/         — Test suite
+- tests/         — Test suite (pytest + Playwright E2E)

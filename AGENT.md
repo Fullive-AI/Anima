@@ -54,12 +54,12 @@ Main modules:
 
 - `core/main.py`: composition root, startup flow, event wiring
 - `core/api/routes.py`: REST API surface and onboarding/config endpoints
-- `core/discovery.py`: adapter orchestration, device registry, command dispatch
+- `core/devices/discovery.py`: adapter orchestration, device registry, command dispatch
 - `core/rules/engine.py`: fast-path rule evaluation
 - `core/brain/engine.py`: LLM decision pipeline and environment summarization
 - `core/brain/skill_loader.py`: loads system/custom skills from disk
 - `core/memory/store.py`: preferences/history/learned profile storage
-- `core/chat_agent.py`: task-oriented chat routing for discovery and skill creation flows
+- `core/brain/react_agent.py`: task-oriented chat routing for discovery and skill creation flows
 - `adapters/miot/`: current primary hardware integration
 - `dashboard/src/`: polling-based operator console
 
@@ -208,7 +208,7 @@ If adding realtime, treat it as a deliberate architecture upgrade, not a hidden 
 
 ### MQTT exists but is not the main runtime path
 
-There is MQTT code in `core/mqtt.py`, but the core system is not currently driven by MQTT in production flow.
+There is MQTT code in `core/runtime/mqtt.py`, but the core system is not currently driven by MQTT in production flow.
 Do not route new critical features through MQTT unless you are intentionally evolving the architecture.
 
 ### Rooms are weakly implemented

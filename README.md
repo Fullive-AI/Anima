@@ -1,6 +1,5 @@
 <div align="center">
 
-<!-- LOGO_PLACEHOLDER: Replace with your Anima logo -->
 <!-- <img src="./assets/logo.png" alt="Anima Logo" width="200"> -->
 
 # Anima
@@ -15,11 +14,11 @@ An open-source **Agentic AI OS** for hardware — auto-discovers devices, gives 
 [![CI](https://github.com/fulai-tech/Anima/actions/workflows/ci.yml/badge.svg)](https://github.com/fulai-tech/Anima/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](./docker-compose.yml)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fulai-tech/Anima)
 
-<!-- DEMO_GIF_PLACEHOLDER: Replace with a demo GIF or screenshot -->
 <!-- <img src="./assets/demo.gif" alt="Anima Dashboard Demo" width="800"> -->
 
-**[Quick Start](#-quick-start)** · **[Documentation](#-documentation)** · **[Contributing](./CONTRIBUTING.md)** · **[Roadmap](#-roadmap)**
+**[Quick Start](#-quick-start)** · **[Architecture](#architecture)** · **[Skill System](#skill-system)** · **[Contributing](./CONTRIBUTING.md)** · **[Roadmap](#-roadmap)** · **[Changelog](./CHANGELOG.md)**
 
 </div>
 
@@ -308,6 +307,19 @@ Anima/
 
 ---
 
+## Documentation
+
+| Resource | Link |
+|----------|------|
+| Architecture Design | [`docs/plans/2026-03-17-anima-design.md`](./docs/plans/2026-03-17-anima-design.md) |
+| API Reference (Swagger) | `http://localhost:8080/docs` (when running) |
+| Contributing Guide | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
+| Security Policy | [`SECURITY.md`](./SECURITY.md) |
+| Changelog | [`CHANGELOG.md`](./CHANGELOG.md) |
+| Agent Architecture Guide | [`AGENT.md`](./AGENT.md) |
+
+---
+
 ## Contributing
 
 We welcome contributions! The easiest ways to start:
@@ -336,5 +348,4 @@ Fullive.AI builds Spatial Agentic AI that gives physical spaces the ability to a
 
 ---
 
-<!-- STAR_HISTORY_PLACEHOLDER -->
 <!-- [![Star History Chart](https://api.star-history.com/svg?repos=fulai-tech/Anima&type=Date)](https://star-history.com/#fulai-tech/Anima&Date) -->
