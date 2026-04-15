@@ -362,6 +362,11 @@ class Brain:
             yield 'data: {"reply":"聊天入口现在统一走模型决策，请先配置可用的 LLM。","error":"llm_required","done":true}\n\n'
             return
 
+        if self._pending_skill_creation or self._looks_like_skill_creation_request(text):
+            async for event in self._stream_unified_chat_once(text, app_state):
+                yield event
+            return
+
         intent = self._classify_intent(text)
         if intent == "chitchat":
             # Fast path: direct streaming, no tool loop
@@ -385,6 +390,35 @@ class Brain:
 
         async for event in agent.run(text, app_state_with_brain):
             yield event.to_sse()
+
+    async def _stream_unified_chat_once(self, message: str, app_state: dict[str, Any]):
+        """Stream a single final event for routes handled by the unified chat graph."""
+        try:
+            result = await self._chat_graph.ainvoke({"message": message, "app_state": app_state})
+            payload = result.get("result", {"reply": "我暂时没有需要执行的操作。"})
+            event = {
+                "type": "reply",
+                "content": payload.get("reply", "") or "我已经处理完成。",
+                "done": True,
+            }
+            for key in (
+                "action",
+                "status",
+                "error",
+                "skill_name",
+                "folder_name",
+                "path",
+                "refresh_skills",
+                "questions",
+                "qr_image_b64",
+                "country",
+            ):
+                if key in payload:
+                    event[key] = payload[key]
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            logger.exception("Unified chat stream failed")
+            yield f"data: {json.dumps({'type': 'error', 'content': f'聊天请求执行失败：{exc}', 'done': True}, ensure_ascii=False)}\n\n"
 
     async def _stream_chitchat_reply(self, message: str):
         """Stream a direct chitchat reply without full planner overhead."""

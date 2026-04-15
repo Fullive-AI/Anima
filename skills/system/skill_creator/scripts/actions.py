@@ -360,6 +360,29 @@ def _validate_request_analysis(
     return normalized, []
 
 
+def _localize_clarification_question(question: str) -> str:
+    text = question.strip()
+    if not text:
+        return ""
+
+    replacements = {
+        "What specific functionality do you want this new skill to have?": "你希望这个新技能具体实现什么功能？",
+        "Under what circumstances should this new skill be triggered?": "这个新技能应该在什么情况下触发？",
+        "Are there any special constraints or requirements for this skill that you need to note?": "这个技能有没有需要特别说明的限制或要求？",
+    }
+    if text in replacements:
+        return replacements[text]
+
+    normalized = text.lower().strip(" ?")
+    if "specific functionality" in normalized and "skill" in normalized:
+        return "你希望这个新技能具体实现什么功能？"
+    if "under what circumstances" in normalized and "trigger" in normalized:
+        return "这个新技能应该在什么情况下触发？"
+    if "special constraints" in normalized or "special requirements" in normalized:
+        return "这个技能有没有需要特别说明的限制或要求？"
+    return text
+
+
 async def _analyze_request_with_llm(
     llm: OpenAITextClient,
     *,
@@ -381,6 +404,7 @@ async def _analyze_request_with_llm(
         )
     base_prompt = f"""
 You are planning an Anima skill before any files are generated.
+All user-facing text fields MUST be written in Simplified Chinese, especially `clarification_questions`.
 
 Mode: {mode}
 User request:
@@ -391,20 +415,21 @@ Device context:
 
 Return exactly one compact JSON object with this schema:
 {{
-  "summary": "one sentence summary of the reusable workflow",
-  "goal": "what the skill should accomplish",
-  "trigger_description": "when this skill should be used",
-  "primary_steps": ["ordered step", "ordered step"],
-  "success_criteria": ["observable outcome", "observable outcome"],
-  "constraints": ["hard rule", "hard rule"],
-  "needed_inputs": ["input or signal", "input or signal"],
-  "assumptions": ["assumption", "assumption"],
+  "summary": "一句话总结这个可复用工作流",
+  "goal": "这个技能要达成的目标",
+  "trigger_description": "这个技能应该在什么时候使用",
+  "primary_steps": ["执行步骤", "执行步骤"],
+  "success_criteria": ["可观察的成功结果", "可观察的成功结果"],
+  "constraints": ["硬性约束", "硬性约束"],
+  "needed_inputs": ["需要的输入或信号", "需要的输入或信号"],
+  "assumptions": ["保守假设", "保守假设"],
   "should_ask_clarification": true,
-  "clarification_questions": ["question", "question"]
+  "clarification_questions": ["你希望这个新技能具体实现什么功能？", "这个新技能应该在什么情况下触发？"]
 }}
 
 Hard constraints:
 - Return JSON only. No markdown fences. No explanation.
+- Use Simplified Chinese for every user-facing string. Do not ask clarification questions in English.
 - Think like a skill designer: extract repeatable triggers, steps, and success criteria before generation.
 - Clarification policy:
 {clarification_policy}
@@ -1078,7 +1103,11 @@ async def create_custom_skill(
                     "Infer any remaining gaps conservatively instead of asking follow-up questions.",
                 ]
         else:
-            questions = _string_list(analysis.get("clarification_questions"))[:3]
+            questions = [
+                _localize_clarification_question(item)
+                for item in _string_list(analysis.get("clarification_questions"))
+            ]
+            questions = [item for item in questions if item][:3]
             question_block = "\n".join(f"{idx}. {item}" for idx, item in enumerate(questions, start=1))
             return {
                 "reply": "我需要先确认几件事，避免生成一个过于宽泛的 skill：\n" + question_block,
