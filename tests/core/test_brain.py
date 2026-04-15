@@ -343,7 +343,7 @@ class TestBrain:
         assert len(tasks) == 1
         assert tasks[0].kind == "execute_skill"
         assert tasks[0].skill_name == "air_purifier"
-        assert "turn on" in tasks[0].goal
+        assert "开启" in tasks[0].goal
 
     def test_build_deterministic_cycle_tasks_turns_off_purifier_when_aqi_is_low(self):
         brain = Brain.__new__(Brain)
@@ -366,7 +366,7 @@ class TestBrain:
 
         assert len(tasks) == 1
         assert tasks[0].skill_name == "air_purifier"
-        assert "turn off" in tasks[0].goal
+        assert "关闭" in tasks[0].goal
 
     def test_build_deterministic_cycle_tasks_uses_average_aqi_when_aqi_missing(self):
         brain = Brain.__new__(Brain)
@@ -389,7 +389,7 @@ class TestBrain:
 
         assert len(tasks) == 1
         assert tasks[0].skill_name == "air_purifier"
-        assert "turn on" in tasks[0].goal
+        assert "开启" in tasks[0].goal
 
     async def test_handle_chat_message_routes_device_discovery_before_unified_planner(self, tmp_path):
         loader = SkillLoader(skills_dir="skills")

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Mic, MicOff, X } from 'lucide-react'
 
 interface VoiceOrbProps {
@@ -34,15 +34,13 @@ export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [, setFinalText] = useState('')
-  const [supported, setSupported] = useState(true)
+  const [supported] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+  })
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFinalRef = useRef('')
-
-  useEffect(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { setSupported(false); return }
-  }, [])
 
   const clearSilenceTimer = () => {
     if (silenceTimer.current) {

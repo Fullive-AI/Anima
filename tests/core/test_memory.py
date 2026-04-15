@@ -16,7 +16,7 @@ class TestMemoryStore:
 
     async def test_read_preferences_default(self):
         prefs = await self.store.get_preferences("default")
-        assert "Comfort" in prefs  # default template should exist
+        assert "用户偏好" in prefs  # default template should exist
 
     async def test_write_and_read_preferences(self):
         await self.store.update_preferences("default", "comfort.temperature", "23°C")
@@ -346,9 +346,9 @@ class TestMemoryStore:
 
         assert result["preferences_created"] is True
         assert result["profiles_created"] == ["humidifier", "light", "speaker"]
-        assert "- humidity: 45-55%" in prefs
-        assert "- brightness: daytime moderate, evening warm and dim" in prefs
-        assert "speaker: keep voice interactions low-noise by default" in prefs
+        assert "湿度" in prefs
+        assert "亮度" in prefs
+        assert "音箱" in prefs
         assert "humidifier" in profiles
         assert "light" in profiles
         assert "speaker" in profiles

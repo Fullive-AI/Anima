@@ -166,6 +166,7 @@ function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated:
       init[s.name] = typeof s.value === 'number' ? s.value : 0
     }
     setValues(init)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reinit on device change only; including editableSensors would loop
   }, [device.device_id])
 
   if (editableSensors.length === 0) return null

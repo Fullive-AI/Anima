@@ -69,7 +69,6 @@ export default function StartupOnboardingModal({ onDevicesChanged }: StartupOnbo
 
     let active = true
     const country = state.country || 'cn'
-    setPolling(true)
 
     const timer = window.setInterval(async () => {
       try {

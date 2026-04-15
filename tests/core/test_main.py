@@ -1,6 +1,6 @@
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from core.main import Anima
 from core.models import Device, Event, EventType, Sensor
@@ -119,10 +119,14 @@ class TestMain:
 
     async def test_bootstrap_startup_runs_brain_cycle_immediately(self):
         anima = Anima.__new__(Anima)
+        anima.settings_store = SimpleNamespace(get=lambda key, default=None: default)
+        anima.virtual_adapter = SimpleNamespace(register_device=MagicMock())
         anima.discovery = SimpleNamespace(
             scan=AsyncMock(),
             devices={},
+            _adapter_map={},
         )
+        anima._sync_device_rooms = MagicMock()
         anima._ensure_system_skills_for_devices = AsyncMock()
         anima._ensure_cold_start_profiles = AsyncMock()
         anima._maybe_start_onboarding = AsyncMock()

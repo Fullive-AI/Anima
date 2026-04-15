@@ -1,9 +1,13 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from adapters.miot.adapter import MIoTAdapter
+import pytest
+
+from adapters.miot.adapter import MIIO_AVAILABLE, MIoTAdapter
 from core.media.xiaomi_speaker import MINA_PLAY_MUSIC_HARDWARES, XiaomiSpeakerPlayer
 from core.models import Device, Sensor
+
+_requires_miio = pytest.mark.skipif(not MIIO_AVAILABLE, reason="python-miio not installed")
 
 
 class TestMIoTAdapter:
@@ -11,6 +15,7 @@ class TestMIoTAdapter:
         adapter = MIoTAdapter()
         assert adapter.name == "miot"
 
+    @_requires_miio
     @patch("adapters.miot.adapter.miio.Discovery")
     async def test_discover_returns_devices(self, mock_discovery_cls):
         mock_info = MagicMock()
@@ -123,6 +128,7 @@ class TestMIoTAdapter:
         assert device.get_sensor("aqi").value == 9
         assert device.get_sensor("pm2_5").value == 9
 
+    @_requires_miio
     def test_unknown_model_gets_generic_reflection_capabilities(self):
         adapter = MIoTAdapter()
 
@@ -182,6 +188,7 @@ class TestMIoTAdapter:
         assert result.message == "/tmp/library/song.wav"
         speaker_player.play_random_file.assert_awaited_once()
 
+    @_requires_miio
     async def test_load_cached_cloud_devices_without_relogin(self):
         class FakeSettings:
             def get(self, key, default=None):
