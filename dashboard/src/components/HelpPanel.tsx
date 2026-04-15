@@ -135,7 +135,7 @@ export default function HelpPanel({ open, onClose }: HelpPanelProps) {
                 </a>
               </p>
               <p>
-                <a href="http://localhost:8080/docs" target="_blank" className="text-violet-500 hover:text-violet-600 underline">
+                <a href="/docs" target="_blank" className="text-violet-500 hover:text-violet-600 underline">
                   FastAPI Swagger /docs
                 </a>
               </p>

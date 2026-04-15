@@ -847,7 +847,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
             app_state.pop("_xiaomi_qr_image_b64", None)
             return {"status": "error", "error": result.get("error", "Login failed")}
         if result["status"] != "ok":
-            return {"status": "error", "error": "未知状态"}
+            return {"status": "error", "error": "Unknown status"}
 
         # Login OK — fetch devices
         try:

@@ -412,7 +412,7 @@ class MIoTAdapter(BaseAdapter):
                     name="play_audio_file",
                     params={
                         "label": "播放本地音频",
-                        "help": "输入 Anima 运行机器上的绝对路径，例如 /Users/name/test.wav",
+                        "help": "Enter the absolute path on the Anima host, e.g. /path/to/audio.wav",
                         "inputs": [{"name": "path", "required": True, "type": "string"}],
                     },
                 ),
