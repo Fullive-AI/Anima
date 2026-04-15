@@ -12,6 +12,7 @@ from core.models import (
     TaskPlanItem,
 )
 from skills.system.air_purifier.scripts.actions import execute as execute_air_purifier_skill
+from skills.system.speaker.scripts.actions import execute as execute_speaker_skill
 
 
 class TestBrain:
@@ -323,6 +324,96 @@ class TestBrain:
         assert len(actions) == 1
         assert actions[0]["action"] == "off"
         assert actions[0]["expected_state"] == {"power": False}
+
+    async def test_air_purifier_execute_maps_chinese_off_intent(self):
+        purifier = Device(
+            device_id="purifier_01",
+            name="空气净化器",
+            adapter="fake",
+            type="air_purifier",
+            online=True,
+            capabilities=[Capability(name="on"), Capability(name="off")],
+        )
+
+        class FakeDiscovery:
+            def get_devices_by_type(self, device_type):
+                return [purifier]
+
+        actions = await execute_air_purifier_skill(
+            context={"discovery": FakeDiscovery(), "brain": object()},
+            plan_item=type("PlanItem", (), {"goal": "关闭空气净化器", "reason": "空气质量已恢复"})(),
+        )
+
+        assert len(actions) == 1
+        assert actions[0]["action"] == "off"
+        assert actions[0]["expected_state"] == {"power": False}
+
+    async def test_air_purifier_execute_maps_chinese_on_intent(self):
+        purifier = Device(
+            device_id="purifier_01",
+            name="空气净化器",
+            adapter="fake",
+            type="air_purifier",
+            online=True,
+            capabilities=[Capability(name="on"), Capability(name="off")],
+        )
+
+        class FakeDiscovery:
+            def get_devices_by_type(self, device_type):
+                return [purifier]
+
+        actions = await execute_air_purifier_skill(
+            context={"discovery": FakeDiscovery(), "brain": object()},
+            plan_item=type("PlanItem", (), {"goal": "打开空气净化器", "reason": "空气不太好"})(),
+        )
+
+        assert len(actions) == 1
+        assert actions[0]["action"] == "on"
+        assert actions[0]["expected_state"] == {"power": True}
+
+    async def test_speaker_execute_maps_chinese_stop_intent(self):
+        speaker = Device(
+            device_id="speaker_01",
+            name="智能音箱",
+            adapter="fake",
+            type="speaker",
+            online=True,
+            capabilities=[Capability(name="play_random_audio"), Capability(name="stop_audio")],
+        )
+
+        class FakeDiscovery:
+            def get_devices_by_type(self, device_type):
+                return [speaker]
+
+        actions = await execute_speaker_skill(
+            context={"discovery": FakeDiscovery(), "brain": object()},
+            plan_item=type("PlanItem", (), {"goal": "停止播放音乐", "reason": "用户要求暂停"})(),
+        )
+
+        assert len(actions) == 1
+        assert actions[0]["action"] == "stop_audio"
+
+    async def test_speaker_execute_maps_chinese_play_intent(self):
+        speaker = Device(
+            device_id="speaker_01",
+            name="智能音箱",
+            adapter="fake",
+            type="speaker",
+            online=True,
+            capabilities=[Capability(name="play_random_audio"), Capability(name="stop_audio")],
+        )
+
+        class FakeDiscovery:
+            def get_devices_by_type(self, device_type):
+                return [speaker]
+
+        actions = await execute_speaker_skill(
+            context={"discovery": FakeDiscovery(), "brain": object()},
+            plan_item=type("PlanItem", (), {"goal": "来一首歌曲", "reason": "用户想听音乐"})(),
+        )
+
+        assert len(actions) == 1
+        assert actions[0]["action"] == "play_random_audio"
 
     def test_build_deterministic_cycle_tasks_bootstraps_air_purifier_on_startup(self):
         brain = Brain.__new__(Brain)
