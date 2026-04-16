@@ -118,10 +118,10 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 px-6 py-8 backdrop-blur-[3px]">
-      <div className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] bg-[#f3efe6] shadow-2xl ring-1 ring-black/5">
-        <div className="flex items-center justify-between border-b border-black/10 bg-[#1f2937] px-6 py-4 text-white">
+      <div className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] bg-slate-50 shadow-2xl ring-1 ring-black/5">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-6 py-4 text-white">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-amber-300/20 p-2 text-amber-200">
+            <div className="rounded-xl bg-violet-500/15 p-2 text-violet-300">
               <BrainCircuit className="h-5 w-5" />
             </div>
             <div>
@@ -147,9 +147,9 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
         </div>
 
         <div className="grid flex-1 gap-0 overflow-hidden md:grid-cols-[1.15fr_0.85fr]">
-          <div className="overflow-y-auto border-r border-black/10 bg-[#f8f3e8] px-6 py-5">
+          <div className="overflow-y-auto border-r border-slate-200 bg-slate-50 px-6 py-5">
             <div className="space-y-6">
-              <div className="rounded-2xl border border-amber-950/10 bg-white/70 p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <SectionTitle
                   title="Extraction State"
                   detail={memory?.extraction_state.last_extracted_at ? new Date(memory.extraction_state.last_extracted_at).toLocaleString() : '尚未提取'}
@@ -160,12 +160,12 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                       <div className="text-xs uppercase tracking-wide text-slate-400">History Cursor</div>
                       <div className="mt-2 text-2xl font-semibold">{memory.extraction_state.history_cursor}</div>
                     </div>
-                    <div className="rounded-2xl bg-[#8b5cf6] px-4 py-3 text-white">
+                    <div className="rounded-2xl bg-violet-600 px-4 py-3 text-white">
                       <div className="text-xs uppercase tracking-wide text-violet-200">Last Batch</div>
                       <div className="mt-2 text-2xl font-semibold">{memory.extraction_state.last_batch_size ?? 0}</div>
                     </div>
-                    <div className="rounded-2xl bg-[#c2410c] px-4 py-3 text-white">
-                      <div className="text-xs uppercase tracking-wide text-orange-100">Topic Memories</div>
+                    <div className="rounded-2xl bg-emerald-600 px-4 py-3 text-white">
+                      <div className="text-xs uppercase tracking-wide text-emerald-100">Topic Memories</div>
                       <div className="mt-2 text-2xl font-semibold">{topicMemories.length}</div>
                     </div>
                   </div>
@@ -174,14 +174,14 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                 )}
               </div>
 
-              <div className="rounded-2xl border border-black/10 bg-white/70 p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <SectionTitle title="Preferences.md" />
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
                   <MarkdownBlock content={memory?.preferences} emptyText={loading ? 'Loading preferences...' : 'No preferences yet.'} />
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-black/10 bg-white/70 p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <SectionTitle title="Device Learned Profiles" detail={`${learnedProfiles.length} profiles`} />
                 <div className="mt-4 space-y-3">
                   {learnedProfiles.length === 0 ? (
@@ -212,9 +212,9 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
             </div>
           </div>
 
-          <div className="overflow-y-auto bg-[#efe8db] px-6 py-5">
+          <div className="overflow-y-auto bg-white px-6 py-5">
             <div className="space-y-6">
-              <div className="rounded-2xl border border-black/10 bg-white/80 p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <SectionTitle title="Memory Manifest" detail={`${memory?.memory_manifest.length ?? 0} topics`} />
                 <div className="mt-4 space-y-2">
                   {memory?.memory_manifest.length ? memory.memory_manifest.map((item) => (
@@ -232,14 +232,14 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-black/10 bg-white/80 p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <SectionTitle title="Topic Memories" detail={`${topicMemories.length} stored`} />
                 <div className="mt-4 space-y-3">
                   {topicMemories.length === 0 ? (
                     <p className="text-sm text-slate-500">{loading ? '正在加载...' : '还没有长期记忆 topic'}</p>
                   ) : (
                     topicMemories.map((memoryItem) => (
-                      <div key={memoryItem.topic} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div key={memoryItem.topic} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-sm font-semibold text-slate-900">{memoryItem.title}</div>
@@ -269,7 +269,7 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-black/10 bg-white/80 p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <SectionTitle title="Recent History" detail={`${memory?.recent_history.length ?? 0} entries`} />
                 <div className="mt-4 space-y-2">
                   {memory?.recent_history.length ? memory.recent_history.map((entry, index) => (

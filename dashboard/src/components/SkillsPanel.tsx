@@ -36,7 +36,7 @@ function SkillCard({
   const status = statusLabel(skill)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -47,7 +47,7 @@ function SkillCard({
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">{skill.description || 'No description provided.'}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${skill.scope === 'system' ? 'bg-violet-100 text-violet-700' : 'bg-sky-100 text-sky-700'}`}>
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${skill.scope === 'system' ? 'bg-violet-100 text-violet-700' : 'bg-violet-100 text-violet-700'}`}>
           {skill.scope === 'system' ? 'System' : 'Custom'}
         </span>
       </div>
@@ -135,7 +135,7 @@ function SkillEditor({
   }
 
   return (
-    <div className="flex h-full w-[420px] flex-col border-l border-black/10 bg-white">
+    <div className="flex h-full w-[420px] flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
         <div>
           <h3 className="text-base font-semibold text-slate-800">编辑自定义技能</h3>
@@ -149,37 +149,37 @@ function SkillEditor({
       <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
         <label className="block space-y-2">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">名称</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+          <input value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
 
         <label className="block space-y-2">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">描述</span>
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
 
         <label className="block space-y-2">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">设备类型</span>
-          <input value={deviceTypes} onChange={(event) => setDeviceTypes(event.target.value)} placeholder="speaker, curtain" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+          <input value={deviceTypes} onChange={(event) => setDeviceTypes(event.target.value)} placeholder="speaker, curtain" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
 
         <label className="block space-y-2">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">触发条件</span>
-          <textarea value={triggerText} onChange={(event) => setTriggerText(event.target.value)} rows={4} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+          <textarea value={triggerText} onChange={(event) => setTriggerText(event.target.value)} rows={4} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
 
         <label className="block space-y-2">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">行为说明</span>
-          <textarea value={actionText} onChange={(event) => setActionText(event.target.value)} rows={4} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-400" />
+          <textarea value={actionText} onChange={(event) => setActionText(event.target.value)} rows={4} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
 
         <label className="block space-y-2">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Knowledge</span>
-          <textarea value={knowledgeMd} onChange={(event) => setKnowledgeMd(event.target.value)} rows={6} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs text-slate-700 outline-none focus:border-sky-400" />
+          <textarea value={knowledgeMd} onChange={(event) => setKnowledgeMd(event.target.value)} rows={6} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
 
         <label className="block space-y-2">
           <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Decide Prompt</span>
-          <textarea value={decideMd} onChange={(event) => setDecideMd(event.target.value)} rows={8} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs text-slate-700 outline-none focus:border-sky-400" />
+          <textarea value={decideMd} onChange={(event) => setDecideMd(event.target.value)} rows={8} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
         </label>
 
         {error ? <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
@@ -187,7 +187,7 @@ function SkillEditor({
 
       <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
         <button onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 cursor-pointer">取消</button>
-        <button onClick={() => void handleSave()} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-700 disabled:opacity-50 cursor-pointer">
+        <button onClick={() => void handleSave()} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-50 cursor-pointer">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePenLine className="h-4 w-4" />}
           保存修改
         </button>
@@ -295,11 +295,11 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 px-6 py-8 backdrop-blur-[3px]">
-      <div className="flex h-full max-h-[92vh] w-full max-w-7xl overflow-hidden rounded-[30px] bg-[#f6f4ee] shadow-2xl ring-1 ring-black/5">
+      <div className="flex h-full max-h-[92vh] w-full max-w-7xl overflow-hidden rounded-[30px] bg-slate-50 shadow-2xl ring-1 ring-black/5">
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b border-black/10 bg-[#0f172a] px-6 py-4 text-white">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-[#0f172a] px-6 py-4 text-white">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-sky-300/15 p-2 text-sky-200">
+            <div className="rounded-xl bg-violet-500/15 p-2 text-violet-300">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
@@ -324,11 +324,11 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
           </div>
         </div>
 
-        <div className="border-b border-black/10 bg-white/70 px-6 py-4">
+        <div className="border-b border-slate-200 bg-white px-6 py-4">
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-4 shadow-sm">
+            <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2">
-                <div className="rounded-xl bg-sky-100 p-2 text-sky-700">
+                <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
                   <Plus className="h-4 w-4" />
                 </div>
                 <div>
@@ -343,12 +343,12 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
                   onChange={(event) => setDraft(event.target.value)}
                   placeholder="例如：新增一个技能，工作日早上 7:30 通过小米音箱提醒我起床，法定节假日不提醒。"
                   rows={4}
-                  className="min-h-[104px] flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-sky-400"
+                  className="min-h-[104px] flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                 />
                 <button
                   onClick={handleCreateSkill}
                   disabled={creating || !draft.trim()}
-                  className="inline-flex min-w-[128px] items-center justify-center gap-2 self-stretch rounded-2xl bg-sky-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-w-[128px] items-center justify-center gap-2 self-stretch rounded-2xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   <span>{creating ? '创建中' : '新增技能'}</span>
@@ -375,7 +375,7 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="搜索技能名、描述、目录名或设备类型"
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400"
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               />
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
@@ -385,8 +385,8 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
                   </div>
                   <div className="mt-2 text-2xl font-semibold">{systemCount}</div>
                 </div>
-                <div className="rounded-2xl bg-sky-600 px-4 py-3 text-white">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-sky-100">
+                <div className="rounded-2xl bg-violet-600 px-4 py-3 text-white">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-violet-100">
                     <Bot className="h-3.5 w-3.5" />
                     <span>Custom</span>
                   </div>
@@ -398,7 +398,7 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
         </div>
 
         <div className="grid flex-1 gap-0 overflow-hidden md:grid-cols-2">
-          <div className="overflow-y-auto border-r border-black/10 bg-[#f8f6f0] px-6 py-5">
+          <div className="overflow-y-auto border-r border-slate-200 bg-slate-50 px-6 py-5">
             <SectionTitle title="System Skills" detail={`${filtered.system.length} visible`} />
             <div className="mt-4 space-y-3">
               {filtered.system.length ? filtered.system.map((skill) => (
@@ -409,7 +409,7 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
             </div>
           </div>
 
-          <div className="overflow-y-auto bg-[#f1ede4] px-6 py-5">
+          <div className="overflow-y-auto bg-white px-6 py-5">
             <SectionTitle title="Custom Skills" detail={`${filtered.custom.length} visible`} />
             <div className="mt-4 space-y-3">
               {filtered.custom.length ? filtered.custom.map((skill) => (
@@ -424,7 +424,7 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
 
         {selectedSkill ? (
           detailLoading ? (
-            <div className="flex h-full w-[420px] items-center justify-center border-l border-black/10 bg-white">
+            <div className="flex h-full w-[420px] items-center justify-center border-l border-slate-200 bg-white">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 正在加载技能详情...
@@ -439,7 +439,7 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
               onSave={handleSaveSkill}
             />
           ) : (
-            <div className="flex h-full w-[420px] flex-col border-l border-black/10 bg-white">
+            <div className="flex h-full w-[420px] flex-col border-l border-slate-200 bg-white">
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                 <h3 className="text-base font-semibold text-slate-800">编辑自定义技能</h3>
                 <button onClick={handleCloseEditor} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer">
