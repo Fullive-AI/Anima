@@ -2,11 +2,14 @@
 """Anima 记忆系统架构图 (L3 三层记忆) — Feishu 风格分层可视化"""
 
 import os
+
 import matplotlib
+
 matplotlib.use('Agg')
+import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
-import matplotlib.font_manager as fm
+
 
 # ── Chinese font setup ────────────────────────────────────────────────────────
 def _find_cjk_font() -> str | None:
