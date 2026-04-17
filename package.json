@@ -4,7 +4,7 @@
   "private": true,
   "description": "Make Every Hardware Intelligent",
   "scripts": {
-    "dev": "concurrently --kill-others --success first -n broker,backend,frontend -c yellow,blue,green \".venv/bin/amqtt -c amqtt.yaml\" \".venv/bin/python -m core.main\" \"pnpm --filter dashboard dev\"",
+    "dev": "node scripts/dev.mjs",
     "dev:frontend": "pnpm --filter dashboard dev",
     "dev:backend": ".venv/bin/python -m core.main",
     "dev:broker": ".venv/bin/amqtt -c amqtt.yaml",
