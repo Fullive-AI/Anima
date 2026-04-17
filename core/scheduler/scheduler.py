@@ -43,8 +43,9 @@ class Scheduler:
         try:
             await asyncio.gather(*self._tasks)
         except asyncio.CancelledError:
-            self.stop()
-            raise
+            if self._running:
+                self.stop()
+                raise
         finally:
             self._running = False
             if self._tasks:
