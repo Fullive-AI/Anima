@@ -13,14 +13,15 @@
   ![MQTT](https://img.shields.io/badge/MQTT-Broker-purple)
   ![Version](https://img.shields.io/badge/Version-0.1.0-orange)
 </div>
-
 <br/>
 
 **Anima** (Latin for "soul") is an open-source Agent OS that auto-discovers your hardware devices, equips each one with AI Skills, and lets them autonomously sense, decide, and collaborate — without requiring any manual configuration.
 
+![alt text](docs/images/anima-demo.gif)
+
 ---
 
-## 💡 Why Anima?
+## Why Anima?
 
 <div align="center">
 
@@ -66,7 +67,7 @@
 
 ---
 
-## 🚀 60-Second Quick Start
+## 60-Second Quick Start
 
 ```bash
 # Clone the repo
@@ -87,7 +88,7 @@ Open **http://localhost:3000** to see the Anima Dashboard.
 
 ### Connect Your Devices
 
-1. Click **⚙ Settings** (top-right gear icon)
+1. Click **Settings** (top-right gear icon)
 2. In **LLM Brain**, enter your API Key and model (or configure via `.env`)
 3. In **Xiaomi**, click **Generate QR Code**
 4. Open **Mi Home** on your phone and scan the QR code
@@ -95,7 +96,7 @@ Open **http://localhost:3000** to see the Anima Dashboard.
 
 > **Why QR scan?** Tokens are stored on Xiaomi's cloud servers. Local scanning finds devices but cannot retrieve tokens. QR login is the most reliable approach — no password, no captcha.
 
-Click **? Help** (top-right) for a full in-Dashboard guide.
+Click **Help** (top-right) for a full in-Dashboard guide.
 
 ### Prerequisites
 
@@ -104,49 +105,53 @@ Click **? Help** (top-right) for a full in-Dashboard guide.
 
 ---
 
-## 🧠 Core Architecture
+## Core Architecture
 
 Anima runs as a **single asyncio process** connected to a lightweight MQTT broker:
 
-```
-┌───────────────────────────────────────────┐
-│              Core (single process)         │
-│                                           │
-│  Discovery ──▶ EventBus ◀── Scheduler     │
-│                   │                       │
-│  Sensor / Chat ──▶ LLM Brain ◀── Memory   │
-│                   │                       │
-│    Dashboard · Chat API · MQTT Client     │
-└──────────────────┬────────────────────────┘
-                   │ MQTT
-            ┌──────┴──────┐
-            │  Mosquitto  │
-            └──┬─────┬────┘
-           MIoT    Matter   HA Bridge
-          Adapter  Adapter  (v0.2+)
-```
-
-```mermaid
-graph TD
-  A[Sensor Event / User Chat] --> B[EventBus]
-  B --> C{LLM Brain}
-  C --> D[Skill Loader: Load domain knowledge]
-  D --> E[LangGraph Planner]
-  E --> F[Skill Executor]
-  F --> G[Device Adapter: MIoT / Matter]
-  G --> H[Physical Device]
-  F --> I[Memory Extractor]
-  I --> J[(preferences.md + learned.json)]
-  J --> E
-
-  style C fill:#6366f1,stroke:#4f46e5,color:#fff
-  style E fill:#0891b2,stroke:#0e7490,color:#fff
-  style J fill:#059669,stroke:#047857,color:#fff
-```
+<img src="docs/images/arch.jpg" alt="Anima Architecture" width="100%" />
 
 ---
 
-## ✨ What's Included
+## System Overview
+
+<img src="images/system-overview.png" alt="System Overview" width="100%" />
+
+---
+
+## Event-Driven Architecture
+
+The **EventBus** is the nervous system of Anima — all modules communicate through it via publish/subscribe, with error isolation per subscriber.
+
+<img src="images/event-driven.png" alt="Event-Driven Architecture" width="100%" />
+
+---
+
+## Skill Decision Flow
+
+When a sensor event or user chat arrives, the LLM Brain loads domain knowledge, plans actions via LangGraph, executes skills, verifies device state, and updates learned profiles.
+
+<img src="images/skill-flow.png" alt="Skill Decision Flow" width="100%" />
+
+---
+
+## Device Communication Flow
+
+Commands flow from the Dashboard through FastAPI to the MQTT broker, then through device adapters (MIoT / Matter) to physical devices. Discovery happens via mDNS or Xiaomi QR login.
+
+<img src="images/device-flow.png" alt="Device Communication Flow" width="100%" />
+
+---
+
+## Skill Ecosystem
+
+Each device type has a dedicated **Skill** — a domain knowledge package that teaches Anima how to make intelligent decisions. Skills are layered: System Skills (built-in) on the left, Custom Skills (user-created) on the right.
+
+<img src="images/skill-ecosystem.png" alt="Skill Ecosystem" width="100%" />
+
+---
+
+## What's Included
 
 | Module | Description |
 |--------|-------------|
@@ -163,15 +168,15 @@ graph TD
 
 ---
 
-## 🎯 Built-in Skills
+## Built-in Skills
 
 Each Skill is a **domain knowledge package** — not just an API wrapper. It teaches Anima *how* to make intelligent decisions for that device type:
 
 | Skill | Knowledge Includes |
 |-------|-------------------|
-| **Humidifier** | Comfort ranges (40–60%), seasonal adjustments, AC interaction, water level alerts |
+| **Humidifier** | Comfort ranges (40-60%), seasonal adjustments, AC interaction, water level alerts |
 | **Air Conditioner** | Energy optimization, circadian temperature scheduling, humidity coordination |
-| **Light** | Circadian lighting (2200K–5000K), time-of-day brightness curves, transition smoothness |
+| **Light** | Circadian lighting (2200K-5000K), time-of-day brightness curves, transition smoothness |
 | **Air Purifier** | Occupancy-aware purification, sleep-time quietness, air quality heuristics |
 | **Speaker** | Explicit playback-oriented behavior, quiet-hour protection, safe no-op defaults |
 | **Coordinator** | Cross-device orchestration — prevents conflicts, creates synergies |
@@ -204,7 +209,7 @@ Global planner policy can also be tuned in [`core/brain/prompts/planner_hints.md
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ```env
 # Required: any OpenAI-compatible API key
@@ -223,7 +228,7 @@ ANIMA_LLM_DISABLE_THINKING=false
 **Supported LLM Providers** (any OpenAI-compatible API):
 
 | Provider | `ANIMA_LLM_MODEL` | `ANIMA_LLM_BASE_URL` |
-|----------|-----------------|---------------------|
+|----------|-------------------|----------------------|
 | OpenAI | `gpt-4o` | *(leave empty)* |
 | Anthropic (via proxy) | `claude-sonnet-4-20250514` | your proxy URL |
 | DeepSeek | `deepseek-chat` | `https://api.deepseek.com/v1` |
@@ -232,7 +237,7 @@ ANIMA_LLM_DISABLE_THINKING=false
 
 ---
 
-## 🛠️ Development
+## Development
 
 | Command | Description |
 |---------|-------------|
@@ -247,7 +252,7 @@ FastAPI Swagger docs: `http://localhost:8080/docs`
 
 ---
 
-## 📡 REST API
+## REST API
 
 <details>
 <summary><strong>View all endpoints</strong></summary>
@@ -279,7 +284,7 @@ FastAPI Swagger docs: `http://localhost:8080/docs`
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Anima/
@@ -308,18 +313,18 @@ Anima/
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 | Version | Milestone | Key Features |
 |---------|-----------|-------------|
-| **v0.1** | "It's Alive" ✅ | Core framework, MIoT adapter, Dashboard, LangGraph brain, memory learning, CLI + API, Docker |
+| **v0.1** | "It's Alive" (done) | Core framework, MIoT adapter, Dashboard, LangGraph brain, memory learning, CLI + API, Docker |
 | v0.2 | "Getting Smarter" | Matter adapter, real-time WebSocket, preference learning, room management |
 | v0.3 | "Community Arrives" | Skill Store, adapter plugins, Telegram Bot, HA bridge |
 | v0.4 | "Getting Stronger" | Multi-user, Raspberry Pi image, security hardening |
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Anima is designed for easy contribution:
 
@@ -330,11 +335,11 @@ See the [Design Document](docs/plans/2026-03-17-anima-design.md) for full archit
 
 ---
 
-## 📝 License
+## License
 
 [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
 <div align="center">
   <br/>
-  <i>Made with ❤️ by the Anima Team</i>
+  <i>Made with love by the Anima Team</i>
 </div>

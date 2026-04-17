@@ -19,7 +19,7 @@ SYSTEM_PROMPT = """你是 Anima，一个智能家居助手。通过调用工具�
 - 需要控制设备时，先用 get_devices 找到设备，再用 execute_skill 执行
 - 需要了解环境时，用 get_environment 获取传感器数据
 - 不确定有哪些 skill 能力时，用 get_skill 按需查询
-- 任务完成后调用 reply 输出最终回复
+- 工具调用全部完成后，直接输出最终回复文本，无需调用任何工具
 - 回复使用中文，简洁友好
 
 在家/离家检测：
@@ -88,18 +88,7 @@ TOOLS: list[dict[str, Any]] = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "reply",
-            "description": "向用户发送最终回复并结束对话。",
-            "parameters": {
-                "type": "object",
-                "properties": {"text": {"type": "string", "description": "回复内容"}},
-                "required": ["text"],
-            },
-        },
-    },
+    # reply tool removed — agent now streams the final answer directly
 ]
 
 
@@ -149,29 +138,66 @@ class ReActAgent:
                 extra_body["thinking"] = {"type": "disabled"}
 
             try:
-                response = await self._llm.chat.completions.create(
+                stream = await self._llm.chat.completions.create(
                     model=self._model,
                     messages=messages,
                     tools=TOOLS,
                     tool_choice="auto",
                     temperature=0.1,
                     max_tokens=600,
+                    stream=True,
                     extra_body=extra_body or None,
                 )
             except Exception as exc:
                 yield AgentEvent(type="error", content=str(exc), step=step, done=True)
                 return
 
-            choice = response.choices[0] if response.choices else None
-            if not choice:
-                yield AgentEvent(type="error", content="LLM 返回空响应", step=step, done=True)
+            # Accumulate streaming response
+            collected_content = ""
+            collected_tool_calls: dict[int, dict[str, Any]] = {}
+            has_tool_calls = False
+
+            try:
+                async for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+
+                    # Stream content tokens — only when no tool calls have started yet
+                    if delta.content:
+                        collected_content += delta.content
+                        if not has_tool_calls:
+                            yield AgentEvent(type="chunk", content=delta.content, step=step)
+
+                    # Accumulate tool call deltas
+                    if delta.tool_calls:
+                        has_tool_calls = True
+                        for tc_delta in delta.tool_calls:
+                            idx = tc_delta.index
+                            if idx not in collected_tool_calls:
+                                collected_tool_calls[idx] = {
+                                    "id": tc_delta.id or "",
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc_delta.function.name or "" if tc_delta.function else "",
+                                        "arguments": tc_delta.function.arguments or "" if tc_delta.function else "",
+                                    },
+                                }
+                            else:
+                                if tc_delta.id:
+                                    collected_tool_calls[idx]["id"] = tc_delta.id
+                                if tc_delta.function:
+                                    if tc_delta.function.name:
+                                        collected_tool_calls[idx]["function"]["name"] += tc_delta.function.name
+                                    if tc_delta.function.arguments:
+                                        collected_tool_calls[idx]["function"]["arguments"] += tc_delta.function.arguments
+            except Exception as exc:
+                yield AgentEvent(type="error", content=str(exc), step=step, done=True)
                 return
 
-            msg = choice.message
-
-            # No tool call → final text reply
-            if not msg.tool_calls:
-                reply_text = msg.content or "我暂时没有需要执行的操作。"
+            # No tool calls → final text reply (already streamed as chunks above)
+            if not has_tool_calls:
+                reply_text = collected_content or "我暂时没有需要执行的操作。"
                 yield AgentEvent(
                     type="reply",
                     content=reply_text,
@@ -182,40 +208,30 @@ class ReActAgent:
                 return
 
             # Process tool calls
+            tool_calls_list = [collected_tool_calls[i] for i in sorted(collected_tool_calls.keys())]
             messages.append(
                 {
                     "role": "assistant",
-                    "content": msg.content,
+                    "content": collected_content or None,
                     "tool_calls": [
                         {
-                            "id": tc.id,
+                            "id": tc["id"],
                             "type": "function",
-                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                            "function": {"name": tc["function"]["name"], "arguments": tc["function"]["arguments"]},
                         }
-                        for tc in msg.tool_calls
+                        for tc in tool_calls_list
                     ],
                 }
             )
 
-            for tc in msg.tool_calls:
-                tool_name = tc.function.name
+            for tc in tool_calls_list:
+                tool_name = tc["function"]["name"]
                 try:
-                    args = json.loads(tc.function.arguments or "{}")
+                    args = json.loads(tc["function"]["arguments"] or "{}")
                 except json.JSONDecodeError:
                     args = {}
 
                 yield AgentEvent(type="action", tool=tool_name, args=args, step=step)
-
-                if tool_name == "reply":
-                    reply_text = args.get("text", "")
-                    yield AgentEvent(
-                        type="reply",
-                        content=reply_text,
-                        step=step,
-                        done=True,
-                        execution_results=execution_results,
-                    )
-                    return
 
                 obs, exec_result = await self._execute_tool(tool_name, args, app_state)
 
@@ -227,7 +243,7 @@ class ReActAgent:
                 messages.append(
                     {
                         "role": "tool",
-                        "tool_call_id": tc.id,
+                        "tool_call_id": tc["id"],
                         "content": obs,
                     }
                 )
