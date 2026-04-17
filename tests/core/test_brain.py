@@ -218,6 +218,12 @@ class TestBrain:
         expected = brain._derive_expected_state(command)
         assert expected == {"brightness": 60}
 
+    def test_derive_expected_state_normalizes_mode_text(self):
+        brain = Brain.__new__(Brain)
+        command = DeviceCommand(device_id="hum_01", action="set_mode", params={"mode": "Auto"})
+        expected = brain._derive_expected_state(command)
+        assert expected == {"mode": "auto"}
+
     async def test_execute_action_with_retry_verifies_state(self):
         brain = Brain.__new__(Brain)
         device = Device(

@@ -2073,7 +2073,7 @@ class Brain:
             if value is not None:
                 return {"target_temperature": value}
         if action == "set_mode" and "mode" in command.params:
-            return {"mode": command.params["mode"]}
+            return {"mode": self._normalize_expected_mode(command.params["mode"])}
         return {}
 
     @staticmethod
@@ -2082,6 +2082,28 @@ class Brain:
             if name in params:
                 return params[name]
         return None
+
+    @staticmethod
+    def _normalize_expected_mode(value: Any) -> Any:
+        name = getattr(value, "name", None)
+        if isinstance(name, str) and name:
+            value = name
+        elif hasattr(value, "value"):
+            value = getattr(value, "value")
+
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        aliases = {
+            "automatic": "auto",
+            "auto_mode": "auto",
+            "humidity": "auto",
+            "humidify": "auto",
+            "medium": "mid",
+            "middle": "mid",
+        }
+        return aliases.get(normalized, normalized)
 
     def _observe_expected_state(self, device: Device, expected_state: dict[str, Any]) -> dict[str, Any]:
         observed: dict[str, Any] = {}

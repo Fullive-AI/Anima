@@ -1,9 +1,20 @@
 import asyncio
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from core.main import Anima
-from core.models import Device, Event, EventType, Sensor
+from core.models import (
+    ActionVerificationResult,
+    BrainCycleResult,
+    Device,
+    Event,
+    EventType,
+    Sensor,
+    SkillActionSpec,
+    SkillExecutionResult,
+    SkillPlanItem,
+)
 from core.scheduler.scheduler import Scheduler
 
 
@@ -139,3 +150,52 @@ class TestMain:
         anima._ensure_cold_start_profiles.assert_awaited_once()
         anima._maybe_start_onboarding.assert_awaited_once()
         anima._run_brain_cycle_serially.assert_awaited_once()
+
+    async def test_brain_cycle_pushes_events_when_execution_results_exist_without_tasks(self):
+        queue: asyncio.Queue[str] = asyncio.Queue()
+        plan_item = SkillPlanItem(
+            skill_name="humidifier",
+            device_type="humidifier",
+            goal="提高室内湿度",
+            reason="当前湿度偏低",
+            priority=1,
+        )
+        action = SkillActionSpec(
+            skill_name="humidifier",
+            device_id="hum_01",
+            action="set_humidity",
+            params={"value": 50},
+            reason="当前湿度偏低",
+            expected_state={"target_humidity": 50},
+        )
+        verification = ActionVerificationResult(
+            device_id="hum_01",
+            action="set_humidity",
+            verified=True,
+            attempts=1,
+            status="unverifiable_but_executed",
+        )
+        cycle_result = BrainCycleResult(
+            execution_results=[
+                SkillExecutionResult(
+                    plan_item=plan_item,
+                    actions=[action],
+                    verifications=[verification],
+                )
+            ],
+        )
+
+        anima = Anima.__new__(Anima)
+        anima._app_state = {"_brain_event_queues": [queue]}
+        anima._brain_cycle_lock = asyncio.Lock()
+        anima._brain_cycle_pending = True
+        anima._brain_cycle_task = None
+        anima.brain = SimpleNamespace(run_cycle=AsyncMock(return_value=cycle_result))
+
+        await anima._drain_brain_cycles()
+
+        payload = json.loads(await asyncio.wait_for(queue.get(), timeout=1))
+        assert payload["type"] == "proactive_action"
+        assert payload["skill"] == "humidifier"
+        assert payload["action"] == "set_humidity"
+        assert payload["verification_passed"] is True

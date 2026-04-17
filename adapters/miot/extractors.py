@@ -10,7 +10,13 @@ except ImportError:
 
 def default_sensors(device_type: str, *, include_generic: bool = False) -> list[tuple[str, str]]:
     type_sensors = {
-        "humidifier": [("humidity", "%"), ("target_humidity", "%"), ("temperature", "°C"), ("water_level", "%")],
+        "humidifier": [
+            ("humidity", "%"),
+            ("target_humidity", "%"),
+            ("mode", ""),
+            ("temperature", "°C"),
+            ("water_level", "%"),
+        ],
         "air_conditioner": [("temperature", "°C")],
         "air_purifier": [
             ("pm2_5", "µg/m3"),
@@ -53,11 +59,12 @@ def _read_humidifier_status(status: Any) -> dict[str, Any]:
     if humidity is None:
         humidity = _read_status_field(status, "humidity")
     snapshot["humidity"] = humidity
-    snapshot["target_humidity"] = (
-        _read_status_field(status, "target_humidity")
-        or _read_status_field(status, "target_hum")
-        or _read_status_field(status, "limit_hum")
-        or _read_status_field(status, "depth")
+    snapshot["target_humidity"] = _first_status_field(
+        status,
+        ("target_humidity", "target_hum", "limit_hum", "HumiSet_Value", "depth"),
+    )
+    snapshot["mode"] = _normalize_mode_value(
+        _first_status_field(status, ("mode", "work_mode", "operation_mode", "Humidifier_Gear"))
     )
     snapshot["temperature"] = _read_status_field(status, "temperature")
 
@@ -158,6 +165,14 @@ def _read_status_field(status: Any, name: str) -> Any:
     return None
 
 
+def _first_status_field(status: Any, names: tuple[str, ...]) -> Any:
+    for name in names:
+        value = _read_status_field(status, name)
+        if value is not None:
+            return value
+    return None
+
+
 def _normalize_power_value(value: Any) -> bool | None:
     if isinstance(value, bool):
         return value
@@ -170,6 +185,46 @@ def _normalize_power_value(value: Any) -> bool | None:
     if isinstance(value, (int, float)):
         return bool(value)
     return None
+
+
+def _normalize_mode_value(value: Any) -> Any:
+    if value is None:
+        return None
+
+    name = getattr(value, "name", None)
+    if isinstance(name, str) and name:
+        return _normalize_mode_text(name)
+
+    raw_value = getattr(value, "value", None)
+    if raw_value is not None and raw_value is not value:
+        return _normalize_mode_value(raw_value)
+
+    if isinstance(value, str):
+        return _normalize_mode_text(value)
+
+    return value
+
+
+def _normalize_mode_text(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "automatic": "auto",
+        "auto_mode": "auto",
+        "humidity": "auto",
+        "humidify": "auto",
+        "low": "low",
+        "lvl1": "low",
+        "level1": "low",
+        "medium": "mid",
+        "middle": "mid",
+        "mid": "mid",
+        "lvl2": "mid",
+        "level2": "mid",
+        "high": "high",
+        "lvl3": "high",
+        "level3": "high",
+    }
+    return aliases.get(normalized, normalized)
 
 
 def _filter_none(snapshot: dict[str, Any]) -> dict[str, Any]:

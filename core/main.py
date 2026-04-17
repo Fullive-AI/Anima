@@ -341,7 +341,7 @@ class Anima:
                 self._brain_cycle_pending = False
                 result = await self.brain.run_cycle()
                 # Push proactive notifications to SSE subscribers
-                if result and result.task_plan_items:
+                if result and (result.task_plan_items or result.execution_results):
                     await self._push_brain_events(result)
 
     async def _push_brain_events(self, result: object) -> None:
