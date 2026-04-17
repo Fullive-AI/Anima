@@ -33,7 +33,6 @@ declare global {
 export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [, setFinalText] = useState('')
   const [supported] = useState(() => {
     if (typeof window === 'undefined') return true
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition)

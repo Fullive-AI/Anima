@@ -9,8 +9,8 @@ interface SkillsPanelProps {
 
 function SectionTitle({ title, detail }: { title: string; detail?: string }) {
   return (
-    <div className="flex items-end justify-between gap-3">
-      <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{title}</h3>
+    <div className="flex items-center justify-between gap-3">
+      <h3 className="text-sm font-medium uppercase tracking-wider text-slate-500">{title}</h3>
       {detail ? <span className="text-xs text-slate-400">{detail}</span> : null}
     </div>
   )
@@ -36,7 +36,7 @@ function SkillCard({
   const status = statusLabel(skill)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:bg-slate-50/70">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -47,7 +47,7 @@ function SkillCard({
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">{skill.description || 'No description provided.'}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${skill.scope === 'system' ? 'bg-violet-100 text-violet-700' : 'bg-violet-100 text-violet-700'}`}>
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${skill.scope === 'system' ? 'bg-slate-100 text-slate-600' : 'bg-violet-100 text-violet-700'}`}>
           {skill.scope === 'system' ? 'System' : 'Custom'}
         </span>
       </div>
@@ -79,7 +79,7 @@ function SkillCard({
         <div className="mt-4">
           <button
             onClick={() => onEdit(skill)}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 cursor-pointer"
           >
             <FilePenLine className="h-4 w-4" />
             编辑技能
@@ -294,39 +294,39 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 px-6 py-8 backdrop-blur-[3px]">
-      <div className="flex h-full max-h-[92vh] w-full max-w-7xl overflow-hidden rounded-[30px] bg-slate-50 shadow-2xl ring-1 ring-black/5">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 px-6 py-8">
+      <div className="flex h-full max-h-[92vh] w-full max-w-7xl overflow-hidden rounded-2xl bg-slate-50 shadow-xl ring-1 ring-slate-200">
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-[#0f172a] px-6 py-4 text-white">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-violet-500/15 p-2 text-violet-300">
+            <div className="rounded-xl bg-violet-100 p-2 text-violet-600">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Skills Center</h2>
-              <p className="text-sm text-slate-300">严格展示系统技能与真实落盘的自定义技能</p>
+              <h2 className="text-lg font-semibold text-slate-800">技能中心</h2>
+              <p className="text-sm text-slate-400">系统技能与真实落盘的自定义技能</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={refresh}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white transition hover:bg-white/15 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 cursor-pointer"
             >
               <RefreshCw className="h-4 w-4" />
               刷新
             </button>
             <button
               onClick={onClose}
-              className="rounded-xl p-2 text-slate-300 transition hover:bg-white/10 hover:text-white cursor-pointer"
+              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div className="border-b border-slate-200 bg-white px-6 py-4">
+        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <div className="rounded-xl bg-violet-100 p-2 text-violet-700">
                   <Plus className="h-4 w-4" />
@@ -343,12 +343,12 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
                   onChange={(event) => setDraft(event.target.value)}
                   placeholder="例如：新增一个技能，工作日早上 7:30 通过小米音箱提醒我起床，法定节假日不提醒。"
                   rows={4}
-                  className="min-h-[104px] flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                  className="min-h-[104px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                 />
                 <button
                   onClick={handleCreateSkill}
                   disabled={creating || !draft.trim()}
-                  className="inline-flex min-w-[128px] items-center justify-center gap-2 self-stretch rounded-2xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-w-[128px] items-center justify-center gap-2 self-stretch rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   <span>{creating ? '创建中' : '新增技能'}</span>
@@ -356,14 +356,14 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
               </div>
 
               {createReply ? (
-                <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+                <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
                   <span className="font-medium">Anima: </span>
                   {createReply}
                 </div>
               ) : null}
 
               {createError ? (
-                <div className="mt-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+                <div className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
                   {createError}
                 </div>
               ) : null}
@@ -375,22 +375,22 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="搜索技能名、描述、目录名或设备类型"
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               />
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-400">
                     <Cpu className="h-3.5 w-3.5" />
                     <span>System</span>
                   </div>
-                  <div className="mt-2 text-2xl font-semibold">{systemCount}</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-800">{systemCount}</div>
                 </div>
-                <div className="rounded-2xl bg-violet-600 px-4 py-3 text-white">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-violet-100">
+                <div className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-violet-400">
                     <Bot className="h-3.5 w-3.5" />
                     <span>Custom</span>
                   </div>
-                  <div className="mt-2 text-2xl font-semibold">{customCount}</div>
+                  <div className="mt-2 text-2xl font-semibold text-violet-700">{customCount}</div>
                 </div>
               </div>
             </div>
@@ -399,7 +399,7 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
 
         <div className="grid flex-1 gap-0 overflow-hidden md:grid-cols-2">
           <div className="overflow-y-auto border-r border-slate-200 bg-slate-50 px-6 py-5">
-            <SectionTitle title="System Skills" detail={`${filtered.system.length} visible`} />
+            <SectionTitle title="系统技能" detail={`${filtered.system.length} visible`} />
             <div className="mt-4 space-y-3">
               {filtered.system.length ? filtered.system.map((skill) => (
                 <SkillCard key={`system-${skill.folder_name}`} skill={skill} />
@@ -409,8 +409,8 @@ export default function SkillsPanel({ open, onClose }: SkillsPanelProps) {
             </div>
           </div>
 
-          <div className="overflow-y-auto bg-white px-6 py-5">
-            <SectionTitle title="Custom Skills" detail={`${filtered.custom.length} visible`} />
+          <div className="overflow-y-auto bg-slate-50 px-6 py-5">
+            <SectionTitle title="自定义技能" detail={`${filtered.custom.length} visible`} />
             <div className="mt-4 space-y-3">
               {filtered.custom.length ? filtered.custom.map((skill) => (
                 <SkillCard key={`custom-${skill.folder_name}`} skill={skill} onEdit={handleOpenEditor} />
