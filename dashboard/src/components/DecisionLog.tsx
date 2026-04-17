@@ -261,6 +261,13 @@ function normalizeAutoText(text?: string) {
     .replace(/([，。；])\s+/g, '$1')
 }
 
+function formatVerificationStatus(status?: string, passed?: boolean | null) {
+  if (!status) return ''
+  if (status === 'verified') return '\n\n状态：已验证'
+  if (status === 'unverifiable_but_executed') return '\n\n状态：已执行，设备未上报可验证状态'
+  return `\n\n状态：\`${status}\`${passed === false ? '，未通过验证' : ''}`
+}
+
 export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessageRef }: DecisionLogProps) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -279,9 +286,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
             ? formatActionSummary(data.action, data.skill || 'system', data.device_id, data.params || {})
             : normalizeAutoText(data.goal) || '系统自动执行'
           const reason = normalizeAutoText(data.reason)
-          const status = data.final_status
-            ? `\n\n状态：\`${data.final_status}\`${data.verification_passed === false ? '，未通过验证' : ''}`
-            : ''
+          const status = formatVerificationStatus(data.final_status, data.verification_passed)
           const reply = `**自动执行**：${title}${reason ? `\n\n> ${reason}` : ''}${status}`
           setConversation(prev => [...prev, {
             id: turnId,

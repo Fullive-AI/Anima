@@ -10,7 +10,7 @@ except ImportError:
 
 def default_sensors(device_type: str, *, include_generic: bool = False) -> list[tuple[str, str]]:
     type_sensors = {
-        "humidifier": [("humidity", "%"), ("temperature", "°C"), ("water_level", "%")],
+        "humidifier": [("humidity", "%"), ("target_humidity", "%"), ("temperature", "°C"), ("water_level", "%")],
         "air_conditioner": [("temperature", "°C")],
         "air_purifier": [
             ("pm2_5", "µg/m3"),
@@ -53,6 +53,12 @@ def _read_humidifier_status(status: Any) -> dict[str, Any]:
     if humidity is None:
         humidity = _read_status_field(status, "humidity")
     snapshot["humidity"] = humidity
+    snapshot["target_humidity"] = (
+        _read_status_field(status, "target_humidity")
+        or _read_status_field(status, "target_hum")
+        or _read_status_field(status, "limit_hum")
+        or _read_status_field(status, "depth")
+    )
     snapshot["temperature"] = _read_status_field(status, "temperature")
 
     water_level = _read_status_field(status, "water_level")

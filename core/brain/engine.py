@@ -808,6 +808,17 @@ class Brain:
             )
 
         observed = self._observe_expected_state(device, action_spec.expected_state)
+        if all(value is None for value in observed.values()):
+            return ActionVerificationResult(
+                device_id=action_spec.device_id,
+                action=action_spec.action,
+                verified=True,
+                attempts=attempts,
+                status="unverifiable_but_executed",
+                expected_state=action_spec.expected_state,
+                observed_state=observed,
+                message="expected state is not exposed by this device snapshot",
+            )
         verified = observed == action_spec.expected_state
         return ActionVerificationResult(
             device_id=action_spec.device_id,

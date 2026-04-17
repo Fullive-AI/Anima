@@ -259,6 +259,42 @@ class TestBrain:
         assert verification.status == "verified"
         assert verification.attempts == 1
 
+    async def test_execute_action_with_retry_treats_missing_expected_sensor_as_unverifiable(self):
+        brain = Brain.__new__(Brain)
+        device = Device(
+            device_id="hum_01",
+            name="Humidifier",
+            adapter="fake",
+            type="humidifier",
+            sensors=[Sensor(name="humidity", unit="%", value=43)],
+        )
+
+        class FakeDiscovery:
+            async def execute_command(self, device_id, action, params):
+                return type("Result", (), {"message": "", "success": True})()
+
+            async def refresh_device_states(self, device_ids=None):
+                return {"refreshed": 1, "failed": 0}
+
+            def get_device(self, device_id):
+                return device
+
+        verification = await brain._execute_action_with_retry(
+            SkillActionSpec(
+                skill_name="humidifier",
+                device_id="hum_01",
+                action="set_humidity",
+                params={"value": 50},
+                expected_state={"target_humidity": 50},
+            ),
+            FakeDiscovery(),
+        )
+
+        assert verification.verified is True
+        assert verification.status == "unverifiable_but_executed"
+        assert verification.attempts == 1
+        assert verification.observed_state == {"target_humidity": None}
+
     async def test_execute_action_with_retry_does_not_treat_failed_command_as_success(self):
         brain = Brain.__new__(Brain)
         device = Device(

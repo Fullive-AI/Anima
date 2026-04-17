@@ -47,11 +47,12 @@ class TestMIoTAdapter:
             sensors=[
                 Sensor(name="power", unit="on/off"),
                 Sensor(name="humidity", unit="%"),
+                Sensor(name="target_humidity", unit="%"),
                 Sensor(name="water_level", unit="%"),
             ],
         )
 
-        status = SimpleNamespace(is_on=True, humidity=48, water_level=75)
+        status = SimpleNamespace(is_on=True, humidity=48, target_humidity=55, water_level=75)
         miio_device = SimpleNamespace(status=lambda: status)
 
         with patch.object(adapter, "_get_miio_device", return_value=miio_device):
@@ -59,6 +60,7 @@ class TestMIoTAdapter:
 
         assert device.get_sensor("power").value is True
         assert device.get_sensor("humidity").value == 48
+        assert device.get_sensor("target_humidity").value == 55
         assert device.get_sensor("water_level").value == 75
 
     async def test_subscribe_refreshes_air_purifier_air_quality_sensors(self):
