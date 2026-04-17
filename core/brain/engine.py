@@ -886,6 +886,8 @@ class Brain:
         message: str = "",
     ) -> None:
         for task in sorted(task_plan_items, key=lambda item: item.priority):
+            if source == "scheduler" and task.kind == "reply":
+                continue
             entry = {
                 "record_type": "planner_task",
                 "source": source,

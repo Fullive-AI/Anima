@@ -76,7 +76,7 @@ class TestMain:
         anima.brain.run_cycle.assert_awaited_once()
         assert anima.discovery.updated == [("hum_01", {"humidity": 35})]
 
-    async def test_sensor_update_queues_follow_up_cycle_when_one_is_inflight(self):
+    async def test_sensor_update_burst_is_debounced_while_one_cycle_is_inflight(self):
         anima = Anima.__new__(Anima)
         device = Device(
             device_id="hum_01",
@@ -125,7 +125,7 @@ class TestMain:
         release.set()
         await first_task
 
-        assert anima.brain.run_cycle.await_count == 2
+        assert anima.brain.run_cycle.await_count == 1
         assert anima.discovery.updated == [("hum_01", {"humidity": 35})]
 
     async def test_bootstrap_startup_runs_brain_cycle_immediately(self):

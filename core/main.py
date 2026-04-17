@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 
 import uvicorn
 
@@ -67,6 +68,8 @@ class Anima:
         self._brain_cycle_lock = asyncio.Lock()
         self._brain_cycle_pending = False
         self._brain_cycle_task: asyncio.Task[None] | None = None
+        self._last_sensor_brain_cycle_request_at = 0.0
+        self._sensor_brain_cycle_min_interval_seconds = 55.0
 
         # Adapters
         adapters = (
@@ -242,8 +245,16 @@ class Anima:
         # Update cached sensor values
         self.discovery.update_device_sensors(device_id, sensor_data)
 
-        # Queue a serialized Brain cycle so sensor refreshes can drive planning
-        # without re-entering nested cycles during command verification.
+        # Sensor refresh may emit several updates in a burst. Run at most one
+        # Brain cycle per refresh window so no-op planner replies do not spam.
+        self._ensure_brain_cycle_state()
+        task = self._brain_cycle_task
+        if task is not None and not task.done():
+            return
+        now = time.monotonic()
+        if now - self._last_sensor_brain_cycle_request_at < self._sensor_brain_cycle_min_interval_seconds:
+            return
+        self._last_sensor_brain_cycle_request_at = now
         self._request_brain_cycle()
 
     async def _on_device_discovered(self, event: Event) -> None:
@@ -319,6 +330,10 @@ class Anima:
             self._brain_cycle_pending = False
         if not hasattr(self, "_brain_cycle_task"):
             self._brain_cycle_task = None
+        if not hasattr(self, "_last_sensor_brain_cycle_request_at"):
+            self._last_sensor_brain_cycle_request_at = 0.0
+        if not hasattr(self, "_sensor_brain_cycle_min_interval_seconds"):
+            self._sensor_brain_cycle_min_interval_seconds = 55.0
 
     def _request_brain_cycle(self) -> None:
         self._ensure_brain_cycle_state()

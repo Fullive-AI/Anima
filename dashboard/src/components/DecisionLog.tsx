@@ -294,6 +294,9 @@ function historyEntryToTurn(entry: Decision, index: number, recordedChatMessages
   if (recordType === 'planner_task') {
     const reply = stringParam(params.reply)
     const userMessage = stringParam(entry.message)
+    if (source === 'scheduler' && entry.task_kind === 'reply') {
+      return null
+    }
     if (source === 'chat' && userMessage && recordedChatMessages.has(userMessage)) {
       return null
     }
