@@ -347,7 +347,9 @@ class Brain:
             return {"reply": "聊天入口现在统一走模型决策，请先配置可用的 LLM。", "error": "llm_required"}
 
         result = await self._chat_graph.ainvoke({"message": text, "app_state": app_state})
-        return result.get("result", {"reply": "我暂时没有需要执行的操作。"})
+        payload = result.get("result", {"reply": "我暂时没有需要执行的操作。"})
+        await self._record_chat_turn(text, str(payload.get("reply", "")))
+        return payload
 
     async def handle_chat_message_stream(self, message: str, app_state: dict[str, Any]):
         """Streaming variant: yields SSE chunks via ReAct agentic loop."""
@@ -374,6 +376,7 @@ class Brain:
             async for chunk in self._stream_chitchat_reply(text):
                 reply_text += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
+            await self._record_chat_turn(text, reply_text)
             yield f"data: {json.dumps({'type': 'reply', 'content': reply_text, 'done': True}, ensure_ascii=False)}\n\n"
             return
 
@@ -389,6 +392,8 @@ class Brain:
         app_state_with_brain["brain"] = self
 
         async for event in agent.run(text, app_state_with_brain):
+            if event.done and event.type in {"reply", "error"}:
+                await self._record_chat_turn(text, event.content)
             yield event.to_sse()
 
     async def _stream_unified_chat_once(self, message: str, app_state: dict[str, Any]):
@@ -396,9 +401,10 @@ class Brain:
         try:
             result = await self._chat_graph.ainvoke({"message": message, "app_state": app_state})
             payload = result.get("result", {"reply": "我暂时没有需要执行的操作。"})
+            reply = payload.get("reply", "") or "我已经处理完成。"
             event = {
                 "type": "reply",
-                "content": payload.get("reply", "") or "我已经处理完成。",
+                "content": reply,
                 "done": True,
             }
             for key in (
@@ -415,10 +421,27 @@ class Brain:
             ):
                 if key in payload:
                     event[key] = payload[key]
+            await self._record_chat_turn(message, reply)
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as exc:
             logger.exception("Unified chat stream failed")
             yield f"data: {json.dumps({'type': 'error', 'content': f'聊天请求执行失败：{exc}', 'done': True}, ensure_ascii=False)}\n\n"
+
+    async def _record_chat_turn(self, message: str, reply: str) -> None:
+        message = message.strip()
+        reply = reply.strip()
+        if not message and not reply:
+            return
+        await self._memory.append_history(
+            "default",
+            {
+                "record_type": "chat_turn",
+                "source": "chat",
+                "action": "chat.reply",
+                "message": message,
+                "params": {"reply": reply},
+            },
+        )
 
     async def _stream_chitchat_reply(self, message: str):
         """Stream a direct chitchat reply without full planner overhead."""

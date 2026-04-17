@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { Brain, Loader2, Send, Sparkles, Wrench, Clock, ChevronDown, ChevronRight } from 'lucide-react'
-import { type ChatExecutionResult, type ChatResponse } from '../hooks/useApi'
+import { api, type ChatExecutionResult, type ChatResponse, type Decision } from '../hooks/useApi'
 
 interface DecisionLogProps {
   onDevicesChanged: () => void
@@ -268,11 +268,102 @@ function formatVerificationStatus(status?: string, passed?: boolean | null) {
   return `\n\n状态：\`${status}\`${passed === false ? '，未通过验证' : ''}`
 }
 
+function stringParam(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function historyEntryToTurn(entry: Decision, index: number, recordedChatMessages: Set<string>): ConversationTurn | null {
+  const recordType = stringParam(entry.record_type)
+  const source = stringParam(entry.source)
+  const params = entry.params || {}
+  const timestamp = entry.timestamp || new Date().toISOString()
+
+  if (recordType === 'chat_turn') {
+    const userMessage = stringParam(entry.message)
+    const reply = stringParam(params.reply)
+    if (!userMessage && !reply) return null
+    return {
+      id: `history-chat-${timestamp}-${index}`,
+      timestamp,
+      userMessage,
+      result: { reply: reply || '已处理完成。' },
+      trace: [],
+    }
+  }
+
+  if (recordType === 'planner_task') {
+    const reply = stringParam(params.reply)
+    const userMessage = stringParam(entry.message)
+    if (source === 'chat' && userMessage && recordedChatMessages.has(userMessage)) {
+      return null
+    }
+    if (entry.task_kind === 'reply' && reply) {
+      return {
+        id: `history-reply-${timestamp}-${index}`,
+        timestamp,
+        userMessage: source === 'chat' ? userMessage : '',
+        result: { reply },
+        trace: [],
+        isProactive: source !== 'chat',
+      }
+    }
+    return null
+  }
+
+  if (entry.device_id && entry.action) {
+    const title = formatActionSummary(entry.action, entry.skill_name || 'system', entry.device_id, params)
+    const reason = normalizeAutoText(entry.reason)
+    const status = formatVerificationStatus(stringParam(entry.final_status), entry.verification_passed)
+    return {
+      id: `history-action-${timestamp}-${index}`,
+      timestamp,
+      userMessage: '',
+      result: { reply: `**自动执行**：${title}${reason ? `\n\n> ${reason}` : ''}${status}` },
+      trace: [],
+      isProactive: true,
+    }
+  }
+
+  return null
+}
+
+function historyEntriesToTurns(entries: Decision[]): ConversationTurn[] {
+  const recordedChatMessages = new Set(
+    entries
+      .filter((entry) => entry.record_type === 'chat_turn')
+      .map((entry) => stringParam(entry.message))
+      .filter(Boolean),
+  )
+  return entries
+    .map((entry, index) => historyEntryToTurn(entry, index, recordedChatMessages))
+    .filter((turn): turn is ConversationTurn => Boolean(turn))
+}
+
 export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessageRef }: DecisionLogProps) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [conversation, setConversation] = useState<ConversationTurn[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
+  const restoredHistoryRef = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const restoreHistory = async () => {
+      try {
+        const decisions = await api.getDecisions()
+        if (cancelled || restoredHistoryRef.current) return
+        const turns = historyEntriesToTurns(decisions).slice(-30)
+        if (turns.length) {
+          setConversation((current) => current.length ? current : turns)
+        }
+        restoredHistoryRef.current = true
+      } catch {
+        restoredHistoryRef.current = true
+      }
+    }
+    void restoreHistory()
+    return () => { cancelled = true }
+  }, [])
 
   // Subscribe to proactive brain events via SSE
   useEffect(() => {

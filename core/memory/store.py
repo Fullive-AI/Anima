@@ -667,11 +667,14 @@ class MemoryStore:
 
     async def get_full_context(self, user_id: str = "default") -> dict[str, Any]:
         """完整版上下文(仅供后台任务/偏好学习/测试使用，禁止在 LLM 对话中直接调用)。"""
+        learned_profiles = await self.get_learned_profiles(user_id)
         return {
             "preferences": await self.get_preferences(user_id),
             "history": await self.get_history(user_id, limit=10),
-            "learned_profiles": await self.get_learned_profiles(user_id),
+            "learned": learned_profiles,
+            "learned_profiles": learned_profiles,
             "memory_manifest": await self.get_memory_manifest(user_id),
+            "extracted_memories": await self.get_extracted_memories(user_id),
         }
 
     async def get_planner_context(self, user_id: str = "default") -> dict[str, Any]:

@@ -32,7 +32,9 @@ export interface Device {
 }
 
 export interface Decision {
+  record_type?: string
   timestamp?: string
+  skill_name?: string
   device_id?: string
   device_type?: string
   action?: string
@@ -42,6 +44,8 @@ export interface Decision {
   message?: string
   task_kind?: string
   source?: string
+  verification_passed?: boolean | null
+  final_status?: string
 }
 
 export interface ChatTaskPlanItem {
