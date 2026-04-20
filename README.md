@@ -19,6 +19,37 @@
 
 ![alt text](docs/images/anima-demo.gif)
 
+
+# Core Highlights
+1. **Autonomous Perception & Intelligent Generation**
+The system actively discovers smart devices on the local area network, automatically generates executable Skills based on device characteristics and professional knowledge, enabling state perception, capability access, and behavior sequence management to achieve global self-driving operation.
+
+2. **Event-Driven & Unified Scheduling**
+With unified scheduling via an event bus and scheduled tasks, the system responds swiftly to critical events, realizing end-to-end automated control and intelligent scheduling.
+
+3. **Brain-Centric Adaptive Decision-Making & Evolution**
+The central Brain module integrates memory evolution, strategy optimization, and self-learning, driving the system’s intelligent leap from passive execution to active service, and delivering a true smart steward experience.
+
+# Memory Management
+1. **Hierarchical Storage & Efficient Retrieval**
+A multi-layered Memory architecture ensures long-term retention, fast retrieval, and controllable context, building a high-efficiency knowledge management system.
+
+2. **On-Demand Loading & Precise Reasoning**
+Memories are split by device or scenario and loaded only for the current context, preventing information bloat while significantly improving reasoning efficiency.
+
+3. **Human-like "Dreaming" & Self-Optimization**
+The system continuously extracts, compresses, and reorganizes memories in the background, enabling uninterrupted long-term self-evolution and empowering sustained system growth.
+
+# Skill Management
+1. **Modularity & Standardization**
+The Skill framework covers knowledge, decision-making, learning, and action execution with full decoupling, supporting system unification, scalability, and reusability.
+
+2. **Self-Expanding Skill Creator**
+For natural language interactions or new device access, the system automatically generates supplementary Skills to dynamically expand its capability boundaries.
+
+3. **Self-Evolving Intelligent Skills**
+By learning user preferences from memory, behavior strategies are dynamically optimized, enabling devices to exhibit human-like and continuously evolving intelligent behaviors.
+
 ---
 
 ## Why Anima?
