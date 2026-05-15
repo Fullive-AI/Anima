@@ -136,6 +136,43 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                     return True
         return False
 
+    def migrate_device_id(old_id: str, new_id: str, device: Any, adapter: Any) -> None:
+        # pending/local 设备输入 token 后会变成 token-based ID；这里同步迁移运行时索引。
+        if old_id == new_id:
+            return
+
+        discovery = app_state["discovery"]
+        store = app_state["settings"]
+
+        discovery.devices.pop(old_id, None)
+        discovery._adapter_map.pop(old_id, None)
+        device.device_id = new_id
+        discovery.devices[new_id] = device
+        discovery._adapter_map[new_id] = adapter
+
+        infos = getattr(adapter, "_device_infos", None)
+        if isinstance(infos, dict):
+            old_info = infos.pop(old_id, {})
+            if old_info and new_id not in infos:
+                infos[new_id] = old_info
+
+        known_devices = getattr(adapter, "_known_devices", None)
+        if isinstance(known_devices, dict):
+            # ID 或连接参数变化后，旧 miio 实例不能继续复用。
+            known_devices.pop(old_id, None)
+            known_devices.pop(new_id, None)
+
+        known_keys = getattr(adapter, "_known_device_keys", None)
+        if isinstance(known_keys, dict):
+            known_keys.pop(old_id, None)
+            known_keys.pop(new_id, None)
+
+        device_rooms = store.get("device_rooms", {})
+        if old_id in device_rooms and new_id not in device_rooms:
+            # 保留用户在 Dashboard 里设置过的房间绑定。
+            device_rooms[new_id] = device_rooms.pop(old_id)
+            store.set("device_rooms", device_rooms)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -646,33 +683,51 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         if not miot:
             return {"success": False, "error": "MIoT adapter not found"}
 
-        # Try to probe the device to get model info
+        token = req.token.strip().lower()
+        if not miot._is_valid_token(token):
+            return {"success": False, "error": "Token must be a 32-character hexadecimal MIoT token"}
+
+        # 手动添加改为强校验：token 无法控制该 IP 时不再保存假在线设备。
         model = "manual"
         try:
             import miio
 
-            dev = miio.Device(ip=req.ip, token=req.token)
+            dev = miio.Device(ip=req.ip, token=token)
             info = dev.info()
             model = info.model or "manual"
-        except Exception:
-            pass  # probe failed, use manual defaults
+        except Exception as exc:
+            return {"success": False, "error": f"Token verification failed: {exc}"}
 
         device_type = req.device_type if req.device_type != "unknown" else miot._guess_device_type(model)
-        device_id = miot._build_device_id(req.ip, model)
+        # 手动输入直接使用 token-based ID，避免 IP 变化后生成另一台设备。
+        device_id = miot._build_device_id(req.ip, model, token=token)
         name = req.name or f"{model} ({req.ip})"
 
-        device = Device(
-            device_id=device_id,
-            name=name,
-            adapter="miot",
-            type=device_type,
-            online=True,
-            capabilities=miot._build_capabilities(model, has_token=True),
-            sensors=miot._default_sensors(device_type),
-        )
+        existing = discovery.devices.get(device_id)
+        if existing:
+            # 同 token 设备已存在时只更新连接信息和展示信息。
+            device = existing
+            device.name = name
+            device.type = device_type
+            device.online = True
+            device.capabilities = miot._build_capabilities(model, has_token=True)
+            device.sensors = miot._default_sensors(device_type)
+        else:
+            device = Device(
+                device_id=device_id,
+                name=name,
+                adapter="miot",
+                type=device_type,
+                online=True,
+                capabilities=miot._build_capabilities(model, has_token=True),
+                sensors=miot._default_sensors(device_type),
+            )
 
         # Register in discovery + adapter
-        miot._device_infos[device_id] = {"ip": req.ip, "token": req.token, "model": model}
+        miot._set_device_info(
+            device_id,
+            {"ip": req.ip, "token": token, "model": model, "source": "manual", "needs_token": False},
+        )
         if device_id not in discovery.devices:
             discovery.devices[device_id] = device
             discovery._adapter_map[device_id] = miot
@@ -686,12 +741,17 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
         # Save to persistent config
         manual_devices = store.get("manual_devices", [])
-        # Avoid duplicates
-        manual_devices = [d for d in manual_devices if d.get("ip") != req.ip]
+        # 同 IP 或同 token 的旧 manual 记录都移除，避免下次启动重复加载。
+        manual_devices = [
+            d
+            for d in manual_devices
+            if d.get("ip") != req.ip and str(d.get("token", "")).strip().lower() != token
+        ]
         manual_devices.append(
             {
+                "device_id": device_id,
                 "ip": req.ip,
-                "token": req.token,
+                "token": token,
                 "name": name,
                 "device_type": device_type,
                 "model": model,
@@ -734,26 +794,40 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         if not ip:
             return {"success": False, "error": "Device IP unknown"}
 
-        # Try to probe device with the provided token
+        token = req.token.strip().lower()
+        if not miot._is_valid_token(token):
+            return {"success": False, "error": "Token must be a 32-character hexadecimal MIoT token"}
+
+        # 激活扫描设备时强校验 token，成功后才能从 pending ID 迁移到 token ID。
         model = "xiaomi.device"
         device_type = "unknown"
         try:
-            dev = miio_lib.Device(ip=ip, token=req.token)
+            dev = miio_lib.Device(ip=ip, token=token)
             dev_info = dev.info()
             model = dev_info.model or model
             device_type = miot._guess_device_type(model)
         except Exception as e:
             return {"success": False, "error": f"Token verification failed: {e}"}
 
+        # 输入 token 后得到最终 token-based ID；这可能不同于原来的 miot_pending_{did}。
+        new_device_id = miot._build_device_id(token=token, did=info.get("did", ""), ip=ip, model=model)
+        migrate_device_id(device_id, new_device_id, device, miot)
+
         # Update device info
-        miot._device_infos[device_id] = {
-            "ip": ip,
-            "token": req.token,
-            "model": model,
-            "did": info.get("did", ""),
-        }
+        miot._set_device_info(
+            new_device_id,
+            {
+                "ip": ip,
+                "token": token,
+                "model": model,
+                "did": info.get("did", ""),
+                "source": "activated",
+                "needs_token": False,
+            },
+        )
 
         # Update device object
+        device.device_id = new_device_id
         device.name = f"{model} ({ip})"
         device.type = device_type
         device.capabilities = miot._build_capabilities(model, has_token=True)
@@ -761,14 +835,21 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
         # Save as manual device for persistence
         manual_devices = store.get("manual_devices", [])
-        manual_devices = [d for d in manual_devices if d.get("ip") != ip]
+        # 激活后的 token 已经是稳定身份；清掉同 IP/同 token 的旧记录。
+        manual_devices = [
+            d
+            for d in manual_devices
+            if d.get("ip") != ip and str(d.get("token", "")).strip().lower() != token
+        ]
         manual_devices.append(
             {
+                "device_id": new_device_id,
                 "ip": ip,
-                "token": req.token,
+                "token": token,
                 "name": device.name,
                 "device_type": device_type,
                 "model": model,
+                "did": info.get("did", ""),
             }
         )
         store.set("manual_devices", manual_devices)
@@ -779,7 +860,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
         return {
             "success": True,
-            "device_id": device_id,
+            "device_id": new_device_id,
             "name": device.name,
             "type": device_type,
             "model": model,
@@ -864,52 +945,64 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         store.set("xiaomi_cloud_devices", cloud_devices)
         store.set("xiaomi_cloud_country", region)
 
-        # Register devices — merge with existing local-discovered devices by IP
+        # Register devices — normalize to the token-based id and migrate any pending local row.
         discovery = app_state["discovery"]
         miot = next((a for a in discovery._adapters if isinstance(a, MIoTAdapter)), None)
         registered = 0
         updated = 0
         if miot:
-            # Build IP → existing device_id lookup
+            # Build IP/DID → existing device_id lookup for pending local/manual rows.
             ip_to_existing: dict[str, str] = {}
-            for did_key, info in miot._device_infos.items():
+            did_to_existing: dict[str, str] = {}
+            for existing_key, info in miot._device_infos.items():
                 if info.get("ip"):
-                    ip_to_existing[info["ip"]] = did_key
+                    ip_to_existing[info["ip"]] = existing_key
+                if info.get("did"):
+                    did_to_existing[str(info["did"])] = existing_key
 
             for cd in cloud_devices:
                 did = cd.get("did", "")
                 if not did:
                     continue
                 ip = cd.get("localip", "")
-                token = cd.get("token", "")
+                token = str(cd.get("token", "")).strip().lower()
                 model = cd.get("model", "unknown")
                 name = cd.get("name", model)
                 device_type = miot._guess_device_type(model)
-                has_token = bool(token) and token != "0" * 32
+                has_token = miot._is_valid_token(token)
+                # QR 登录拿到云端 token 后，cloud 设备也使用同一套 token-based ID。
+                device_id = miot._build_device_id(token=token, did=did, ip=ip, model=model)
 
-                # Check if this device already exists (matched by IP)
-                existing_id = ip_to_existing.get(ip) if ip else None
+                existing_id = discovery.devices.get(device_id) and device_id
+                if not existing_id:
+                    # 若之前只有 local pending 设备，则通过 did/ip 找到并迁移。
+                    existing_id = did_to_existing.get(str(did)) or (ip_to_existing.get(ip) if ip else None)
 
                 if existing_id and existing_id in discovery.devices:
                     # Update existing device with cloud data
                     device = discovery.devices[existing_id]
+                    if existing_id != device_id:
+                        migrate_device_id(existing_id, device_id, device, miot)
                     device.name = name
                     device.type = device_type
                     device.online = bool(cd.get("isOnline", False))
                     if has_token:
                         device.capabilities = miot._build_capabilities(model, has_token=True)
                         device.sensors = miot._default_sensors(device_type)
-                    miot._device_infos[existing_id] = {
-                        "ip": ip,
-                        "token": token,
-                        "model": model,
-                        "did": did,
-                        "needs_token": not has_token,
-                    }
+                    miot._set_device_info(
+                        device_id,
+                        {
+                            "ip": ip,
+                            "token": token if has_token else "",
+                            "model": model,
+                            "did": did,
+                            "source": "cloud_qr",
+                            "needs_token": not has_token,
+                        },
+                    )
                     updated += 1
                 else:
                     # New device from cloud
-                    device_id = f"miot_cloud_{did}"
                     device = Device(
                         device_id=device_id,
                         name=name,
@@ -919,13 +1012,17 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                         capabilities=miot._build_capabilities(model, has_token=has_token),
                         sensors=miot._default_sensors(device_type) if has_token else [],
                     )
-                    miot._device_infos[device_id] = {
-                        "ip": ip,
-                        "token": token,
-                        "model": model,
-                        "did": did,
-                        "needs_token": not has_token,
-                    }
+                    miot._set_device_info(
+                        device_id,
+                        {
+                            "ip": ip,
+                            "token": token if has_token else "",
+                            "model": model,
+                            "did": did,
+                            "source": "cloud_qr",
+                            "needs_token": not has_token,
+                        },
+                    )
                     if device_id not in discovery.devices:
                         discovery.devices[device_id] = device
                         discovery._adapter_map[device_id] = miot

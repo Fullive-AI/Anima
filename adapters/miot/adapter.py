@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 from typing import Any
 
 try:
@@ -57,6 +59,8 @@ class MIoTAdapter(BaseAdapter):
 
     def __init__(self, settings_store=None, speaker_player=None) -> None:
         self._known_devices: dict[str, Any] = {}
+        # token-based ID 后，同一个 device_id 的 IP 可能变化；这里记录缓存对应的连接参数。
+        self._known_device_keys: dict[str, tuple[str, str, str]] = {}
         self._device_infos: dict[str, dict] = {}
         self._settings = settings_store
         self._speaker_player = speaker_player
@@ -68,13 +72,99 @@ class MIoTAdapter(BaseAdapter):
                 return dtype
         return "unknown"
 
-    def _build_device_id(self, ip: str, model: str) -> str:
+    def _is_valid_token(self, token: str) -> bool:
+        token = str(token or "").strip().lower()
+        return bool(re.fullmatch(r"[0-9a-f]{32}", token)) and token != "0" * 32 and token != "f" * 32
+
+    def _build_device_id_from_token(self, token: str) -> str:
+        # 不把明文 token 暴露为 device_id；同一 token 的 hash 会稳定生成同一个展示 ID。
+        token = str(token or "").strip().lower()
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()[:12]
+        return f"miot_token_{digest}"
+
+    def _build_pending_device_id_from_did(self, did: str) -> str:
+        # 局域网扫描通常没有真实 token，先用 did 生成临时 ID，等激活后迁移到 token ID。
+        return f"miot_pending_{did}"
+
+    def _build_pending_device_id_from_ip(self, ip: str, model: str) -> str:
         safe_ip = ip.replace(".", "_")
-        safe_model = model.replace(".", "_")
-        return f"miot_{safe_ip}_{safe_model}"
+        safe_model = (model or "unknown").replace(".", "_")
+        return f"miot_pending_{safe_ip}_{safe_model}"
+
+    def _build_device_id(
+        self,
+        ip: str = "",
+        model: str = "",
+        *,
+        token: str = "",
+        did: str = "",
+    ) -> str:
+        token = str(token or "").strip().lower()
+        did = str(did or "").strip()
+
+        # 统一身份优先级：真实控制 token > did 临时身份 > ip/model 兜底临时身份。
+        if self._is_valid_token(token):
+            return self._build_device_id_from_token(token)
+        if did:
+            return self._build_pending_device_id_from_did(did)
+        return self._build_pending_device_id_from_ip(ip, model)
 
     def _build_device_id_from_did(self, did: str) -> str:
-        return f"miot_cloud_{did}"
+        return self._build_device_id(did=did)
+
+    def _cached_cloud_info_by_did(self) -> dict[str, dict[str, Any]]:
+        # 本地扫描只能稳定拿到 did/ip；用 did 到云端缓存里补 token/model/name。
+        if not self._settings:
+            return {}
+
+        result: dict[str, dict[str, Any]] = {}
+        for item in self._settings.get("xiaomi_cloud_devices", []) or []:
+            did = str(item.get("did", "")).strip()
+            token = str(item.get("token", "")).strip().lower()
+            if did and self._is_valid_token(token):
+                result[did] = dict(item)
+        return result
+
+    def _set_device_info(self, device_id: str, info: dict[str, Any]) -> None:
+        # 集中更新连接信息，并让旧 miio 实例失效，避免继续访问旧 IP。
+        current = dict(self._device_infos.get(device_id, {}))
+        current.update({key: value for key, value in info.items() if value not in (None, "")})
+        self._device_infos[device_id] = current
+        self._known_devices.pop(device_id, None)
+        self._known_device_keys.pop(device_id, None)
+
+    def _merge_device_object(self, target: Device, incoming: Device) -> Device:
+        target.name = incoming.name or target.name
+        if target.type == "unknown" or incoming.type != "unknown":
+            target.type = incoming.type
+        target.online = incoming.online
+        if incoming.capabilities:
+            target.capabilities = incoming.capabilities
+        if incoming.sensors:
+            target.sensors = incoming.sensors
+        return target
+
+    def _append_or_merge_discovered_device(
+        self,
+        devices: list[Device],
+        device: Device,
+        seen_ids: set[str],
+        seen_ips: set[str],
+    ) -> None:
+        # 不同来源可能归一到同一个 token ID；这里合并 Device 展示信息，避免重复展示。
+        info = self._device_infos.get(device.device_id, {})
+        ip = info.get("ip", "")
+        if ip:
+            seen_ips.add(ip)
+
+        if device.device_id in seen_ids:
+            existing = next((d for d in devices if d.device_id == device.device_id), None)
+            if existing is not None:
+                self._merge_device_object(existing, device)
+            return
+
+        seen_ids.add(device.device_id)
+        devices.append(device)
 
     async def _discover_cloud(self) -> list[Device]:
         if not self._settings:
@@ -111,8 +201,10 @@ class MIoTAdapter(BaseAdapter):
                     if not did:
                         continue
 
-                    device_id = self._build_device_id_from_did(did)
+                    # 云端能拿到 token 时直接生成最终 token-based ID。
+                    device_id = self._build_device_id(token=token, did=did, ip=ip, model=model)
                     device_type = self._guess_device_type(model)
+                    has_token = self._is_valid_token(token)
 
                     device = Device(
                         device_id=device_id,
@@ -120,18 +212,22 @@ class MIoTAdapter(BaseAdapter):
                         adapter=self.name,
                         type=device_type,
                         online=bool(is_online),
-                        capabilities=self._build_capabilities(model, has_token=True),
-                        sensors=self._default_sensors(device_type),
+                        capabilities=self._build_capabilities(model, has_token=has_token),
+                        sensors=self._default_sensors(device_type) if has_token else [],
                     )
                     devices.append(device)
 
-                    if ip and token and token != "0" * 32:
-                        self._device_infos[device_id] = {
+                    self._set_device_info(
+                        device_id,
+                        {
                             "ip": ip,
-                            "token": token,
+                            "token": token if has_token else "",
                             "model": model,
                             "did": did,
-                        }
+                            "source": "cloud",
+                            "needs_token": not has_token,
+                        },
+                    )
                 except Exception:
                     logger.exception("Failed to process cloud device: %s", cd.get("did", "?"))
         except Exception as exc:
@@ -157,8 +253,10 @@ class MIoTAdapter(BaseAdapter):
             name = cd.get("name", model)
             is_online = bool(cd.get("isOnline", False))
 
-            device_id = self._build_device_id_from_did(did)
+            # 启动时读取云端缓存也必须使用同一套 ID 规则，避免重启后回到旧 ID。
+            device_id = self._build_device_id(token=token, did=did, ip=ip, model=model)
             device_type = self._guess_device_type(model)
+            has_token = self._is_valid_token(token)
             devices.append(
                 Device(
                     device_id=device_id,
@@ -166,17 +264,22 @@ class MIoTAdapter(BaseAdapter):
                     adapter=self.name,
                     type=device_type,
                     online=is_online,
-                    capabilities=self._build_capabilities(model, has_token=bool(token and token != "0" * 32)),
-                    sensors=self._default_sensors(device_type),
+                    capabilities=self._build_capabilities(model, has_token=has_token),
+                    sensors=self._default_sensors(device_type) if has_token else [],
                 )
             )
 
-            self._device_infos[device_id] = {
-                "ip": ip,
-                "token": token,
-                "model": model,
-                "did": did,
-            }
+            self._set_device_info(
+                device_id,
+                {
+                    "ip": ip,
+                    "token": token if has_token else "",
+                    "model": model,
+                    "did": did,
+                    "source": "cloud_cache",
+                    "needs_token": not has_token,
+                },
+            )
 
         if devices:
             logger.info("Loaded %d cached Xiaomi cloud devices from config", len(devices))
@@ -189,6 +292,8 @@ class MIoTAdapter(BaseAdapter):
         hello = bytes.fromhex("21310020ffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
         port = 54321
         devices: list[Device] = []
+        # local scan 若没有 token，会尝试用 did 从云端缓存补齐 token。
+        cloud_info_by_did = self._cached_cloud_info_by_did()
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -206,42 +311,57 @@ class MIoTAdapter(BaseAdapter):
                         continue
 
                     did = struct.unpack(">I", data[8:12])[0]
+                    did_str = str(did)
                     token_bytes = data[16:32]
                     token = token_bytes.hex()
-                    has_token = token != "0" * 32 and token != "f" * 32
-                    device_id = f"miot_local_{did}"
+                    has_token = self._is_valid_token(token)
+                    cloud_info = cloud_info_by_did.get(did_str, {})
+                    cloud_token = str(cloud_info.get("token", "")).strip().lower()
+                    # 真实扫描 token 优先；多数设备会返回空 token，此时用云端缓存 token。
+                    resolved_token = token if has_token else cloud_token
 
-                    model = "xiaomi.device"
+                    model = str(cloud_info.get("model", "") or "xiaomi.device")
+                    name = str(cloud_info.get("name", "") or "")
                     device_type = "unknown"
-                    if has_token:
+                    if self._is_valid_token(resolved_token):
                         try:
-                            dev = miio.Device(ip=ip, token=token)
+                            dev = miio.Device(ip=ip, token=resolved_token)
                             info = dev.info()
                             model = info.model or model
                             device_type = self._guess_device_type(model)
                         except Exception:
                             logger.debug("Failed to inspect local MIoT model for %s", ip, exc_info=True)
+                            device_type = self._guess_device_type(model)
 
-                    name = f"小米设备 ({ip})" if not has_token else f"{model} ({ip})"
+                    has_resolved_token = self._is_valid_token(resolved_token)
+                    # 有 token 就归一到最终 ID；没有 token 就保留 pending DID ID 等待激活。
+                    device_id = self._build_device_id(token=resolved_token, did=did_str, ip=ip, model=model)
+
+                    if not name:
+                        name = f"小米设备 ({ip})" if not has_resolved_token else f"{model} ({ip})"
                     device = Device(
                         device_id=device_id,
                         name=name,
                         adapter=self.name,
                         type=device_type,
                         online=True,
-                        capabilities=self._build_capabilities(model, has_token=has_token),
-                        sensors=self._default_sensors(device_type) if has_token else [],
+                        capabilities=self._build_capabilities(model, has_token=has_resolved_token),
+                        sensors=self._default_sensors(device_type) if has_resolved_token else [],
                     )
                     devices.append(device)
 
-                    base_info = {"ip": ip, "token": token if has_token else "", "model": model, "did": str(did)}
-                    if has_token:
-                        self._device_infos[device_id] = base_info
-                    else:
-                        self._device_infos[device_id] = {**base_info, "needs_token": True}
+                    base_info = {
+                        "ip": ip,
+                        "token": resolved_token if has_resolved_token else "",
+                        "model": model,
+                        "did": did_str,
+                        "source": "local",
+                        "needs_token": not has_resolved_token,
+                    }
+                    self._set_device_info(device_id, base_info)
 
                     logger.info(
-                        "Local scan: ip=%s did=%d token=%s", ip, did, "available" if has_token else "needs_setup"
+                        "Local scan: ip=%s did=%d token=%s", ip, did, "available" if has_resolved_token else "needs_setup"
                     )
                 except TimeoutError:
                     break
@@ -265,7 +385,10 @@ class MIoTAdapter(BaseAdapter):
             model = md.get("model", "manual")
             name = md.get("name", f"{model} ({ip})")
             device_type = md.get("device_type", self._guess_device_type(model))
-            device_id = self._build_device_id(ip, model)
+            did = str(md.get("did", "")).strip()
+            # 手动设备重启加载时也重新计算 token ID，不信任旧配置里的历史 device_id。
+            device_id = self._build_device_id(ip, model, token=token, did=did)
+            has_token = self._is_valid_token(token)
 
             device = Device(
                 device_id=device_id,
@@ -273,11 +396,21 @@ class MIoTAdapter(BaseAdapter):
                 adapter=self.name,
                 type=device_type,
                 online=True,
-                capabilities=self._build_capabilities(model, has_token=True),
-                sensors=self._default_sensors(device_type),
+                capabilities=self._build_capabilities(model, has_token=has_token),
+                sensors=self._default_sensors(device_type) if has_token else [],
             )
             devices.append(device)
-            self._device_infos[device_id] = {"ip": ip, "token": token, "model": model}
+            self._set_device_info(
+                device_id,
+                {
+                    "ip": ip,
+                    "token": token if has_token else "",
+                    "model": model,
+                    "did": did,
+                    "source": "manual",
+                    "needs_token": not has_token,
+                },
+            )
 
         if manual:
             logger.info("Loaded %d manual devices from config", len(manual))
@@ -291,50 +424,29 @@ class MIoTAdapter(BaseAdapter):
         seen_ids: set[str] = set()
         devices: list[Device] = []
 
+        # 三种来源统一进入 append/merge，token ID 相同的设备会被合并。
         manual = await self._load_manual_devices()
         for device in manual:
-            info = self._device_infos.get(device.device_id, {})
-            if info.get("ip"):
-                seen_ips.add(info["ip"])
-            seen_ids.add(device.device_id)
-        devices.extend(manual)
+            self._append_or_merge_discovered_device(devices, device, seen_ids, seen_ips)
 
         cached_cloud = await self._load_cached_cloud_devices()
         for device in cached_cloud:
-            info = self._device_infos.get(device.device_id, {})
-            ip = info.get("ip", "")
-            if device.device_id in seen_ids:
-                continue
-            if ip and ip not in seen_ips:
-                seen_ips.add(ip)
-            seen_ids.add(device.device_id)
-            devices.append(device)
+            self._append_or_merge_discovered_device(devices, device, seen_ids, seen_ips)
 
         cloud = await self._discover_cloud()
         for device in cloud:
-            info = self._device_infos.get(device.device_id, {})
-            ip = info.get("ip", "")
-            if device.device_id in seen_ids:
-                continue
-            if ip and ip in seen_ips:
-                continue
-            if ip:
-                seen_ips.add(ip)
-            seen_ids.add(device.device_id)
-            devices.append(device)
+            self._append_or_merge_discovered_device(devices, device, seen_ids, seen_ips)
 
         local = await self._discover_local()
         for device in local:
             info = self._device_infos.get(device.device_id, {})
             ip = info.get("ip", "")
             if device.device_id in seen_ids:
+                self._append_or_merge_discovered_device(devices, device, seen_ids, seen_ips)
                 continue
             if ip and ip in seen_ips:
                 continue
-            if ip:
-                seen_ips.add(ip)
-            seen_ids.add(device.device_id)
-            devices.append(device)
+            self._append_or_merge_discovered_device(devices, device, seen_ids, seen_ips)
 
         logger.info(
             "MIoT discovered %d devices total (%d manual, %d cloud, %d local)",
@@ -354,13 +466,20 @@ class MIoTAdapter(BaseAdapter):
             return None
 
         expected_cls = resolve_device_path(info.get("model", "")).device_class
+        # token-based ID 下 IP 会被 local scan 更新；缓存 key 不一致时必须重建 miio 连接对象。
+        cache_key = (
+            str(info.get("ip", "")),
+            str(info.get("token", "")),
+            str(info.get("model", "")),
+        )
         cached = self._known_devices.get(device_id)
-        if cached is not None and isinstance(cached, expected_cls):
+        if cached is not None and isinstance(cached, expected_cls) and self._known_device_keys.get(device_id) == cache_key:
             return cached
 
         try:
             dev = create_device_instance(info)
             self._known_devices[device_id] = dev
+            self._known_device_keys[device_id] = cache_key
             return dev
         except Exception:
             logger.exception("Failed to create miio device for %s", device_id)
