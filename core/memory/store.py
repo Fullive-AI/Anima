@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from core.memory.history_filter import HistoryFilter
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_PREFERENCES = """# 用户偏好
@@ -53,6 +55,7 @@ def _device_type_sort_key(device_type: str) -> tuple[int, str]:
 class MemoryStore:
     def __init__(self, base_dir: str = "data/memory") -> None:
         self._base = Path(base_dir)
+        self._history_filter = HistoryFilter()
 
     def _user_dir(self, user_id: str) -> Path:
         d = self._base / "users" / user_id
@@ -381,7 +384,22 @@ class MemoryStore:
         data = []
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
-        entry["timestamp"] = datetime.now(UTC).isoformat()
+        if not isinstance(data, list):
+            data = []
+
+        now = datetime.now(UTC)
+        recent_entries = [item for item in data[-30:] if isinstance(item, dict)]
+        # 写入前统一交给 history_filter 判断；当前只过滤重复 refresh_environment。
+        filter_result = self._history_filter.should_write(
+            entry=entry,
+            recent_entries=recent_entries,
+            now=now,
+        )
+        if not filter_result.should_write:
+            logger.debug("Skipped history entry: %s", filter_result.reason)
+            return
+
+        entry["timestamp"] = now.isoformat()
         data.append(entry)
         # Keep last 1000 entries
         if len(data) > 1000:
