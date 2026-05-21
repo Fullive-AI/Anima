@@ -6,9 +6,8 @@ import logging
 import re
 from typing import Any
 
-from openai import AsyncOpenAI
-
 from core.brain.skill_loader import SkillLoader
+from core.llm.runtime import LLMSnapshot, LLMRuntime
 from core.memory.store import MemoryStore
 from core.runtime.config import settings
 
@@ -76,16 +75,34 @@ def _extract_json(text: str) -> dict[str, Any] | None:
 class MemoryExtractionService:
     def __init__(self, memory: MemoryStore, *, skills_dir: str | None = None) -> None:
         self._memory = memory
-        self._llm = AsyncOpenAI(
+        self._llm_runtime = LLMRuntime(
             api_key=settings.llm_api_key,
-            base_url=settings.llm_base_url or None,
+            model=settings.llm_model,
+            base_url=settings.llm_base_url,
+            disable_thinking=settings.llm_disable_thinking,
         )
-        self._model = settings.llm_model
-        self._disable_thinking = settings.llm_disable_thinking
         self._skills_dir = skills_dir or settings.skills_dir
         self._lock = asyncio.Lock()
         self._pending: set[str] = set()
         self._tasks: dict[str, asyncio.Task[None]] = {}
+
+    async def reload_llm_config(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        base_url: str,
+        disable_thinking: bool,
+    ) -> bool:
+        return await self._llm_runtime.reload(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            disable_thinking=disable_thinking,
+        )
+
+    async def close(self) -> None:
+        await self._llm_runtime.close()
 
     def schedule(self, user_id: str = "default") -> None:
         self._pending.add(user_id)
@@ -125,7 +142,8 @@ class MemoryExtractionService:
         )
         if not recent_history:
             return writes > 0
-        if not settings.llm_api_key:
+        snapshot = self._llm_runtime.snapshot()
+        if not snapshot.configured:
             return writes > 0
 
         manifest = await self._memory.get_memory_manifest(user_id)
@@ -134,7 +152,12 @@ class MemoryExtractionService:
             manifest=manifest,
             custom_skills=custom_skills,
         )
-        content = await self._invoke_llm_text(prompt, temperature=0.1, max_tokens=1400)
+        content = await self._invoke_llm_text(
+            prompt,
+            temperature=0.1,
+            max_tokens=1400,
+            snapshot=snapshot,
+        )
         payload = _extract_json(content)
         if not payload:
             logger.warning("Memory extraction returned invalid JSON")
@@ -217,13 +240,21 @@ class MemoryExtractionService:
             "- Use snake_case topics.\n"
         )
 
-    async def _invoke_llm_text(self, prompt: str, *, temperature: float, max_tokens: int) -> str:
+    async def _invoke_llm_text(
+        self,
+        prompt: str,
+        *,
+        temperature: float,
+        max_tokens: int,
+        snapshot: LLMSnapshot | None = None,
+    ) -> str:
+        snapshot = snapshot or self._llm_runtime.snapshot()
         extra_body: dict[str, Any] = {}
-        if self._disable_thinking:
+        if snapshot.disable_thinking:
             extra_body["thinking"] = {"type": "disabled"}
 
-        response = await self._llm.chat.completions.create(
-            model=self._model,
+        response = await snapshot.client.chat.completions.create(
+            model=snapshot.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             max_tokens=max_tokens,

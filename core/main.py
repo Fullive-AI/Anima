@@ -17,6 +17,7 @@ from core.brain.engine import Brain
 from core.brain.skill_loader import SkillLoader
 from core.devices.discovery import DiscoveryOrchestrator
 from core.events.bus import EventBus
+from core.llm.config import resolve_llm_config
 from core.media.audio_registry import LocalAudioRegistry
 from core.media.xiaomi_speaker import XiaomiSpeakerPlayer
 from core.memory.extractor import MemoryExtractionService
@@ -96,6 +97,7 @@ class Anima:
             "discovery": self.discovery,
             "brain": self.brain,
             "memory": self.memory,
+            "memory_extractor": self.memory_extractor,
             "bus": self.bus,
             "settings": self.settings_store,
             "audio_registry": self.audio_registry,
@@ -103,6 +105,7 @@ class Anima:
             "_brain_event_queues": [],
         }
         self._app_state = app_state
+        await self._apply_runtime_llm_config(app_state)
 
         # Setup scheduled jobs
         self._register_scheduler_jobs()
@@ -123,6 +126,7 @@ class Anima:
                 scheduler_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await scheduler_task
+                await self._close_llm_runtime()
 
         elif mode == "full":
             # Run API server + scheduler
@@ -132,6 +136,25 @@ class Anima:
             server = uvicorn.Server(config)
 
             await self._run_full_mode(server, app_state)
+
+    async def _apply_runtime_llm_config(self, app_state: dict[str, object]) -> None:
+        config = resolve_llm_config(app_state["settings"])
+        await self.brain.reload_llm_config(
+            api_key=config.api_key,
+            model=config.model,
+            base_url=config.base_url,
+            disable_thinking=config.disable_thinking,
+        )
+        await self.memory_extractor.reload_llm_config(
+            api_key=config.api_key,
+            model=config.model,
+            base_url=config.base_url,
+            disable_thinking=config.disable_thinking,
+        )
+
+    async def _close_llm_runtime(self) -> None:
+        await self.brain.close()
+        await self.memory_extractor.close()
 
     async def _run_full_mode(self, server: uvicorn.Server, app_state: dict[str, object]) -> None:
         server_task = asyncio.create_task(server.serve(), name="uvicorn-server")
@@ -160,6 +183,7 @@ class Anima:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            await self._close_llm_runtime()
 
     async def _bootstrap_startup(self, app_state: dict[str, object]) -> None:
         logger.info("Starting Anima v0.1 — Make Every Hardware Intelligent")

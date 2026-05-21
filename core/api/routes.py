@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+from core.llm.config import resolve_llm_config
 from core.models import DeviceCommand
 
 logger = logging.getLogger(__name__)
@@ -1049,20 +1050,17 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
 
     @app.get("/api/settings/llm/status")
     async def llm_status():
-        from core.runtime.config import settings as env_settings
-
         store = app_state["settings"]
-        api_key = store.get("llm_api_key", "") or env_settings.llm_api_key
+        config = resolve_llm_config(store)
         # Mask key for display: show first 8 chars + ***
-        masked_key = (api_key[:8] + "***") if api_key else ""
-        disable_thinking = store.get("llm_disable_thinking", env_settings.llm_disable_thinking)
+        masked_key = (config.api_key[:8] + "***") if config.api_key else ""
         return {
-            "configured": bool(api_key),
+            "configured": bool(config.api_key),
             "masked_key": masked_key,
-            "model": store.get("llm_model", "") or env_settings.llm_model,
-            "base_url": store.get("llm_base_url", "") or env_settings.llm_base_url or "",
-            "disable_thinking": disable_thinking,
-            "source": "dashboard" if store.get("llm_api_key") else "env",
+            "model": config.model,
+            "base_url": config.base_url,
+            "disable_thinking": config.disable_thinking,
+            "source": config.source,
         }
 
     @app.post("/api/settings/llm/configure")
@@ -1076,6 +1074,33 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
                 "llm_disable_thinking": req.disable_thinking,
             }
         )
-        return {"success": True, "model": req.model}
+        config = resolve_llm_config(store)
+
+        brain = app_state.get("brain")
+        brain_reloaded = False
+        if brain and hasattr(brain, "reload_llm_config"):
+            brain_reloaded = await brain.reload_llm_config(
+                api_key=config.api_key,
+                model=config.model,
+                base_url=config.base_url,
+                disable_thinking=config.disable_thinking,
+            )
+
+        memory_extractor = app_state.get("memory_extractor")
+        memory_reloaded = False
+        if memory_extractor and hasattr(memory_extractor, "reload_llm_config"):
+            memory_reloaded = await memory_extractor.reload_llm_config(
+                api_key=config.api_key,
+                model=config.model,
+                base_url=config.base_url,
+                disable_thinking=config.disable_thinking,
+            )
+
+        return {
+            "success": True,
+            "model": config.model,
+            "source": config.source,
+            "runtime_reloaded": brain_reloaded or memory_reloaded,
+        }
 
     return app

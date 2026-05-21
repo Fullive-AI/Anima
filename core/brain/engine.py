@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from langgraph.graph import END, StateGraph
-from openai import AsyncOpenAI
 
 from core.brain.skill_loader import LoadedSkill, SkillLoader
 from core.events.bus import EventBus
+from core.llm.runtime import LLMRuntime
 from core.memory.extractor import MemoryExtractionService
 from core.memory.learning import PreferenceLearningService
 from core.memory.store import MemoryStore
@@ -117,12 +117,12 @@ class Brain:
         self._environment_provider: Callable[[], list[Device]] | None = None
         self._memory_extractor: MemoryExtractionService | None = None
         self._preference_learner: PreferenceLearningService | None = None
-        self._llm = AsyncOpenAI(
+        self._llm_runtime = LLMRuntime(
             api_key=settings.llm_api_key,
-            base_url=settings.llm_base_url or None,
+            model=settings.llm_model,
+            base_url=settings.llm_base_url,
+            disable_thinking=settings.llm_disable_thinking,
         )
-        self._llm_model = settings.llm_model
-        self._llm_disable_thinking = settings.llm_disable_thinking
         self._pending_skill_creation: dict[str, Any] | None = None
         self._air_purifier_startup_bootstrap_pending = True
         self._cycle_graph = self._build_cycle_graph()
@@ -136,6 +136,24 @@ class Brain:
 
     def set_preference_learner(self, learner: PreferenceLearningService) -> None:
         self._preference_learner = learner
+
+    async def reload_llm_config(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        base_url: str,
+        disable_thinking: bool,
+    ) -> bool:
+        return await self._llm_runtime.reload(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            disable_thinking=disable_thinking,
+        )
+
+    async def close(self) -> None:
+        await self._llm_runtime.close()
 
     def schedule_preference_learning(self, user_id: str = "default") -> None:
         if self._preference_learner is not None:
@@ -343,7 +361,7 @@ class Brain:
         if not text:
             return {"reply": "请先输入你的需求。"}
 
-        if not settings.llm_api_key and not app_state["settings"].get("llm_api_key", ""):
+        if not self._llm_runtime.snapshot().configured and not app_state["settings"].get("llm_api_key", ""):
             return {"reply": "聊天入口现在统一走模型决策，请先配置可用的 LLM。", "error": "llm_required"}
 
         result = await self._chat_graph.ainvoke({"message": text, "app_state": app_state})
@@ -360,7 +378,7 @@ class Brain:
             yield 'data: {"reply":"请先输入你的需求。","done":true}\n\n'
             return
 
-        if not settings.llm_api_key and not app_state["settings"].get("llm_api_key", ""):
+        if not self._llm_runtime.snapshot().configured and not app_state["settings"].get("llm_api_key", ""):
             yield 'data: {"reply":"聊天入口现在统一走模型决策，请先配置可用的 LLM。","error":"llm_required","done":true}\n\n'
             return
 
@@ -381,10 +399,11 @@ class Brain:
             return
 
         # ReAct agentic loop for all other intents
+        snapshot = self._llm_runtime.snapshot()
         agent = ReActAgent(
-            llm=self._llm,
-            model=self._llm_model,
-            disable_thinking=self._llm_disable_thinking,
+            llm=snapshot.client,
+            model=snapshot.model,
+            disable_thinking=snapshot.disable_thinking,
             skill_loader=self._skill_loader,
             memory=self._memory,
         )
@@ -445,12 +464,13 @@ class Brain:
 
     async def _stream_chitchat_reply(self, message: str):
         """Stream a direct chitchat reply without full planner overhead."""
+        snapshot = self._llm_runtime.snapshot()
         extra_body: dict[str, Any] = {}
-        if self._llm_disable_thinking:
+        if snapshot.disable_thinking:
             extra_body["thinking"] = {"type": "disabled"}
         prompt = f"你是 Anima，一个智能家居助手。用简短友好的中文回复用户。\n用户说：{message}"
-        stream = await self._llm.chat.completions.create(
-            model=self._llm_model,
+        stream = await snapshot.client.chat.completions.create(
+            model=snapshot.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=200,
@@ -1880,12 +1900,13 @@ class Brain:
         return devices
 
     async def _invoke_llm_text(self, prompt: str, *, temperature: float, max_tokens: int) -> str:
+        snapshot = self._llm_runtime.snapshot()
         extra_body: dict[str, Any] = {}
-        if self._llm_disable_thinking:
+        if snapshot.disable_thinking:
             extra_body["thinking"] = {"type": "disabled"}
 
-        response = await self._llm.chat.completions.create(
-            model=self._llm_model,
+        response = await snapshot.client.chat.completions.create(
+            model=snapshot.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             max_tokens=max_tokens,
