@@ -9,7 +9,8 @@ REFRESH_ENVIRONMENT_ACTIONS = {
     "plan.refresh_environment",
     "environment_refresh",
 }
-
+#过滤写入history文件中的refresh_environment操作
+#减少memory读取的token消耗
 
 @dataclass(frozen=True)
 class HistoryFilterResult:
@@ -28,14 +29,11 @@ class HistoryFilter:
         recent_entries: list[dict[str, Any]],
         now: datetime,
     ) -> HistoryFilterResult:
-        # 当前第一版只过滤重复的环境刷新记录，避免影响真实设备动作和用户指令。
-        if self._is_refresh_environment_history(entry) and self._has_recent_refresh_environment_history(
-            recent_entries,
-            now=now,
-        ):
+        # 环境刷新是系统内部状态同步，不直接代表用户偏好；当前版本全部跳过写入 history。
+        if self._is_refresh_environment_history(entry):
             return HistoryFilterResult(
                 should_write=False,
-                reason="duplicate_refresh_environment",
+                reason="refresh_environment_filtered",
             )
         return HistoryFilterResult(should_write=True)
 
