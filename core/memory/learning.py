@@ -81,7 +81,8 @@ class PreferenceLearningService:
             relevant_memories = [
                 memory
                 for memory in extracted_memories.values()
-                if device_type in memory.get("device_types", []) or not memory.get("device_types")
+                if (device_type in memory.get("device_types", []) or not memory.get("device_types"))
+                and memory.get("status") == "confirmed"
             ]
             if len(relevant_history) < 3 and not relevant_memories:
                 continue
@@ -157,5 +158,9 @@ class PreferenceLearningService:
             + '  "weak_signals": ["string"],\n'
             + '  "confidence_notes": "string"\n'
             + "}\n"
-            + f"Focus only on durable {device_type} preferences. Prefer durable patterns over one-off events and use the extracted long-term memories as supporting evidence."
+            + f"Focus only on durable {device_type} preferences. Prefer durable patterns over one-off events and use the extracted long-term memories as supporting evidence.\n"
+            + "Use extracted long-term memories only when they are confirmed.\n"
+            + "Do not promote one-off behavior into stable_preferences.\n"
+            + "If evidence is weak, put it in weak_signals or leave the profile unchanged.\n"
+            + "Candidate, stale, or rejected memories must not become stable_preferences."
         )

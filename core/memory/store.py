@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from core.memory.history_filter import HistoryFilter
+from core.memory.memory_merge import merge_extracted_memory
 
 logger = logging.getLogger(__name__)
 
@@ -399,6 +401,7 @@ class MemoryStore:
             logger.debug("Skipped history entry: %s", filter_result.reason)
             return
 
+        entry.setdefault("event_id", uuid.uuid4().hex)
         entry["timestamp"] = now.isoformat()
         data.append(entry)
         # Keep last 1000 entries
@@ -594,9 +597,18 @@ class MemoryStore:
     ) -> str:
         slug = self._slugify_topic(topic)
         path = self._memories_dir(user_id) / f"{slug}.json"
-        payload = dict(content)
-        payload.setdefault("topic", slug)
-        payload["updated_at"] = datetime.now(UTC).isoformat()
+        existing: dict[str, Any] | None = None
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                data = None
+            if isinstance(data, dict):
+                existing = data
+
+        incoming = dict(content)
+        incoming["topic"] = slug
+        payload = merge_extracted_memory(existing, incoming, now=datetime.now(UTC).isoformat())
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return slug
 
@@ -605,6 +617,64 @@ class MemoryStore:
         path = self._memories_dir(user_id) / f"{slug}.json"
         if path.exists():
             path.unlink()
+
+    async def search_memory_details(
+        self,
+        user_id: str = "default",
+        *,
+        device_type: str = "",
+        device_id: str = "",
+        query: str = "",
+        statuses: set[str] | None = None,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        statuses = statuses or {"confirmed"}
+        memories = await self.get_extracted_memories(user_id)
+        query_tokens = self._memory_query_tokens(query)
+        scored: list[tuple[float, str, dict[str, Any]]] = []
+
+        for topic, memory in memories.items():
+            if not self._is_complete_memory(memory):
+                continue
+            if str(memory.get("status", "")).strip() not in statuses:
+                continue
+
+            memory_device_types = [str(item).strip() for item in memory.get("device_types", [])]
+            memory_device_ids = [str(item).strip() for item in memory.get("device_ids", [])]
+            if device_type and memory_device_types and device_type not in memory_device_types:
+                continue
+            if device_id and memory_device_ids and device_id not in memory_device_ids:
+                continue
+
+            score = 0.0
+            if device_id and device_id in memory_device_ids:
+                score += 8.0
+            if device_type and device_type in memory_device_types:
+                score += 5.0
+            elif device_type and not memory_device_types:
+                score += 1.0
+
+            category = str(memory.get("category", "")).strip()
+            if category in {"preference", "routine", "constraint"}:
+                score += 2.0
+
+            confidence = str(memory.get("confidence", "")).strip()
+            if confidence == "high":
+                score += 1.0
+            elif confidence == "medium":
+                score += 0.5
+
+            searchable_text = self._memory_search_text(memory)
+            for token in query_tokens:
+                if token and token in searchable_text:
+                    score += 1.5
+
+            if score <= 0:
+                continue
+            scored.append((score, topic, memory))
+
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [memory for _, _, memory in scored[: max(limit, 0)]]
 
     # ── Three-Layer Memory Context (for LLM) ──
     #
@@ -708,6 +778,9 @@ class MemoryStore:
         self,
         user_id: str = "default",
         device_type: str = "",
+        *,
+        device_id: str = "",
+        query: str = "",
     ) -> dict[str, Any]:
         """供 skill 决策使用: L1 常驻 + 该设备的 L3 学习档案（按需加载）。"""
         core = await self.get_core_identity(user_id)
@@ -716,7 +789,69 @@ class MemoryStore:
         if device_type:
             learned_profile = await self.get_learned_for_skill(user_id, device_type)
 
+        relevant_memories = await self.search_memory_details(
+            user_id,
+            device_type=device_type,
+            device_id=device_id,
+            query=query,
+            statuses={"confirmed"},
+            limit=5,
+        )
+
         return {
             **core,
             "learned_profile": learned_profile,
+            "relevant_memories": relevant_memories,
         }
+
+    @staticmethod
+    def _is_complete_memory(memory: dict[str, Any]) -> bool:
+        required = {
+            "topic",
+            "title",
+            "category",
+            "claim_type",
+            "status",
+            "summary",
+            "details",
+            "device_types",
+            "device_ids",
+            "scenes",
+            "confidence",
+            "evidence_count",
+            "positive_evidence",
+            "negative_evidence",
+            "source_actions",
+            "created_at",
+            "updated_at",
+        }
+        return required.issubset(memory.keys())
+
+    @staticmethod
+    def _memory_search_text(memory: dict[str, Any]) -> str:
+        details = memory.get("details", [])
+        scenes = memory.get("scenes", [])
+        parts = [
+            str(memory.get("topic", "")),
+            str(memory.get("title", "")),
+            str(memory.get("summary", "")),
+            *[str(item) for item in details if str(item).strip()],
+            *[str(item) for item in scenes if str(item).strip()],
+        ]
+        return " ".join(parts).lower().replace("_", " ")
+
+    @staticmethod
+    def _memory_query_tokens(query: str) -> list[str]:
+        normalized = str(query or "").strip().lower().replace("_", " ")
+        if not normalized:
+            return []
+        tokens = re.findall(r"[a-z]+|\d+|[\u4e00-\u9fff]+", normalized)
+        unique: list[str] = []
+        seen: set[str] = set()
+        for token in [normalized, *tokens]:
+            token = token.strip()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            unique.append(token)
+        return unique

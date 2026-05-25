@@ -89,7 +89,11 @@ class SkillLoader:
         return sorted(skill_dirs)
 
     def _should_skip_dir(self, path: Path) -> bool:
-        return any(part.startswith(".") or part.startswith("_") or part == "__pycache__" for part in path.parts)
+        try:
+            parts = path.relative_to(self._dir).parts
+        except ValueError:
+            parts = path.parts
+        return any(part.startswith(".") or part.startswith("_") or part == "__pycache__" for part in parts)
 
     def _load_skill(self, skill_dir: Path) -> LoadedSkill:
         skill_md_path = skill_dir / "SKILL.md"

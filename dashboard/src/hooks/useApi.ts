@@ -164,11 +164,19 @@ export interface ExtractedMemory {
   topic: string
   title: string
   category: string
+  claim_type: string
+  status: 'candidate' | 'confirmed' | 'rejected' | 'stale'
   summary: string
   details: string[]
   device_types: string[]
+  device_ids: string[]
+  scenes: string[]
   confidence: 'low' | 'medium' | 'high'
+  evidence_count: number
+  positive_evidence: Array<Record<string, unknown>>
+  negative_evidence: Array<Record<string, unknown>>
   source_actions: string[]
+  created_at?: string
   updated_at?: string
 }
 

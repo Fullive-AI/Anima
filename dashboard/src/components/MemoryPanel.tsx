@@ -245,9 +245,14 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                             <div className="text-sm font-semibold text-slate-900">{memoryItem.title}</div>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <Tag tone="violet">{memoryItem.category}</Tag>
+                              <Tag tone={memoryItem.status === 'confirmed' ? 'emerald' : memoryItem.status === 'candidate' ? 'amber' : 'slate'}>
+                                {memoryItem.status}
+                              </Tag>
                               <Tag tone={memoryItem.confidence === 'high' ? 'emerald' : memoryItem.confidence === 'medium' ? 'amber' : 'slate'}>
                                 {memoryItem.confidence}
                               </Tag>
+                              <Tag>{memoryItem.claim_type}</Tag>
+                              <Tag>{memoryItem.evidence_count} evidence</Tag>
                             </div>
                           </div>
                           <ShieldCheck className="h-4 w-4 text-emerald-500" />
@@ -256,6 +261,9 @@ export default function MemoryPanel({ open, onClose }: MemoryPanelProps) {
                         <div className="mt-3 flex flex-wrap gap-2">
                           {memoryItem.device_types.map((deviceType) => (
                             <Tag key={deviceType}>{deviceType}</Tag>
+                          ))}
+                          {memoryItem.scenes.map((scene) => (
+                            <Tag key={scene} tone="amber">{scene}</Tag>
                           ))}
                         </div>
                         {memoryItem.details.length ? (

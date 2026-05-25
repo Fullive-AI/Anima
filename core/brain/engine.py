@@ -499,11 +499,17 @@ class Brain:
         if not devices:
             devices = discovery.get_devices_by_type(plan_item.device_type)
 
-        user_memory = context.get("user_memory")
-        if not isinstance(user_memory, dict):
-            user_memory = await self._memory.get_skill_context(
-                device_type=plan_item.device_type,
-            )
+        planner_memory = context.get("user_memory")
+        if not isinstance(planner_memory, dict):
+            planner_memory = {}
+        skill_memory = await self._memory.get_skill_context(
+            device_type=plan_item.device_type,
+            query=f"{plan_item.goal}\n{plan_item.reason}",
+        )
+        user_memory = {
+            **planner_memory,
+            **skill_memory,
+        }
 
         async def _decide_for_device(device: Device) -> SkillActionSpec | None:
             prompt = self._build_prompt_context(
@@ -1356,14 +1362,25 @@ class Brain:
             learned_profile=learned_profile or "(none)",
             knowledge=skill.knowledge,
         )
+        relevant_memories = user_memory.get("relevant_memories", [])
+        memory_block = ""
+        if relevant_memories:
+            memory_block = (
+                "\n\n## Relevant Long-Term Memories\n"
+                f"{json.dumps(relevant_memories, ensure_ascii=False, indent=2)}\n"
+                "Use these memories as supporting context. "
+                "The current user request and real-time device state have higher priority than memory. "
+                "Only confirmed memories should be treated as durable context. "
+                "Do not follow stale, rejected, or weak memories as hard rules.\n"
+            )
         if not planner_goal and not planner_reason:
             return (
-                f"{base_prompt}\n\n"
+                f"{base_prompt}{memory_block}\n\n"
                 "## Language Rule\n"
                 "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST be written in Simplified Chinese.\n"
             )
         return (
-            f"{base_prompt}\n\n"
+            f"{base_prompt}{memory_block}\n\n"
             "## Language Rule\n"
             "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST be written in Simplified Chinese.\n\n"
             "## Planner Intent\n"
@@ -2135,7 +2152,7 @@ class Brain:
         if isinstance(name, str) and name:
             value = name
         elif hasattr(value, "value"):
-            value = getattr(value, "value")
+            value = value.value
 
         if not isinstance(value, str):
             return value

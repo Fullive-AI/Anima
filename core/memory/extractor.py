@@ -7,7 +7,8 @@ import re
 from typing import Any
 
 from core.brain.skill_loader import SkillLoader
-from core.llm.runtime import LLMSnapshot, LLMRuntime
+from core.llm.runtime import LLMRuntime, LLMSnapshot
+from core.memory.memory_merge import normalize_memory_for_storage
 from core.memory.store import MemoryStore
 from core.runtime.config import settings
 
@@ -155,7 +156,7 @@ class MemoryExtractionService:
         content = await self._invoke_llm_text(
             prompt,
             temperature=0.1,
-            max_tokens=1400,
+            max_tokens=1800,
             snapshot=snapshot,
         )
         payload = _extract_json(content)
@@ -203,7 +204,7 @@ class MemoryExtractionService:
     ) -> str:
         return (
             "You are Anima's background memory extraction worker.\n"
-            "This worker runs independently from the main planner so it must only summarize stable, reusable memory.\n\n"
+            "This worker runs independently from the main planner so it must only propose evidence-backed long-term memory candidates.\n\n"
             "Analyze only the recent history batch below. Do not infer beyond the evidence.\n"
             "Prefer updating an existing topic rather than inventing duplicates.\n"
             "Ignore one-off execution noise.\n\n"
@@ -220,10 +221,18 @@ class MemoryExtractionService:
             '      "topic": "stable_snake_case_topic",\n'
             '      "title": "Short title",\n'
             '      "category": "preference | routine | constraint | context",\n'
+            '      "claim_type": "explicit_preference | implicit_preference | routine | device_alias | constraint | home_context",\n'
+            '      "status": "candidate | confirmed",\n'
             '      "summary": "one sentence summary",\n'
             '      "details": ["fact", "fact"],\n'
             '      "device_types": ["light"],\n'
+            '      "device_ids": ["device id from history when known"],\n'
+            '      "scenes": ["night", "bedroom"],\n'
             '      "confidence": "low | medium | high",\n'
+            '      "positive_evidence": [\n'
+            '        {"event_id": "history event_id", "timestamp": "history timestamp", "source": "chat", "action": "set_brightness", "device_type": "light", "device_id": "device id", "summary": "short evidence summary"}\n'
+            "      ],\n"
+            '      "negative_evidence": [],\n'
             '      "source_actions": ["turn_on", "plan.ask_user"],\n'
             '      "linked_custom_skill_name": "exact existing custom skill name or empty string"\n'
             "    }\n"
@@ -231,7 +240,13 @@ class MemoryExtractionService:
             '  "forget_topics": ["obsolete_topic"]\n'
             "}\n"
             "Rules:\n"
-            "- Save only durable user preferences, routines, constraints, or home context.\n"
+            "- Save only durable user preferences, routines, constraints, device aliases, or home context.\n"
+            "- Use event_id from history entries in positive_evidence or negative_evidence.\n"
+            "- Evidence must refer only to events in the provided recent history batch.\n"
+            "- Status is advisory. The system will recalculate final status using evidence rules.\n"
+            "- Do not mark implicit preferences or routines as confirmed from a single event.\n"
+            "- Explicit user preferences or constraints may be proposed as confirmed, but the system will verify.\n"
+            "- Do not infer durable preferences from one device action.\n"
             "- Do not save ephemeral failures, transient sensor values, or obvious duplicates.\n"
             "- For memories about created, activated, or available custom skills, only save them when they match one real skill from the custom skill inventory.\n"
             "- When a memory refers to a real custom skill, set linked_custom_skill_name exactly to the inventory name.\n"
@@ -280,43 +295,7 @@ class MemoryExtractionService:
     def _normalize_memory_item(item: Any) -> dict[str, Any] | None:
         if not isinstance(item, dict):
             return None
-        topic_raw = str(item.get("topic", "")).strip().lower()
-        topic = re.sub(r"[^a-z0-9_]+", "_", topic_raw).strip("_")
-        if not topic:
-            return None
-        title = str(item.get("title", topic)).strip() or topic
-        category = str(item.get("category", "context")).strip().lower() or "context"
-        if category not in {"preference", "routine", "constraint", "context"}:
-            category = "context"
-        summary = str(item.get("summary", "")).strip()
-        if not summary:
-            return None
-        details = item.get("details", [])
-        if not isinstance(details, list):
-            details = []
-        device_types = item.get("device_types", [])
-        if not isinstance(device_types, list):
-            device_types = []
-        source_actions = item.get("source_actions", [])
-        if not isinstance(source_actions, list):
-            source_actions = []
-        confidence = str(item.get("confidence", "medium")).strip().lower() or "medium"
-        if confidence not in {"low", "medium", "high"}:
-            confidence = "medium"
-        linked_custom_skill_name = str(item.get("linked_custom_skill_name", "")).strip()
-        payload = {
-            "topic": topic,
-            "title": title,
-            "category": category,
-            "summary": summary,
-            "details": [str(detail).strip() for detail in details if str(detail).strip()],
-            "device_types": [str(name).strip() for name in device_types if str(name).strip()],
-            "confidence": confidence,
-            "source_actions": [str(name).strip() for name in source_actions if str(name).strip()],
-        }
-        if linked_custom_skill_name:
-            payload["linked_custom_skill_name"] = linked_custom_skill_name
-        return payload
+        return normalize_memory_for_storage(item)
 
     def _load_custom_skill_inventory(self) -> list[dict[str, Any]]:
         loader = SkillLoader(skills_dir=self._skills_dir)
