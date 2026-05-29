@@ -1,66 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1"/>
-      <stop offset="100%" style="stop-color:#06b6d4"/>
-    </linearGradient>
-    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#a5b4fc"/>
-      <stop offset="100%" style="stop-color:#67e8f9"/>
-    </linearGradient>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#6366f1" flood-opacity="0.4"/>
-    </filter>
-    <filter id="innerGlow">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-    </filter>
-  </defs>
-  <!-- Background circle -->
-  <circle cx="256" cy="256" r="240" fill="url(#bg)" filter="url(#shadow)"/>
-  <!-- Inner ring -->
-  <circle cx="256" cy="256" r="200" fill="none" stroke="url(#glow)" stroke-width="2" opacity="0.5"/>
-  <!-- Circuit nodes (hardware) -->
-  <circle cx="256" cy="100" r="8" fill="#a5b4fc"/>
-  <circle cx="400" cy="200" r="8" fill="#a5b4fc"/>
-  <circle cx="380" cy="340" r="8" fill="#a5b4fc"/>
-  <circle cx="132" cy="340" r="8" fill="#a5b4fc"/>
-  <circle cx="112" cy="200" r="8" fill="#a5b4fc"/>
-  <!-- Circuit lines connecting to center soul -->
-  <line x1="256" y1="100" x2="256" y2="180" stroke="#a5b4fc" stroke-width="2" opacity="0.6"/>
-  <line x1="400" y1="200" x2="330" y2="230" stroke="#a5b4fc" stroke-width="2" opacity="0.6"/>
-  <line x1="380" y1="340" x2="310" y2="300" stroke="#a5b4fc" stroke-width="2" opacity="0.6"/>
-  <line x1="132" y1="340" x2="202" y2="300" stroke="#a5b4fc" stroke-width="2" opacity="0.6"/>
-  <line x1="112" y1="200" x2="182" y2="230" stroke="#a5b4fc" stroke-width="2" opacity="0.6"/>
-  <!-- Central soul orb -->
-  <circle cx="256" cy="256" r="70" fill="#1e1b4b" opacity="0.5"/>
-  <circle cx="256" cy="256" r="55" fill="none" stroke="#a5b4fc" stroke-width="1.5" opacity="0.7">
-    <animateTransform attributeName="transform" type="rotate" from="0 256 256" to="360 256 256" dur="20s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="256" cy="256" r="40" fill="none" stroke="#67e8f9" stroke-width="1" opacity="0.5">
-    <animateTransform attributeName="transform" type="rotate" from="360 256 256" to="0 256 256" dur="15s" repeatCount="indefinite"/>
-  </circle>
-  <!-- "A" letterform -->
-  <text x="256" y="278" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="80" font-weight="700" fill="white" filter="url(#innerGlow)">A</text>
-  <!-- Pulse dots on circuit nodes -->
-  <circle cx="256" cy="100" r="4" fill="white" opacity="0.8">
-    <animate attributeName="r" values="4;8;4" dur="2s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="400" cy="200" r="4" fill="white" opacity="0.8">
-    <animate attributeName="r" values="4;8;4" dur="2.5s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.5s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="380" cy="340" r="4" fill="white" opacity="0.8">
-    <animate attributeName="r" values="4;8;4" dur="3s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.8;0.3;0.8" dur="3s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="132" cy="340" r="4" fill="white" opacity="0.8">
-    <animate attributeName="r" values="4;8;4" dur="2.2s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.2s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="112" cy="200" r="4" fill="white" opacity="0.8">
-    <animate attributeName="r" values="4;8;4" dur="2.8s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.8s" repeatCount="indefinite"/>
-  </circle>
+<svg width="2152" height="503" viewBox="0 0 2152 503" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="176.777" y="33.1367" width="250" height="250" rx="32" transform="rotate(45 176.777 33.1367)" fill="#2E2C83"/>
+<rect x="153.194" y="80" width="184.122" height="184.122" rx="20" transform="rotate(45 153.194 80)" fill="#6714F7"/>
+<rect x="376.483" y="316" width="132" height="132" rx="24" transform="rotate(45 376.483 316)" fill="black"/>
+<rect x="376.483" width="132" height="132" rx="24" transform="rotate(45 376.483 0)" fill="#251E57"/>
+<rect x="365.127" y="27" width="93.5174" height="93.5174" rx="12" transform="rotate(45 365.127 27)" fill="#4930EA"/>
+<rect x="365.127" y="343" width="93.5174" height="93.5174" rx="12" transform="rotate(45 365.127 343)" fill="#5F09C9"/>
+<path d="M928.352 407.838H871.857V331.354H673.259V407.838H616.765V252.045C616.765 229.302 620.676 208.37 628.498 189.249C636.32 170.128 647.185 153.687 661.091 139.926C674.997 126.164 691.438 115.445 710.415 107.767C729.391 100.09 750.105 96.2512 772.558 96.2512H899.887C903.798 96.2512 907.492 96.9755 910.969 98.4241C914.445 99.8726 917.487 101.901 920.095 104.508C922.702 107.115 924.73 110.157 926.179 113.634C927.627 117.111 928.352 120.804 928.352 124.716V407.838ZM673.259 274.86H871.857V152.745H772.558C770.82 152.745 767.126 153.035 761.477 153.615C755.972 154.049 749.526 155.28 742.138 157.308C734.895 159.336 727.218 162.451 719.106 166.652C710.994 170.852 703.534 176.647 696.726 184.034C689.917 191.422 684.268 200.693 679.777 211.847C675.432 222.856 673.259 236.255 673.259 252.045V274.86ZM1270.45 407.838H1213.95V277.467C1213.95 270.079 1212.65 263.488 1210.04 257.694C1207.58 251.755 1204.17 246.685 1199.83 242.484C1195.48 238.283 1190.34 235.096 1184.4 232.924C1178.61 230.606 1172.3 229.447 1165.5 229.447H1066.63V407.838H1010.14V200.983C1010.14 197.072 1010.86 193.45 1012.31 190.118C1013.76 186.642 1015.79 183.672 1018.39 181.21C1021 178.602 1024.04 176.574 1027.52 175.126C1031 173.677 1034.69 172.953 1038.6 172.953H1165.93C1173.03 172.953 1180.49 173.75 1188.31 175.343C1196.28 176.936 1204.1 179.544 1211.78 183.165C1219.6 186.642 1226.99 191.132 1233.94 196.637C1241.04 201.997 1247.27 208.588 1252.63 216.41C1258.13 224.087 1262.48 232.996 1265.67 243.136C1268.85 253.276 1270.45 264.72 1270.45 277.467V407.838ZM1399.6 124.716H1343.11V73.6536H1399.6V124.716ZM1399.6 407.838H1343.11V172.953H1399.6V407.838ZM1685.85 407.838H1629.36V252.045C1629.36 244.657 1627.4 239.08 1623.49 235.314C1619.58 231.403 1613.78 229.447 1606.11 229.447H1532.67V407.838H1476.17V200.983C1476.17 197.072 1476.9 193.45 1478.34 190.118C1479.79 186.642 1481.82 183.672 1484.43 181.21C1487.04 178.602 1490.08 176.574 1493.55 175.126C1497.03 173.677 1500.72 172.953 1504.64 172.953H1606.54C1614.36 172.953 1622.77 174.329 1631.75 177.081C1640.73 179.834 1649.27 184.252 1657.39 190.336V172.953H1733.87C1739.23 172.953 1744.88 173.605 1750.82 174.908C1756.76 176.067 1762.63 177.95 1768.42 180.558C1774.36 183.165 1780.01 186.569 1785.37 190.77C1790.73 194.826 1795.44 199.824 1799.49 205.763C1803.55 211.557 1806.81 218.293 1809.27 225.97C1811.73 233.648 1812.96 242.339 1812.96 252.045V407.838H1756.47V252.045C1756.47 244.657 1754.59 239.08 1750.82 235.314C1747.2 231.403 1741.55 229.447 1733.87 229.447H1683.03C1684.91 236.4 1685.85 243.933 1685.85 252.045V407.838ZM2129.85 330.05C2129.85 337.872 2128.48 346.346 2125.72 355.472C2122.97 364.454 2118.48 372.855 2112.25 380.677C2106.17 388.355 2098.13 394.801 2088.13 400.016C2078.28 405.231 2066.26 407.838 2052.06 407.838H1950.16C1942.33 407.838 1933.86 406.462 1924.73 403.71C1915.75 400.957 1907.35 396.539 1899.53 390.455C1891.85 384.226 1885.41 376.187 1880.19 366.337C1874.98 356.342 1872.37 344.246 1872.37 330.05C1872.37 322.228 1873.74 313.754 1876.5 304.628C1879.25 295.502 1883.67 287.1 1889.75 279.423C1895.98 271.6 1904.02 265.082 1913.87 259.867C1923.87 254.652 1935.96 252.045 1950.16 252.045H2052.06V305.931H1950.16C1942.48 305.931 1936.54 308.322 1932.34 313.102C1928.14 317.737 1926.04 323.531 1926.04 330.485C1926.04 337.872 1928.43 343.667 1933.21 347.867C1938.13 351.923 1943.93 353.951 1950.59 353.951H2052.06C2059.74 353.951 2065.68 351.634 2069.88 346.998C2074.08 342.363 2076.18 336.569 2076.18 329.615V250.741C2076.18 243.353 2073.86 237.487 2069.23 233.141C2064.74 228.795 2059.02 226.622 2052.06 226.622H1927.99V172.953H2052.06C2059.89 172.953 2068.29 174.329 2077.27 177.081C2086.39 179.834 2094.8 184.324 2102.47 190.553C2110.3 196.637 2116.81 204.677 2122.03 214.672C2127.24 224.522 2129.85 236.545 2129.85 250.741V330.05Z" fill="#191919"/>
 </svg>
