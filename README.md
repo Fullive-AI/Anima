@@ -92,7 +92,7 @@ Anima目前适配了Mi home/miot设备，后续会增添新的硬件设备协议
 Anima 的整体运行链路由用户请求、设备发现、传感器更新、定时任务和设备动作共同驱动。信号进入 Anima Core 后，Brain 结合设备状态、Memory 与 Skill 上下文完成理解和规划；执行阶段再由 Skill 将决策转化为结构化动作，并通过 Adapter 映射到具体硬件协议，完成真实设备控制与反馈记录。
 
 <div align="center">
-  <img src="docs/images/overall%20architecture.svg" alt="Anima Overall Architecture" width="100%" />
+  <img src="docs/images/architecture.svg" alt="Anima Overall Architecture" width="100%" />
 </div>
 
 ---
@@ -144,9 +144,13 @@ scripts/
 
 你也可以在 `skills/custom/` 下添加自己的 skill，让 Anima 学会新的设备行为或家庭工作流。
 
+下图展示了 Skill 在 Anima 中的完整生命周期：设备能力可以通过自动发现或用户定义进入 Skill Creator，随后被整理进 Skill Bank，供 Brain 在规划时检索和选择。执行阶段，Planner 会根据当前环境、设备状态和 Memory 上下文选择合适的 Skill；Skill 再把高层目标转成结构化动作，并通过 Adapter 落到真实设备。执行结果会回流到 Memory 和 learned profile，让后续决策更贴近用户习惯。
+
 <div align="center">
   <img src="docs/images/skill%20system.svg" alt="Anima Skill System Architecture" width="100%" />
 </div>
+
+这意味着 Anima 中的 Skill 不是一次性的函数调用，而是一个可以被创建、注册、检索、执行和反馈学习的设备智能单元。新增设备类型时，优先扩展 Skill，而不是把设备策略硬编码进 Brain 或 Adapter。
 
 ### 3. Memory：可证据化的长期记忆
 
@@ -163,9 +167,13 @@ L3 Memory Detail
   skill 执行前按设备类型和任务检索的详细长期记忆。
 ```
 
+下图对应了 Memory 在 Anima 运行时中的位置：底层文件负责保存偏好、历史、学习画像和 topic memories；中间的 Memory service 负责读取、提取、合并与更新；上层则通过 `get_planner_context()` 和 `get_skill_context(device_type)` 把不同粒度的记忆交给 Brain 和 Skill。这样 Planner 不需要每次读取所有历史，只需要先知道“有哪些记忆可用”，再在真正执行设备 Skill 时按需加载细节。
+
 <div align="center">
   <img src="docs/images/memory%20system.svg" alt="Anima Memory System Architecture" width="100%" />
 </div>
+
+这套分层设计让 Anima 可以同时兼顾长期学习和上下文控制：L1 保持轻量、L2 提供目录、L3 只在需要时加载确认过的详细记忆。执行结果、用户对话和设备状态会持续进入 history，并在后台被提取为更稳定的长期记忆，最终影响后续的设备决策。
 
 当前 memory 系统已经支持：
 

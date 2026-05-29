@@ -1,5 +1,15 @@
 [English](./2026-03-17-anima-design.md) | [中文](./2026-03-17-anima-design.zh-CN.md)
 
+> **Historical design note**
+>
+> This document is an early architecture proposal written before the current implementation stabilized.
+> It is kept for project history and design context, but some details are now outdated, including the
+> MQTT-centered adapter layout, Matter/Home Assistant bridge assumptions, `learned.md`, `skill.yaml`,
+> and early deployment/roadmap descriptions.
+>
+> For the current implementation-oriented design, see [design.md](./design.md). For contribution
+> guardrails and module boundaries, see [ARCHITECTURE_GUARDRAILS.md](../../ARCHITECTURE_GUARDRAILS.md).
+
 # Anima — Make Every Hardware Intelligent
 
 > An open-source Agent OS that auto-discovers your hardware devices, empowers each one with AI Skills, and lets them autonomously sense, decide, and collaborate.
