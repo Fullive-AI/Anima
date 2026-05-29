@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/images/logo.png" alt="Anima Logo" width="320" />
+  <img src="docs/images/Logo.svg" alt="Anima Logo" width="320" />
   <h1></h1>
   <p><strong>Make every hardware intelligent</strong></p>
   <p>An open-source Agent OS for hardware intelligence.</p>
@@ -19,7 +19,7 @@
 
 **Anima** 是一个面向智能硬件的开源 Agent OS。它的目标不是再做一个设备控制面板，而是让家中的硬件设备拥有可感知、可决策、可学习、可扩展的 AI 能力。
 
-名字 **Anima** 来自拉丁语，意为“灵魂”。这个名字也正对应了项目最初的想法：今天的智能硬件已经有传感器、联网能力和执行能力，但它们大多数仍然停留在“等待命令”的阶段。Anima 想做的是给这些硬件接上一套可运行的智能中枢，让灯、空调、加湿器、空气净化器、音箱以及未来更多设备，不只是被控制，而是能理解环境、理解用户、理解彼此。
+名字 **Anima** 起源于拉丁语，意为“灵魂”。这个名字也正对应了项目最初的想法：今天的智能硬件已经有传感器、联网能力和执行能力，但它们大多数仍然停留在“等待命令”的阶段。Anima 想做的是给这些硬件接上一套可运行的智能中枢，让灯、空调、加湿器、空气净化器、音箱以及未来更多设备，不只是被控制，而是能理解环境、理解用户、理解彼此。
 
 > Anima 的愿景：把每一台硬件从“可联网设备”推进到“可协作的智能体”。
 
@@ -225,7 +225,6 @@ Adapter 负责把 Anima 的结构化动作转成真实设备协议。
 ```bash
 git clone https://github.com/fulai-tech/Anima.git
 cd Anima
-
 pnpm install
 pnpm dev
 ```
@@ -410,11 +409,11 @@ Anima 仍处于早期版本，但已经具备完整可运行的核心闭环：
 
 ## 重大更新
 
-这里会记录 Anima 的重要版本发布、架构升级和关键能力演进，方便开发者快速了解项目每个阶段的核心变化。
+这里会记录 Anima 的版本发布、架构升级和关键能力演进，方便开发者快速了解项目每个阶段的核心变化。
 
 ### 2026-06-01：Anima 正式开源
 
-Anima 首个开源版本发布，提供面向智能硬件的 Agent OS 基础能力：本地设备发现、MIoT 设备接入、LLM Brain 决策、Skill 机制、长期 Memory 系统和可视化 Dashboard。这个版本奠定了 Anima 连接大模型与物理设备的核心运行框架。
+Anima 首个开源版本发布，提供面向智能硬件的 Agent OS 基础能力：本地设备发现、MIoT 设备接入、LLM Brain 决策、Skill 机制、长期 Memory 系统和可视化 Dashboard。
 
 ---
 
