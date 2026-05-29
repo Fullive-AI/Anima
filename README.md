@@ -147,7 +147,7 @@ scripts/
 下图展示了 Skill 在 Anima 中的完整生命周期：设备能力可以通过自动发现或用户定义进入 Skill Creator，随后被整理进 Skill Bank，供 Brain 在规划时检索和选择。执行阶段，Planner 会根据当前环境、设备状态和 Memory 上下文选择合适的 Skill；Skill 再把高层目标转成结构化动作，并通过 Adapter 落到真实设备。执行结果会回流到 Memory 和 learned profile，让后续决策更贴近用户习惯。
 
 <div align="center">
-  <img src="docs/images/skill%20system.svg" alt="Anima Skill System Architecture" width="100%" />
+  <img src="docs/images/skill system.png" alt="Anima Skill System Architecture" width="100%" />
 </div>
 
 这意味着 Anima 中的 Skill 不是一次性的函数调用，而是一个可以被创建、注册、检索、执行和反馈学习的设备智能单元。新增设备类型时，优先扩展 Skill，而不是把设备策略硬编码进 Brain 或 Adapter。
@@ -185,7 +185,6 @@ L3 Memory Detail
 - 只有 confirmed memory 默认进入 skill 决策
 - learned profile 按设备类型保存到 `learned.json`
 
-这让 Anima 能减少“一次行为被过度学习”的问题。例如，用户临时开了一次灯，不会立刻变成“用户长期喜欢开灯”；只有明确表达或重复证据才会逐步成为长期记忆。
 
 ### 4. Adapter：真实硬件接入层
 
