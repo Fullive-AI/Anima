@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/images/Logo.svg" alt="Anima Logo" width="320" />
+  <img src="docs/images/Logo.svg" alt="Anima logo" width="320" />
   <h1></h1>
   <p><strong>Make every hardware intelligent</strong></p>
   <p>An open-source Agent OS for hardware intelligence.</p>
