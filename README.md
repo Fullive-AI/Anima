@@ -1,376 +1,461 @@
 <div align="center">
-  <img src="docs/images/logo.svg" alt="Anima Logo" width="120" />
-  <h1>Anima</h1>
-  <p><em>Make Every Hardware Intelligent — An open-source Agent OS that breathes AI into every device you own.</em></p>
+  <img src="docs/images/logo.png" alt="Anima Logo" width="320" />
+  <h1></h1>
+  <p><strong>Make every hardware intelligent</strong></p>
+  <p>An open-source Agent OS for hardware intelligence.</p>
 
   [English](./README.md) | [中文](./README.zh-CN.md)
   <br/><br/>
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-  ![Python](https://img.shields.io/badge/Python-3.13-blue)
-  ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
-  ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)
-  ![MQTT](https://img.shields.io/badge/MQTT-Broker-purple)
-  ![Version](https://img.shields.io/badge/Version-0.1.0-orange)
+  [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
+  ![Python](https://img.shields.io/badge/Python-3.11--3.13-blue)
+  ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi)
+  ![React](https://img.shields.io/badge/React-Dashboard-61DAFB?logo=react)
+  ![LangGraph](https://img.shields.io/badge/LangGraph-Agent%20Brain-purple)
+  ![MIoT](https://img.shields.io/badge/Xiaomi%20MIoT-Supported-orange)
 </div>
+
 <br/>
 
-**Anima** (Latin for "soul") is an open-source Agent OS that auto-discovers your hardware devices, equips each one with AI Skills, and lets them autonomously sense, decide, and collaborate — without requiring any manual configuration.
+**Anima** 是一个面向智能硬件的开源 Agent OS。它的目标不是再做一个设备控制面板，而是让家中的硬件设备拥有可感知、可决策、可学习、可扩展的 AI 能力。
 
-![alt text](docs/images/anima-demo.gif)
+名字 **Anima** 来自拉丁语，意为“灵魂”。这个名字也正对应了项目最初的想法：今天的智能硬件已经有传感器、联网能力和执行能力，但它们大多数仍然停留在“等待命令”的阶段。Anima 想做的是给这些硬件接上一套可运行的智能中枢，让灯、空调、加湿器、空气净化器、音箱以及未来更多设备，不只是被控制，而是能理解环境、理解用户、理解彼此。
 
+> Anima 的愿景：把每一台硬件从“可联网设备”推进到“可协作的智能体”。
 
-# Core Highlights
-1. **Autonomous Perception & Intelligent Generation**
-The system actively discovers smart devices on the local area network, automatically generates executable Skills based on device characteristics and professional knowledge, enabling state perception, capability access, and behavior sequence management to achieve global self-driving operation.
+<div align="center">
+  <img src="docs/images/bedroom-CN.svg" alt="Anima Dashboard Bedroom Design" width="100%" />
+</div>
 
-2. **Event-Driven & Unified Scheduling**
-With unified scheduling via an event bus and scheduled tasks, the system responds swiftly to critical events, realizing end-to-end automated control and intelligent scheduling.
+## Anima 是什么
 
-3. **Brain-Centric Adaptive Decision-Making & Evolution**
-The central Brain module integrates memory evolution, strategy optimization, and self-learning, driving the system’s intelligent leap from passive execution to active service, and delivering a true smart steward experience.
+Anima 可以理解为运行在你本地网络中的智能硬件 Agent Runtime：
 
-# Memory Management
-1. **Hierarchical Storage & Efficient Retrieval**
-A multi-layered Memory architecture ensures long-term retention, fast retrieval, and controllable context, building a high-efficiency knowledge management system.
+- 它会发现设备，维护设备状态，并通过 adapter 控制真实硬件。
+- 它维护长期 Memory，从明确偏好和重复行为中学习。
+- 它借助 LLM Brain 读取环境、用户意图、历史记忆和 skill 知识，然后规划行动。
+- 它将每类设备的专业知识封装成 Skill，让决策不只是“开/关”，而是符合场景、舒适度和安全边界。
+- 它提供 Dashboard、REST API 和 CLI，让你可以观察、调试、控制和扩展整个系统。
 
-2. **On-Demand Loading & Precise Reasoning**
-Memories are split by device or scenario and loaded only for the current context, preventing information bloat while significantly improving reasoning efficiency.
-
-3. **Human-like "Dreaming" & Self-Optimization**
-The system continuously extracts, compresses, and reorganizes memories in the background, enabling uninterrupted long-term self-evolution and empowering sustained system growth.
-
-# Skill Management
-1. **Modularity & Standardization**
-The Skill framework covers knowledge, decision-making, learning, and action execution with full decoupling, supporting system unification, scalability, and reusability.
-
-2. **Self-Expanding Skill Creator**
-For natural language interactions or new device access, the system automatically generates supplementary Skills to dynamically expand its capability boundaries.
-
-3. **Self-Evolving Intelligent Skills**
-By learning user preferences from memory, behavior strategies are dynamically optimized, enabling devices to exhibit human-like and continuously evolving intelligent behaviors.
+Anima目前适配了Mi home/miot设备，后续会增添新的硬件设备协议，也欢迎开源社区的朋友们做出贡献
 
 ---
 
-## Why Anima?
+## 为什么做 Anima
 
 <div align="center">
 
-![Zero Config](https://img.shields.io/badge/Zero%20Config-Auto%20Discovery-0A7EA4?style=for-the-badge)
-![AI Skills](https://img.shields.io/badge/AI%20Skills-Per%20Device-1B5E20?style=for-the-badge)
-![Memory](https://img.shields.io/badge/Memory-Learns%20Your%20Habits-B71C1C?style=for-the-badge)
-![LLM Brain](https://img.shields.io/badge/LLM%20Brain-Any%20OpenAI%20API-4A148C?style=for-the-badge)
-![Skill System](https://img.shields.io/badge/Skill%20System-Extensible-0D47A1?style=for-the-badge)
-![Dashboard](https://img.shields.io/badge/Dashboard-Real--time%20UI-6A1B9A?style=for-the-badge)
+![零配置](https://img.shields.io/badge/零配置-自动发现-0A7EA4?style=for-the-badge)
+![AI技能](https://img.shields.io/badge/AI%20技能-每台设备-1B5E20?style=for-the-badge)
+![记忆系统](https://img.shields.io/badge/记忆系统-学习你的习惯-B71C1C?style=for-the-badge)
+![LLM大脑](https://img.shields.io/badge/LLM%20大脑-兼容OpenAI%20API-4A148C?style=for-the-badge)
+![技能系统](https://img.shields.io/badge/技能系统-可扩展-0D47A1?style=for-the-badge)
+![控制面板](https://img.shields.io/badge/控制面板-实时可视化-6A1B9A?style=for-the-badge)
 
 </div>
 
 > [!TIP]
-> Most smart home systems ask *"what sensors do you need?"*. Anima asks **"what do you have — I'll use it."** It discovers your devices, loads domain knowledge for each one, and starts making intelligent decisions from day one.
+> 大多数智能家居系统问的是"你需要什么传感器？"Anima 问的是 **"你有什么——我来用。"** 它自动发现你的设备，为每台设备加载领域知识，从第一天起就开始做智能决策。
 
 <details>
-<summary><strong>Q: Does it require manual device configuration?</strong></summary>
+<summary><strong>Q：需要手动配置设备吗？</strong></summary>
 
-**A:** No. Anima auto-discovers devices on your local network via mDNS. For Xiaomi/Mi Home devices, a single QR scan fetches all tokens automatically — no IP lists, no manual token extraction.
+**A：** 不需要。Anima 通过相应的适配器协议自动扫描局域网发现设备。对于小米/米家设备，一次扫码即可自动获取所有 Token——无需手动填写 IP 列表或提取 Token。
 
 </details>
 
 <details>
-<summary><strong>Q: Is it just a fancy on/off toggle?</strong></summary>
+<summary><strong>Q：它只是个花哨的开关控制器吗？</strong></summary>
 
-**A:** Far from it. Each device type gets a dedicated **Skill** — a domain knowledge package that includes comfort models, occupancy awareness, cross-device coordination rules, and preference learning. Your humidifier knows about seasonal adjustments and AC interactions; your lights follow circadian rhythms automatically.
-
-</details>
-
-<details>
-<summary><strong>Q: How does it learn my preferences?</strong></summary>
-
-**A:** Anima maintains a memory system with `preferences.md`, normalized learned profiles per device type, and extracted topic memories. The Brain incrementally extracts preferences from your interaction history and evolves its behavior over time.
+**A：** 远不止如此。核心设备类型都有专属的 **技能（Skill）**——一个包含舒适度模型、占用感知、跨设备协调规则和偏好学习的领域知识包。你的加湿器了解季节调整和空调联动；你的灯光会自动遵循昼夜节律。
 
 </details>
 
 <details>
-<summary><strong>Q: Which LLM providers are supported?</strong></summary>
+<summary><strong>Q：它怎么学习我的偏好？</strong></summary>
 
-**A:** Any OpenAI-compatible API — including OpenAI, DeepSeek, Doubao, Anthropic (via proxy), and local Ollama models. Just set `ANIMA_LLM_API_KEY` and optionally `ANIMA_LLM_BASE_URL`.
+**A：** Anima 维护着一套包含 `preferences.md`、各设备类型规范化 learned profile 和提取 topic memories 的记忆系统。Brain 会从你的交互历史中增量提取偏好，并随时间演进行为。
+
+</details>
+
+<details>
+<summary><strong>Q：支持哪些 LLM 提供商？</strong></summary>
+
+**A：** 任何兼容 OpenAI API 的服务——包括 OpenAI、DeepSeek、豆包、Anthropic（通过代理）以及本地 Ollama 模型。只需设置 `ANIMA_LLM_API_KEY`，可选设置 `ANIMA_LLM_BASE_URL`。
 
 </details>
 
 ---
 
-## 60-Second Quick Start
+## 系统架构
+
+Anima 的整体运行链路由用户请求、设备发现、传感器更新、定时任务和设备动作共同驱动。信号进入 Anima Core 后，Brain 结合设备状态、Memory 与 Skill 上下文完成理解和规划；执行阶段再由 Skill 将决策转化为结构化动作，并通过 Adapter 映射到具体硬件协议，完成真实设备控制与反馈记录。
+
+<div align="center">
+  <img src="docs/images/overall%20architecture.svg" alt="Anima Overall Architecture" width="100%" />
+</div>
+
+---
+
+
+## 核心亮点
+
+### 1. Brain：中枢决策层
+
+Brain 是 Anima 的智能中枢。它负责把用户对话、设备状态、环境信号、记忆和 skill 能力合并起来，生成可执行计划。
+
+当前 Brain 支持：
+
+- 基于 LangGraph 的 planner / executor 流程
+- 统一聊天入口 `/api/chat`
+- 定时 brain tick，用于主动环境检查和自动化决策
+- skill 执行前的上下文构建
+- 动作执行后的状态验证和 history 写入
+- OpenAI-compatible LLM 后端
+
+Brain 的目标不是让 LLM 随意控制设备，而是让它在明确的技能边界、设备能力和安全规则内做决策。
+
+### 2. Skill：设备智能的最小单元
+
+Anima 中的 Skill 不是一个简单函数，也不是普通 prompt。它是一个设备领域知识包，通常包含：
+
+```text
+SKILL.md              # skill 元信息、适用设备和工作规则
+references/
+  knowledge.md        # 领域知识
+  decide.md           # 单次决策 prompt
+  learn.md            # 长期学习 prompt
+scripts/
+  actions.py          # 结构化动作执行入口
+```
+
+内置 Skill 包括：
+
+| Skill | 作用 |
+|---|---|
+| `light` | 灯光控制、亮度、色温、昼夜节律 |
+| `humidifier` | 湿度舒适区间、季节因素、空调联动 |
+| `air_conditioner` | 温度控制、舒适度和能耗平衡 |
+| `air_purifier` | 空气质量、净化模式、睡眠安静策略 |
+| `speaker` | 音频播放、停止播放、安静时段保护 |
+| `coordinator` | 跨设备协同 |
+| `device_discovery` | 设备发现、米家扫码、设备激活 |
+| `skill_creator` | 根据自然语言需求生成自定义 skill |
+
+你也可以在 `skills/custom/` 下添加自己的 skill，让 Anima 学会新的设备行为或家庭工作流。
+
+<div align="center">
+  <img src="docs/images/skill%20system.svg" alt="Anima Skill System Architecture" width="100%" />
+</div>
+
+### 3. Memory：可证据化的长期记忆
+
+Anima 的 Memory 系统采用分层设计：
+
+```text
+L1 Core Identity
+  每次请求都加载的极简偏好摘要，例如 preferences_summary。
+
+L2 Memory Directory
+  给 planner 看的记忆目录，例如有哪些 learned profile 和 memory topic。
+
+L3 Memory Detail
+  skill 执行前按设备类型和任务检索的详细长期记忆。
+```
+
+<div align="center">
+  <img src="docs/images/memory%20system.svg" alt="Anima Memory System Architecture" width="100%" />
+</div>
+
+当前 memory 系统已经支持：
+
+- `history.json` 为每条交互生成 `event_id`
+- extracted memory 使用标准 schema 存储
+- `claim_type` 区分明确偏好、隐式偏好、例行行为、设备别名、约束和家庭上下文
+- `positive_evidence` / `negative_evidence` 记录证据来源
+- `status` 区分 `candidate`、`confirmed`、`rejected`、`stale`
+- 只有 confirmed memory 默认进入 skill 决策
+- learned profile 按设备类型保存到 `learned.json`
+
+这让 Anima 能减少“一次行为被过度学习”的问题。例如，用户临时开了一次灯，不会立刻变成“用户长期喜欢开灯”；只有明确表达或重复证据才会逐步成为长期记忆。
+
+### 4. Adapter：真实硬件接入层
+
+Adapter 负责把 Anima 的结构化动作转成真实设备协议。
+
+当前主要支持：
+
+- Xiaomi / Mi Home / MIoT 设备发现
+- 小米云扫码获取设备列表和 token
+- 本地 `ip + token` 控制普通 MIoT 设备
+- Xiaomi speaker 的部分云端播放能力
+- 手动添加 MIoT 设备
+- 设备状态刷新和动作执行结果返回
+
+需要注意：普通 MIoT 设备执行命令时，本质仍依赖设备当前可达的局域网 IP 和 token。小米云登录主要用于发现设备和获取 token，不等于所有设备都支持云端远程控制。
+
+## 功能特性
+
+- **自动发现设备**：局域网扫描、小米云设备同步、设备去重和运行时注册。
+- **AI 决策中枢**：LLM Brain 根据环境、设备、skill 和 memory 生成行动计划。
+- **可扩展 Skill 系统**：每个设备类型都有独立知识、决策、学习和动作脚本。
+- **长期记忆机制**：从 history 中提取候选记忆，按证据晋升为 confirmed memory。
+- **偏好学习**：按设备类型生成 learned profile，让后续决策更贴近用户习惯。
+- **实时 Dashboard**：设备列表、环境状态、聊天控制、设置、memory 调试。
+- **REST API**：提供设备、聊天、设置、扫描、memory 等接口。
+- **MIoT 支持**：支持 Xiaomi / Mi Home 设备 token 获取、本地控制和部分音箱云端能力。
+- **本地优先**：核心运行在你的机器上，设备控制尽量通过局域网完成。
+
+---
+
+## 快速开始 quick start
+
+### 环境要求
+
+- Node.js >= 18
+- pnpm >= 8
+- Python >= 3.11
+- uv
+
+`pnpm install` 会通过 `uv sync` 安装 Python 依赖。
+要控制 MIoT 设备，请执行 uv sync --extra dev --extra miot --python 3.13，或把 postinstall 改成包含 miot
+
+### 安装并运行
 
 ```bash
-# Clone the repo
 git clone https://github.com/fulai-tech/Anima.git
 cd Anima
 
-# Install all dependencies (frontend + backend in one command)
 pnpm install
-
-# Configure
-cp .env.example .env      # Fill in ANIMA_LLM_API_KEY
-
-# Launch everything (MQTT Broker + Dashboard + Backend)
 pnpm dev
 ```
 
-Open **http://localhost:3000** to see the Anima Dashboard.
+启动后访问：
 
-### Connect Your Devices
-
-1. Click **Settings** (top-right gear icon)
-2. In **LLM Brain**, enter your API Key and model (or configure via `.env`)
-3. In **Xiaomi**, click **Generate QR Code**
-4. Open **Mi Home** on your phone and scan the QR code
-5. Done — all devices and tokens are fetched automatically
-
-> **Why QR scan?** Tokens are stored on Xiaomi's cloud servers. Local scanning finds devices but cannot retrieve tokens. QR login is the most reliable approach — no password, no captcha.
-
-Click **Help** (top-right) for a full in-Dashboard guide.
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) >= 18 + [pnpm](https://pnpm.io/) >= 8
-- [uv](https://docs.astral.sh/uv/) — Python package manager (auto-installed via `pnpm install`)
-
----
-
-## Core Architecture
-
-Anima runs as a **single asyncio process** connected to a lightweight MQTT broker:
-
-<img src="docs/images/arch.jpg" alt="Anima Architecture" width="100%" />
-
----
-
-## System Overview
-
-<img src="images/system-overview.png" alt="System Overview" width="100%" />
-
----
-
-## Event-Driven Architecture
-
-The **EventBus** is the nervous system of Anima — all modules communicate through it via publish/subscribe, with error isolation per subscriber.
-
-<img src="images/event-driven.png" alt="Event-Driven Architecture" width="100%" />
-
----
-
-## Skill Decision Flow
-
-When a sensor event or user chat arrives, the LLM Brain loads domain knowledge, plans actions via LangGraph, executes skills, verifies device state, and updates learned profiles.
-
-<img src="images/skill-flow.png" alt="Skill Decision Flow" width="100%" />
-
----
-
-## Device Communication Flow
-
-Commands flow from the Dashboard through FastAPI to the MQTT broker, then through device adapters (MIoT / Matter) to physical devices. Discovery happens via mDNS or Xiaomi QR login.
-
-<img src="images/device-flow.png" alt="Device Communication Flow" width="100%" />
-
----
-
-## Skill Ecosystem
-
-Each device type has a dedicated **Skill** — a domain knowledge package that teaches Anima how to make intelligent decisions. Skills are layered: System Skills (built-in) on the left, Custom Skills (user-created) on the right.
-
-<img src="images/skill-ecosystem.png" alt="Skill Ecosystem" width="100%" />
-
----
-
-## What's Included
-
-| Module | Description |
-|--------|-------------|
-| **Dashboard** | React + Vite + Tailwind — device list, environment view, AI decision stream, unified chat, settings, and memory debugger |
-| **LLM Brain** | Skill-driven LangGraph planner/executor — plans actions, executes skills, verifies device state, serves `/api/chat` |
-| **Skill System** | Per-device domain knowledge packages + user-extensible custom skills |
-| **Memory System** | `preferences.md` + topic memories + normalized `learned.json` profiles with incremental extraction |
-| **EventBus** | Async event system with wildcard subscriptions and error isolation |
-| **Discovery** | Auto-scans via mDNS, registers devices, deduplicates |
-| **MIoT Adapter** | Xiaomi/Mi Home device discovery and control via python-miio |
-| **Scheduler** | Periodic scanning, preference learning, memory extraction, and brain ticks |
-| **REST API** | FastAPI on port 8080 — devices, chat, settings, environment, memory-debug endpoints |
-| **CLI** | Interactive Rich terminal: `devices`, `scan`, `status <id>`, `history` |
-
----
-
-## Built-in Skills
-
-Each Skill is a **domain knowledge package** — not just an API wrapper. It teaches Anima *how* to make intelligent decisions for that device type:
-
-| Skill | Knowledge Includes |
-|-------|-------------------|
-| **Humidifier** | Comfort ranges (40-60%), seasonal adjustments, AC interaction, water level alerts |
-| **Air Conditioner** | Energy optimization, circadian temperature scheduling, humidity coordination |
-| **Light** | Circadian lighting (2200K-5000K), time-of-day brightness curves, transition smoothness |
-| **Air Purifier** | Occupancy-aware purification, sleep-time quietness, air quality heuristics |
-| **Speaker** | Explicit playback-oriented behavior, quiet-hour protection, safe no-op defaults |
-| **Coordinator** | Cross-device orchestration — prevents conflicts, creates synergies |
-| **Device Discovery** | Xiaomi QR onboarding, local scan helpers, activation flows |
-| **Skill Creator** | Analysis-first custom skill generation and auto-generated system skills |
-
-### Creating Custom Skills
-
-Drop your skill into `skills/custom/<your-skill>/` following the template:
-
-```
-skills/
-  system/               # Built-in skills maintained by Anima
-    humidifier/
-      SKILL.md          # Skill manifest + behavior spec
-      references/
-        knowledge.md
-        decide.md
-        learn.md
-      scripts/
-        actions.py
-  custom/               # Your skills live here
-    <your-skill>/
-      SKILL.md
-      references/
-      scripts/
+```text
+Dashboard: http://localhost:3000
+Backend API: http://localhost:8080
+Swagger: http://localhost:8080/docs
 ```
 
-Global planner policy can also be tuned in [`core/brain/prompts/planner_hints.md`](./core/brain/prompts/planner_hints.md).
+### 配置 LLM
 
----
-
-## Configuration
+你可以在 `.env` 中配置，也可以在 Dashboard 设置页配置。
 
 ```env
-# Required: any OpenAI-compatible API key
 ANIMA_LLM_API_KEY=sk-xxx
-
-# Optional: model name (default: gpt-4o)
 ANIMA_LLM_MODEL=gpt-4o
-
-# Optional: custom endpoint for DeepSeek / Doubao / Ollama / etc.
-ANIMA_LLM_BASE_URL=https://api.deepseek.com/v1
-
-# Optional: disable deep thinking (required for Doubao)
+ANIMA_LLM_BASE_URL=
 ANIMA_LLM_DISABLE_THINKING=false
 ```
 
-**Supported LLM Providers** (any OpenAI-compatible API):
+Anima 使用 OpenAI-compatible API，因此可以接入 OpenAI、DeepSeek、豆包、Ollama 兼容端点或其他代理服务。
 
-| Provider | `ANIMA_LLM_MODEL` | `ANIMA_LLM_BASE_URL` |
-|----------|-------------------|----------------------|
-| OpenAI | `gpt-4o` | *(leave empty)* |
-| Anthropic (via proxy) | `claude-sonnet-4-20250514` | your proxy URL |
-| DeepSeek | `deepseek-chat` | `https://api.deepseek.com/v1` |
-| Doubao | `doubao-seed-2-0-lite-260215` | `https://ark.cn-beijing.volces.com/api/v3` |
-| Ollama (local) | `llama3` | `http://localhost:11434/v1` |
+### 连接小米设备
 
----
+推荐方式是在 Dashboard 中使用小米扫码登录：
 
-## Development
+1. 打开 Dashboard 设置页。
+2. 进入 Xiaomi / Mi Home 配置区域。
+3. 生成二维码。
+4. 使用米家 App 扫码。
+5. 在 Xiaomi Cloud 返回 token 的情况下自动同步；未返回 token 的设备仍可手动输入 token 激活
 
-| Command | Description |
-|---------|-------------|
-| `pnpm install` | Install all dependencies (frontend + backend) |
-| `pnpm dev` | Start Dashboard (port 3000) + Backend (port 8080) together |
-| `pnpm dev:frontend` | Start Dashboard only |
-| `pnpm dev:backend` | Start Python backend only |
-| `pnpm build` | Build Dashboard for production |
-| `uv run pytest tests/ -v` | Run the full test suite |
-
-FastAPI Swagger docs: `http://localhost:8080/docs`
+如果你已经知道设备 IP 和 token，也可以手动添加 MIoT 设备。
 
 ---
 
-## REST API
+## 常用命令
 
-<details>
-<summary><strong>View all endpoints</strong></summary>
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check |
-| GET | `/api/devices` | List all discovered devices |
-| GET | `/api/devices/{device_id}` | Get device details |
-| POST | `/api/devices/{device_id}/command` | Send command to a device |
-| POST | `/api/devices/add` | Add a manual MIoT device by IP + token |
-| POST | `/api/devices/{device_id}/activate` | Activate a discovered device with a token |
-| GET | `/api/rooms` | List rooms |
-| POST | `/api/chat` | Unified graph-based chat (reply, system ops, skill execution) |
-| GET | `/api/decisions` | Recent AI decision history |
-| GET | `/api/environment` | Aggregated environment snapshot |
-| POST | `/api/environment/refresh` | Refresh device states |
-| POST | `/api/scan` | Trigger device re-scan |
-| GET | `/api/memory` | View learned profiles, topic memories, extraction state, history |
-| GET | `/api/settings` | Read persisted dashboard settings |
-| GET | `/api/settings/xiaomi/status` | Xiaomi cloud connection status |
-| POST | `/api/settings/xiaomi/qr/start` | Start Xiaomi QR login flow |
-| POST | `/api/settings/xiaomi/qr/poll` | Poll Xiaomi QR login status |
-| POST | `/api/settings/xiaomi/disconnect` | Clear Xiaomi cloud connection |
-| GET | `/api/settings/llm/status` | Read current LLM configuration |
-| POST | `/api/settings/llm/configure` | Save LLM configuration |
-
-</details>
+| 命令 | 说明 |
+|---|---|
+| `pnpm install` | 安装前端和后端依赖 |
+| `pnpm dev` | 同时启动 Dashboard、Backend 和本地 broker |
+| `pnpm dev:frontend` | 仅启动前端 |
+| `pnpm dev:backend` | 仅启动后端 |
+| `pnpm dev:broker` | 仅启动本地 MQTT broker |
+| `pnpm build` | 构建前端 |
+| `uv run pytest tests/ -v` | 运行测试 |
+| `uv run ruff check .` | 运行 Python lint |
 
 ---
 
-## Project Structure
+## 项目结构
 
-```
+```text
 Anima/
-├── dashboard/                  # Frontend (React + Vite + Tailwind)
-│   └── src/components/         # DeviceList, DeviceCard, DecisionLog, ChatBar, Header
-├── core/                       # Python backend
-│   ├── brain/                  # LLM decision engine + Skill loader
-│   ├── events/                 # Async EventBus
-│   ├── rules/                  # Fast-path rules engine
-│   ├── memory/                 # User memory (markdown + JSON)
-│   ├── scheduler/              # Periodic job scheduler
-│   ├── api/                    # FastAPI REST endpoints
-│   └── main.py                 # Main entrypoint
-├── adapters/                   # Device protocol adapters
-│   └── miot/                   # Xiaomi MIoT adapter
+├── core/
+│   ├── api/                 # FastAPI routes
+│   ├── brain/               # Brain, planner, executor, ReAct agent, skill loader
+│   ├── devices/             # Discovery orchestrator
+│   ├── events/              # Async EventBus
+│   ├── llm/                 # LLM runtime config
+│   ├── media/               # Xiaomi speaker playback support
+│   ├── memory/              # Preferences, history, learned profiles, extracted memories
+│   ├── runtime/             # Settings and persisted config
+│   └── main.py              # Application entrypoint
+├── adapters/
+│   └── miot/                # Xiaomi MIoT adapter
 ├── skills/
-│   ├── system/                 # Built-in skills shipped with Anima
-│   └── custom/                 # User-created skills
-├── tests/                      # Automated test suite
-├── docs/plans/                 # Design doc + implementation plan
-├── package.json                # pnpm monorepo root
-├── pyproject.toml              # Python dependencies
-├── docker-compose.yml          # MQTT broker + core
-└── .env.example                # Configuration template
+│   ├── system/              # Built-in skills
+│   └── custom/              # User-defined skills
+├── dashboard/               # React + Vite dashboard
+├── tests/                   # Automated tests
+├── docs/                    # Design notes and implementation plans
+├── data/                    # Local runtime data
+├── package.json             # Root pnpm scripts
+└── pyproject.toml           # Python project config
 ```
 
 ---
 
-## Roadmap
+## API 概览
 
-| Version | Milestone | Key Features |
-|---------|-----------|-------------|
-| **v0.1** | "It's Alive" (done) | Core framework, MIoT adapter, Dashboard, LangGraph brain, memory learning, CLI + API, Docker |
-| v0.2 | "Getting Smarter" | Matter adapter, real-time WebSocket, preference learning, room management |
-| v0.3 | "Community Arrives" | Skill Store, adapter plugins, Telegram Bot, HA bridge |
-| v0.4 | "Getting Stronger" | Multi-user, Raspberry Pi image, security hardening |
+后端默认运行在 `http://localhost:8080`。
+
+常用接口包括：
+
+| Method | Endpoint | 说明 |
+|---|---|---|
+| `GET` | `/health` | 健康检查 |
+| `GET` | `/api/devices` | 获取设备列表 |
+| `POST` | `/api/devices/{device_id}/command` | 向设备发送命令 |
+| `POST` | `/api/devices/add` | 手动添加 MIoT 设备 |
+| `POST` | `/api/devices/{device_id}/activate` | 用 token 激活扫描到的设备 |
+| `POST` | `/api/chat` | 统一聊天与任务执行入口 |
+| `GET` | `/api/environment` | 当前环境聚合状态 |
+| `POST` | `/api/environment/refresh` | 刷新设备状态 |
+| `POST` | `/api/scan` | 触发设备扫描 |
+| `GET` | `/api/memory` | 查看 memory、history、learned profile |
+| `GET` | `/api/settings` | 读取设置 |
+| `POST` | `/api/settings/llm/configure` | 配置 LLM |
+| `POST` | `/api/settings/xiaomi/qr/start` | 开始小米扫码登录 |
+| `POST` | `/api/settings/xiaomi/qr/poll` | 轮询扫码状态 |
+
+完整接口可以查看 Swagger：
+
+```text
+http://localhost:8080/docs
+```
 
 ---
 
-## Contributing
+## 如何扩展
 
-Anima is designed for easy contribution:
+### 添加一个 Skill
 
-- **Write a Skill** — create a new folder under `skills/custom/` with `SKILL.md`, `references/`, and optional `scripts/`. Copy from `skills/custom/_template/` to get started.
-- **Write an Adapter** — 1 class, 3 methods: `discover()`, `subscribe()`, `execute()`
+最简单的扩展方式是新增 skill。
 
-See the [Design Document](docs/plans/2026-03-17-anima-design.md) for full architecture details.
+```text
+skills/custom/my_skill/
+├── SKILL.md
+├── references/
+│   ├── knowledge.md
+│   ├── decide.md
+│   └── learn.md
+└── scripts/
+    └── actions.py
+```
+
+一个好的 skill 应该回答四个问题：
+
+```text
+1. 它适用于哪些设备或场景？
+2. 它需要哪些领域知识？
+3. 它在什么情况下应该行动，什么情况下应该 no-op？
+4. 它能输出哪些结构化动作？
+```
+
+### 添加一个 Adapter
+
+Adapter 用来接入新的硬件协议。核心接口很小：
+
+```text
+discover()   # 发现设备
+subscribe()  # 刷新或订阅状态
+execute()    # 执行动作
+```
+
+你可以参考 `adapters/miot/` 实现新的协议适配器，例如 Matter、Home Assistant、BLE、HTTP API 或私有设备协议。
+
+---
+
+## 当前状态
+
+Anima 仍处于早期版本，但已经具备完整可运行的核心闭环：
+
+```text
+设备发现 -> Brain 规划 -> Skill 决策 -> Adapter 执行 -> 状态验证 -> History/Memory 学习
+```
+
+当前更成熟的部分：
+
+- Core runtime
+- Dashboard
+- MIoT adapter
+- Skill framework
+- Memory extraction and learned profile
+- Chat and REST API
+
+仍在持续演进的方向：
+
+- 更多设备协议 adapter
+- 更完善的远程控制策略
+- 更强的 memory 检索和冲突处理
+- Skill marketplace / community skills
+- 多用户和权限模型
+- 更完整的安全策略和部署体验
+
+---
+
+## 重大更新
+
+这里会记录 Anima 的重要版本发布、架构升级和关键能力演进，方便开发者快速了解项目每个阶段的核心变化。
+
+### 2026-06-01：Anima 正式开源
+
+Anima 首个开源版本发布，提供面向智能硬件的 Agent OS 基础能力：本地设备发现、MIoT 设备接入、LLM Brain 决策、Skill 机制、长期 Memory 系统和可视化 Dashboard。这个版本奠定了 Anima 连接大模型与物理设备的核心运行框架。
+
+---
+
+## 贡献
+
+Anima 欢迎不同类型的贡献：
+
+- 新增设备 adapter
+- 编写或改进 skill
+- 优化 Brain 决策流
+- 改进 Memory 机制
+- 增强 Dashboard 体验
+- 补充测试和文档
+- 报告真实设备兼容性问题
+
+开始贡献前可以阅读：
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [ARCHITECTURE_GUARDRAILS.md](./ARCHITECTURE_GUARDRAILS.md)
+- [docs/plans/design.md](./docs/plans/design.md)
+
+---
+
+## 安全说明
+
+Anima 会连接真实设备并执行真实动作。请注意：
+
+- 不要把 Dashboard 或 API 直接暴露到公网。
+- 小米 token、LLM API key 等敏感信息应只保存在可信环境。
+- 控制公司、公共空间或多人共享空间设备时，应先建立明确权限边界。
+- 对自动化行为保持保守，尤其是涉及门锁、安防、电器电源等高风险设备时。
 
 ---
 
 ## License
 
-[Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+This project is licensed under the Apache License 2.0.
+See the [LICENSE](./LICENSE) file for details.
 
 <div align="center">
   <br/>
-  <i>Made with love by the Anima Team</i>
+  <p><em><strong>Anima</strong></em></p>
+  <p><em>Make every hardware intelligent.</em></p>
 </div>
