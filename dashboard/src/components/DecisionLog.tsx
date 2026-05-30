@@ -205,7 +205,7 @@ function MarkdownMessage({ content }: { content: string }) {
 
 function ExecutionSummaryCard({ items }: { items: ChatExecutionResult[] }) {
   return (
-    <div className="rounded-2xl rounded-tl-md border border-emerald-200/80 bg-emerald-50 px-4 py-3">
+    <div className="rounded-2xl rounded-tl-md border border-emerald-200/70 bg-emerald-50/70 px-4 py-3">
       <div className="flex items-center gap-2 mb-2">
         <div className="flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100">
           <Wrench className="h-3 w-3 text-emerald-600" />
@@ -526,26 +526,26 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
   }
 
   return (
-    <aside className="w-[400px] min-w-[400px] border-l border-slate-200/80 bg-white flex flex-col shadow-[-1px_0_0_#e2e8f0]">
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
-        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-violet-600">
+    <aside className="flex w-[400px] min-w-[400px] flex-col overflow-hidden rounded-[24px] border border-slate-200/70 bg-white/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+      <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-violet-600 shadow-[0_6px_16px_rgba(124,58,237,0.22)]">
           <Brain className="w-3.5 h-3.5 text-white" />
         </div>
-        <h2 className="text-sm font-semibold text-slate-700">Anima</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Anima</h2>
         <span className="ml-auto text-[10px] text-slate-400 font-medium">AI 助手</span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {conversation.length === 0 ? (
-          <div className="p-8 text-center mt-6">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+          <div className="mt-6 p-8 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 ring-1 ring-violet-100">
               <Sparkles className="w-6 h-6 text-violet-400" />
             </div>
             <p className="text-sm font-medium text-slate-600">和 Anima 说话，控制你的设备</p>
             <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">例如：打开客厅的灯<br />把卧室空调调到 26 度</p>
           </div>
         ) : (
-          <div className="py-4 space-y-1">
+          <div className="space-y-1 py-4">
             {conversation.map((turn) => (
               <ConversationCard key={turn.id} turn={turn} />
             ))}
@@ -554,7 +554,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
         )}
       </div>
 
-      <div className="border-t border-slate-100 bg-white p-3.5">
+      <div className="border-t border-slate-100 bg-white/95 p-3.5">
         <div className="flex items-end gap-2.5">
           <textarea
             value={message}
@@ -567,12 +567,12 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
             }}
             rows={2}
             placeholder="说点什么..."
-            className="flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-violet-500 focus:ring-2 focus:ring-violet-500/15 focus:bg-white placeholder:text-slate-400"
+            className="flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/15"
           />
           <button
             onClick={() => void handleSend()}
             disabled={sending || !message.trim()}
-            className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-violet-600 text-white transition-all hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm hover:shadow-md"
+            className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-violet-600 text-white shadow-[0_8px_20px_rgba(124,58,237,0.24)] transition-all hover:bg-violet-700 hover:shadow-[0_10px_24px_rgba(124,58,237,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
@@ -605,7 +605,7 @@ function AgentTrace({ trace }: { trace: AgentEvent[] }) {
                   <span>
                     <span className="font-medium text-amber-600">{event.tool}</span>
                     {event.args && Object.keys(event.args).length > 0 && (
-                      <span className="ml-1 text-slate-400">({JSON.stringify(event.args)})</span>
+                      <span className="ml-1 break-all text-slate-400">({JSON.stringify(event.args)})</span>
                     )}
                   </span>
                 </>
@@ -636,8 +636,8 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
     return (
       <div className="px-4 py-2">
         <div className="flex mb-2">
-          <div className="max-w-[92%] rounded-[18px] rounded-tl-sm border border-emerald-200/80 bg-emerald-50/60 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-4 pt-3 pb-2 text-[10px] uppercase tracking-widest text-emerald-600 font-semibold">
+          <div className="max-w-[92%] overflow-hidden rounded-[18px] rounded-tl-sm border border-emerald-200/70 bg-emerald-50/60 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center gap-2 px-4 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
               <Sparkles className="h-3 w-3" />
               <span>Anima 自动执行</span>
               <span className="ml-auto text-emerald-400 normal-case font-normal">{formatTime(turn.timestamp)}</span>
@@ -655,8 +655,8 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
     <div className="px-4 py-2">
       {/* User message */}
       <div className="flex justify-end mb-2">
-        <div className="max-w-[85%] rounded-[18px] rounded-tr-sm bg-violet-600 px-4 py-3 text-sm leading-6 text-white shadow-sm">
-          <div className="mb-1 text-[10px] uppercase tracking-widest text-violet-300 flex items-center gap-1">
+        <div className="max-w-[85%] rounded-[18px] rounded-tr-sm bg-violet-600 px-4 py-3 text-sm leading-6 text-white shadow-[0_6px_18px_rgba(124,58,237,0.18)]">
+          <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-violet-300">
             <Clock className="inline w-2.5 h-2.5" />{formatTime(turn.timestamp)}
           </div>
           {turn.userMessage}
@@ -666,7 +666,7 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
       {/* Status indicator — real-time progress */}
       {hasStatus && (
         <div className="flex mb-2">
-          <div className="rounded-[18px] rounded-tl-sm border border-amber-100 bg-amber-50/60 px-4 py-2.5 flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-[18px] rounded-tl-sm border border-amber-100 bg-amber-50/60 px-4 py-2.5">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500" />
             <span className="text-xs text-amber-600 font-medium">{turn.statusText}</span>
           </div>
@@ -679,10 +679,10 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
       {/* Assistant reply — collapsible */}
       {hasReply ? (
         <div className="flex mb-2">
-          <div className="max-w-[92%] rounded-[18px] rounded-tl-sm border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+          <div className="max-w-[92%] overflow-hidden rounded-[18px] rounded-tl-sm border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <button
               onClick={() => setReplyOpen(o => !o)}
-              className="w-full flex items-center gap-2 px-4 pt-3 pb-2 text-[10px] uppercase tracking-widest text-violet-500 font-semibold hover:text-violet-700 transition-colors"
+              className="flex w-full items-center gap-2 px-4 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-500 transition-colors hover:text-violet-700"
             >
               {replyOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               <Sparkles className="h-3 w-3" />
@@ -712,7 +712,7 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
         </div>
       ) : turn.result.reply === '' && hasTrace && !hasStatus ? (
         <div className="flex mb-2">
-          <div className="rounded-[18px] rounded-tl-sm border border-violet-100 bg-violet-50/60 px-4 py-3 flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-[18px] rounded-tl-sm border border-violet-100 bg-violet-50/60 px-4 py-3">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />
             <span className="text-xs text-violet-500 font-medium">思考中...</span>
           </div>

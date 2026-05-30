@@ -128,10 +128,10 @@ export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
   if (!supported) return null
 
   return (
-    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 pointer-events-none">
+    <div className="pointer-events-none fixed bottom-7 left-1/2 z-40 flex -translate-x-1/2 flex-col items-center gap-3">
       {/* Transcript bubble */}
       {listening && (
-        <div className="pointer-events-auto max-w-xs w-max bg-white/95 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-2.5 shadow-lg flex items-center gap-2">
+        <div className="pointer-events-auto flex w-max max-w-xs items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-4 py-2.5 shadow-[0_12px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm">
           <span className="text-sm text-slate-700 max-w-[220px] truncate">
             {transcript || <span className="text-slate-400 italic">正在聆听...</span>}
           </span>
@@ -159,10 +159,10 @@ export default function VoiceOrb({ onSend, disabled }: VoiceOrbProps) {
           onClick={handleClick}
           disabled={disabled}
           title={listening ? '点击发送 / 再次点击停止' : '语音输入'}
-          className={`relative w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all duration-200 cursor-pointer
+          className={`relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full transition-all duration-200
             ${listening
-              ? 'bg-violet-600 scale-110 shadow-violet-400/40 shadow-2xl'
-              : 'bg-white border-2 border-violet-200 hover:border-violet-400 hover:scale-105 hover:shadow-violet-200/60'
+              ? 'scale-110 bg-violet-600 shadow-[0_16px_34px_rgba(124,58,237,0.36)]'
+              : 'border border-violet-200 bg-white shadow-[0_10px_28px_rgba(124,58,237,0.18)] hover:scale-105 hover:border-violet-400 hover:shadow-[0_14px_32px_rgba(124,58,237,0.24)]'
             }
             ${disabled ? 'opacity-40 cursor-not-allowed' : ''}
           `}

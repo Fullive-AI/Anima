@@ -36,9 +36,9 @@
   --radius-2xl: 28px;
 
   /* Shadow */
-  --shadow-sm:  0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
-  --shadow-md:  0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04);
-  --shadow-lg:  0 12px 32px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.06);
+  --shadow-sm:  0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.05);
+  --shadow-md:  0 2px 4px rgba(15,23,42,0.05), 0 12px 30px rgba(15,23,42,0.07);
+  --shadow-lg:  0 16px 40px rgba(15,23,42,0.14);
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */
@@ -99,7 +99,7 @@ body {
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  height: 5px;
   border-radius: 99px;
   background: #e2e8f0;
   outline: none;
@@ -109,8 +109,9 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #ffffff;
   border-radius: 50%;
   background: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-glow);
@@ -123,9 +124,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border: none;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #ffffff;
   border-radius: 50%;
   background: var(--color-primary);
   cursor: pointer;

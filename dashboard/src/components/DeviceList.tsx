@@ -156,7 +156,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
       onContextMenu={(e) => openContextMenu(e, 'device', d.device_id, d.name)}
     >
       {renamingDeviceId === d.device_id ? (
-        <div className="px-3 py-2 border-l-2 border-violet-500">
+        <div className="mx-2 rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2">
           <input
             ref={renameInputRef}
             value={renamingDeviceName}
@@ -166,33 +166,35 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
               if (e.key === 'Enter') handleRenameDevice(d.device_id)
               if (e.key === 'Escape') setRenamingDeviceId(null)
             }}
-            className="w-full text-sm border border-violet-400 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-violet-500/20 bg-white"
+            className="w-full rounded-lg border border-violet-300 bg-white px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-violet-500/20"
           />
         </div>
       ) : (
         <button
           onClick={() => onSelect(d.device_id)}
-          className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all cursor-grab active:cursor-grabbing ${
+          className={`mx-2 flex w-[calc(100%-1rem)] cursor-grab items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all active:cursor-grabbing ${
             selectedId === d.device_id
-              ? 'bg-violet-50 border-l-2 border-violet-600 pl-[10px]'
-              : 'border-l-2 border-transparent hover:bg-slate-50'
+              ? 'bg-violet-50 text-violet-700 shadow-[inset_3px_0_0_#7c3aed,0_1px_2px_rgba(124,58,237,0.08)]'
+              : 'text-slate-700 hover:bg-slate-50'
           }`}
         >
-          <span className={`flex-shrink-0 ${d.needs_token ? 'text-amber-400' : d.online ? 'text-violet-600' : 'text-slate-300'}`}>
+          <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
+            selectedId === d.device_id ? 'bg-white text-violet-600 shadow-sm' : d.needs_token ? 'bg-amber-50 text-amber-500' : d.online ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-300'
+          }`}>
             <DeviceIcon type={d.type} />
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <p className={`text-sm font-medium truncate ${selectedId === d.device_id ? 'text-violet-700' : 'text-slate-700'}`}>{d.name}</p>
+              <p className={`truncate text-sm font-semibold ${selectedId === d.device_id ? 'text-violet-700' : 'text-slate-700'}`}>{d.name}</p>
               {d.adapter === 'virtual' && (
                 <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 border border-violet-200">虚拟</span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="mt-0.5 truncate text-[11px] text-slate-400">
               {d.needs_token ? '需要 Token' : (TYPE_LABELS[d.type] || d.type)} · {d.adapter}
             </p>
           </div>
-          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${d.needs_token ? 'bg-amber-400' : d.online ? 'bg-emerald-400' : 'bg-slate-300'}`} />
+          <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${d.needs_token ? 'bg-amber-400' : d.online ? 'bg-emerald-400' : 'bg-slate-300'}`} />
         </button>
       )}
     </li>
@@ -209,15 +211,15 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
         onDragOver={e => { e.preventDefault(); setDragOverRoomId(room.room_id) }}
         onDragLeave={() => setDragOverRoomId(null)}
         onDrop={() => handleDrop(room.room_id)}
-        className={`transition-colors ${isOver ? 'bg-violet-50/60' : ''}`}
+        className={`py-1 transition-colors ${isOver ? 'bg-violet-50/60' : ''}`}
       >
         <div
-          className="flex items-center gap-1 px-3 py-1.5 group"
+          className="group mx-2 flex items-center gap-1 rounded-lg px-2 py-1.5"
           onContextMenu={(e) => openContextMenu(e, 'room', room.room_id, room.name)}
         >
           <button
             onClick={() => setCollapsed(c => ({ ...c, [room.room_id]: !isCollapsed }))}
-            className="flex items-center gap-1 flex-1 min-w-0"
+            className="flex min-w-0 flex-1 items-center gap-1"
           >
             {isCollapsed
               ? <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
@@ -234,25 +236,25 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                   if (e.key === 'Escape') setEditingRoomId(null)
                 }}
                 onClick={e => e.stopPropagation()}
-                className="text-[11px] font-semibold text-slate-600 bg-white border border-violet-400 rounded px-1 py-0.5 w-full outline-none"
+                className="w-full rounded border border-violet-300 bg-white px-1 py-0.5 text-[11px] font-semibold text-slate-600 outline-none"
               />
             ) : (
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest truncate">
+              <span className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                 {room.name}
                 <span className="ml-1 text-slate-300 normal-case font-normal">({roomDevices.length})</span>
               </span>
             )}
           </button>
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               onClick={() => { setEditingRoomId(room.room_id); setEditingName(room.name) }}
-              className="p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors"
+              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-violet-50 hover:text-violet-600"
             >
               <Pencil className="w-3 h-3" />
             </button>
             <button
               onClick={() => handleDeleteRoom(room.room_id)}
-              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+              className="rounded-md p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 className="w-3 h-3" />
             </button>
@@ -261,7 +263,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
         {!isCollapsed && (
           <ul>
             {roomDevices.length === 0 ? (
-              <li className={`px-8 py-2 text-[11px] ${isOver ? 'text-violet-500' : 'text-slate-400'}`}>
+              <li className={`mx-2 rounded-lg px-8 py-2 text-[11px] ${isOver ? 'bg-violet-50 text-violet-500' : 'text-slate-400'}`}>
                 {isOver ? '松开以移入此房间' : '拖拽设备到此处'}
               </li>
             ) : roomDevices.map(renderDevice)}
@@ -272,12 +274,12 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
   }
 
   return (
-    <aside className="w-64 min-w-[256px] bg-white border-r border-slate-200/80 flex flex-col shadow-[1px_0_0_#e2e8f0]">
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-        <h2 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">设备列表</h2>
+    <aside className="flex w-[328px] min-w-[328px] flex-col overflow-hidden rounded-[24px] border border-slate-200/70 bg-white/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">设备列表</h2>
         <button
           onClick={() => setAddingRoom(true)}
-          className="p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-md transition-colors"
+          className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-violet-50 hover:text-violet-600"
           title="新增房间"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -285,7 +287,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
       </div>
 
       {addingRoom && (
-        <div className="px-3 py-2 border-b border-slate-100">
+        <div className="border-b border-slate-100 px-3 py-2">
           <input
             ref={addInputRef}
             value={newRoomName}
@@ -296,14 +298,14 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
               if (e.key === 'Escape') { setAddingRoom(false); setNewRoomName('') }
             }}
             placeholder="房间名称..."
-            className="w-full text-sm border border-violet-300 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-violet-400"
+            className="w-full rounded-lg border border-violet-300 px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-500/20"
           />
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto">
         {devices.length === 0 ? (
-          <div className="p-4 text-sm text-slate-400 text-center">
+          <div className="p-5 text-center text-sm text-slate-400">
             <p>暂无设备</p>
             <p className="mt-1 text-xs">点击右上角「扫描设备」</p>
           </div>
@@ -319,9 +321,9 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                 className={`transition-colors ${dragOverRoomId === '__unassigned__' ? 'bg-slate-50' : ''}`}
               >
                 {rooms.length > 0 && (
-                  <div className="flex items-center gap-1 px-3 py-2">
+                  <div className="mx-2 flex items-center gap-1 rounded-lg px-2 py-2">
                     <Home className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
-                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
                       未分配
                       <span className="ml-1 text-slate-300 normal-case">({unassigned.length})</span>
                     </span>
@@ -334,7 +336,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
         )}
       </div>
 
-      <div className="px-4 py-2.5 border-t border-slate-100 text-[11px] text-slate-400 flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 border-t border-slate-100 bg-white/90 px-4 py-2.5 text-[11px] text-slate-400">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
         {devices.filter(d => d.online).length} 在线 · 共 {devices.length} 台
       </div>
@@ -342,11 +344,11 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
       {/* Right-click context menu */}
       {contextMenu && (
         <div
-          className="fixed z-50 min-w-[140px] rounded-xl border border-slate-200 bg-white shadow-lg py-1 text-sm"
+          className="fixed z-50 min-w-[148px] rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-[0_16px_40px_rgba(15,23,42,0.14)]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={e => e.stopPropagation()}
         >
-          <div className="px-3 py-1.5 text-[11px] text-slate-400 font-medium border-b border-slate-100 truncate max-w-[180px]">
+          <div className="max-w-[180px] truncate border-b border-slate-100 px-3 py-1.5 text-[11px] font-medium text-slate-400">
             {contextMenu.name}
           </div>
           {contextMenu.type === 'device' && (
@@ -357,7 +359,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                   setRenamingDeviceName(contextMenu.name)
                   setContextMenu(null)
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-2 text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-700"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 重命名
@@ -367,7 +369,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                   handleDeleteDevice(contextMenu.id)
                   setContextMenu(null)
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-red-50 transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-2 text-red-500 transition-colors hover:bg-red-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 删除设备
@@ -382,7 +384,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                   setEditingName(contextMenu.name)
                   setContextMenu(null)
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-2 text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-700"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 重命名房间
@@ -392,7 +394,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                   handleDeleteRoom(contextMenu.id)
                   setContextMenu(null)
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-red-500 hover:bg-red-50 transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-2 text-red-500 transition-colors hover:bg-red-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 删除房间

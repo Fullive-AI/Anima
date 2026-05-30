@@ -27,13 +27,13 @@ function SensorBadge({ name, value, unit }: { name: string; value: unknown; unit
     : '--'
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 hover:bg-slate-100/60 transition-colors">
-      <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-white shadow-sm border border-slate-100">
+    <div className="flex min-h-[70px] items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50/80 px-3 py-2.5 transition-colors hover:bg-white">
+      <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-100 bg-white shadow-sm">
         <Icon className="h-3.5 w-3.5 text-violet-500" />
       </div>
-      <div>
-        <p className="text-[10px] capitalize text-slate-400 font-medium">{name}</p>
-        <p className="text-sm font-mono font-semibold text-slate-700 leading-tight">{display}</p>
+      <div className="min-w-0">
+        <p className="truncate text-[10px] font-semibold capitalize tracking-wide text-slate-400">{name}</p>
+        <p className="font-mono text-base font-semibold leading-tight text-slate-700">{display}</p>
       </div>
     </div>
   )
@@ -75,18 +75,18 @@ function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: 
   }
 
   return (
-    <div className="rounded-2xl border border-amber-200/80 bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.06)]">
+    <div className="rounded-[22px] border border-amber-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h3 className="text-base font-semibold text-slate-800">{device.name}</h3>
           <p className="text-xs text-slate-400 mt-0.5">{device.ip || device.device_id}</p>
         </div>
-        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-600">
+        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600">
           需要激活
         </span>
       </div>
 
-      <div className="mb-4 space-y-1.5 rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-sm text-slate-600">
+      <div className="mb-4 space-y-1.5 rounded-2xl border border-amber-100 bg-amber-50/50 p-3 text-sm text-slate-600">
         <p className="font-medium text-slate-700 text-xs">已在局域网发现此设备，但缺少 Token。</p>
         <ol className="ml-4 list-decimal space-y-1 text-xs text-slate-500">
           <li>扫码登录小米/米家账号获取 Token</li>
@@ -103,12 +103,12 @@ function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: 
               placeholder="输入 32 位 Token"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none transition-all"
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono transition-all focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
             />
             <button
               onClick={handleActivate}
               disabled={activating || !token}
-              className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-40"
+              className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-40"
             >
               {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
               激活
@@ -185,10 +185,10 @@ function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated:
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-violet-200/60 bg-violet-50/40 overflow-hidden">
+    <div className="mt-3 overflow-hidden rounded-2xl border border-violet-200/60 bg-violet-50/40">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-violet-600 hover:bg-violet-50 transition-colors"
+        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-violet-600 transition-colors hover:bg-violet-50"
       >
         {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         <FlaskConical className="w-3.5 h-3.5" />
@@ -227,7 +227,7 @@ function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated:
           <button
             onClick={handleApply}
             disabled={saving}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50 transition-colors cursor-pointer"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
             {saved ? '已推送，AI 正在响应...' : '推送传感器数据'}
@@ -250,12 +250,15 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
       const inputs = capability.params?.inputs || []
       if (inputs.length === 1) {
         const input = inputs[0]
-        if (input.default !== undefined) {
+        const currentValue = getCurrentCapabilityValue(device, capability, input)
+        if (currentValue !== undefined) {
+          nextValues[capability.name] = currentValue
+        } else if (input.default !== undefined) {
           nextValues[capability.name] = input.default
         } else if (input.type === 'enum' && input.options?.length) {
           nextValues[capability.name] = input.options[0]
         } else if (input.type === 'number') {
-          nextValues[capability.name] = 0
+          nextValues[capability.name] = getNumericRange(capability, input)?.min ?? 0
         } else {
           nextValues[capability.name] = ''
         }
@@ -272,6 +275,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
       const result = await api.sendCommand(device.device_id, action, params)
       if (result.success) {
         setMessage(`${labelForAction(action)} 已发送`)
+        setValues(prev => ({ ...prev, [action]: getSubmittedCapabilityValue(action, params) ?? prev[action] }))
         onDevicesChanged?.()
       } else {
         setError(result.message || '执行失败')
@@ -294,7 +298,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
           key={capability.name}
           onClick={() => handleCommand(capability.name)}
           disabled={disabled}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm disabled:opacity-50 cursor-pointer"
+          className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm disabled:opacity-50"
         >
           {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-violet-500" /> : <Power className="h-4 w-4 text-slate-400" />}
           {labelForCapability(capability)}
@@ -307,10 +311,10 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
       const value = values[capability.name]
 
       return (
-        <div key={capability.name} className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 w-full">
+        <div key={capability.name} className="w-full rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3.5">
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{labelForCapability(capability)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{labelForCapability(capability)}</p>
               {capability.params?.help && <p className="mt-0.5 text-xs text-slate-400">{capability.params.help}</p>}
             </div>
           </div>
@@ -320,7 +324,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
             <button
               onClick={() => handleCommand(capability.name, { [input.name]: normalizeInputValue(input, value) })}
               disabled={disabled || value === '' || value === undefined}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-50 cursor-pointer"
+              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
             >
               {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
               应用
@@ -334,13 +338,13 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.06)] hover:shadow-[0_4px_16px_rgba(15,23,42,0.08)] transition-shadow">
+    <div className="rounded-[22px] border border-slate-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_2px_4px_rgba(15,23,42,0.05),0_12px_30px_rgba(15,23,42,0.07)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-base font-semibold text-slate-800">{device.name}</h3>
           <p className="text-xs text-slate-400 mt-0.5">{device.ip || device.device_id}</p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
           device.online
             ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
             : 'bg-slate-100 text-slate-400 border border-slate-200'
@@ -350,7 +354,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
       </div>
 
       {device.sensors.length > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {device.sensors.map((s) => (
             <SensorBadge key={s.name} name={s.name} value={s.value} unit={s.unit} />
           ))}
@@ -359,7 +363,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
 
       {getVisibleCapabilities(device).length > 0 ? (
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2.5">
             {getVisibleCapabilities(device).map((capability) => renderCapability(capability))}
           </div>
           {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
@@ -390,7 +394,7 @@ function renderInputControl(
         value={String(value ?? '')}
         onChange={(e) => setValues((prev) => ({ ...prev, [capabilityName]: e.target.value }))}
         disabled={disabled}
-        className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none transition-all"
+        className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition-all focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
       >
         {(input.options || []).map((option) => (
           <option key={option} value={option}>{option}</option>
@@ -405,7 +409,7 @@ function renderInputControl(
         value={String(value ?? false)}
         onChange={(e) => setValues((prev) => ({ ...prev, [capabilityName]: e.target.value === 'true' }))}
         disabled={disabled}
-        className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none transition-all"
+        className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition-all focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
       >
         <option value="true">开启</option>
         <option value="false">关闭</option>
@@ -444,7 +448,7 @@ function renderInputControl(
         value={String(value ?? '')}
         onChange={(e) => setValues((prev) => ({ ...prev, [capabilityName]: Number(e.target.value) }))}
         disabled={disabled}
-        className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none transition-all"
+        className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition-all focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
       />
     )
   }
@@ -455,7 +459,7 @@ function renderInputControl(
       value={String(value ?? '')}
       onChange={(e) => setValues((prev) => ({ ...prev, [capabilityName]: e.target.value }))}
       disabled={disabled}
-      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 focus:outline-none transition-all"
+      className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition-all focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
     />
   )
 }
@@ -468,6 +472,76 @@ function normalizeInputValue(input: CapabilityInput, value: string | number | bo
     return Boolean(value)
   }
   return value
+}
+
+function getSubmittedCapabilityValue(action: string, params: Record<string, unknown>) {
+  const sensorNames = SENSOR_NAMES_BY_CAPABILITY[action] || []
+  for (const name of sensorNames) {
+    const value = normalizeCapabilityValue(params[name])
+    if (value !== undefined) return value
+  }
+  const values = Object.values(params)
+  return values.length === 1 ? normalizeCapabilityValue(values[0]) : undefined
+}
+
+function normalizeCapabilityValue(value: unknown): string | number | boolean | undefined {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value
+  }
+  return undefined
+}
+
+function getCurrentCapabilityValue(device: Device, capability: DeviceCapability, input: CapabilityInput) {
+  const sensorValue = getCapabilitySensorValue(device, capability.name)
+  if (sensorValue === undefined) return undefined
+
+  if (input.type === 'number') {
+    const numericValue = Number(sensorValue)
+    if (!Number.isFinite(numericValue)) return undefined
+    const range = getNumericRange(capability, input)
+    if (!range) return numericValue
+    return Math.min(range.max, Math.max(range.min, numericValue))
+  }
+
+  if (input.type === 'boolean') {
+    if (typeof sensorValue === 'boolean') return sensorValue
+    if (typeof sensorValue === 'string') return ['true', 'on', '1', '开'].includes(sensorValue.toLowerCase())
+    if (typeof sensorValue === 'number') return sensorValue !== 0
+    return undefined
+  }
+
+  if (input.type === 'enum') {
+    const value = String(sensorValue)
+    return input.options?.includes(value) ? value : undefined
+  }
+
+  return String(sensorValue)
+}
+
+function getCapabilitySensorValue(device: Device, capabilityName: string) {
+  const sensorNames = SENSOR_NAMES_BY_CAPABILITY[capabilityName] || []
+  for (const name of sensorNames) {
+    const sensor = device.sensors.find((item) => normalizeSensorName(item.name) === name)
+    if (sensor && sensor.value !== null && sensor.value !== undefined) {
+      return sensor.value
+    }
+  }
+  return undefined
+}
+
+function normalizeSensorName(name: string) {
+  return name.trim().toLowerCase().replace(/[-\s]+/g, '_')
+}
+
+const SENSOR_NAMES_BY_CAPABILITY: Record<string, string[]> = {
+  set_brightness: ['brightness'],
+  set_color_temp: ['color_temp', 'color_temperature'],
+  set_target_humidity: ['target_humidity', 'relative_humidity', 'humidity'],
+  set_humidity: ['target_humidity', 'relative_humidity', 'humidity'],
+  set_target_temperature: ['target_temperature', 'temperature'],
+  set_temperature: ['target_temperature', 'temperature'],
+  set_fan_level: ['fan_level', 'fan_speed'],
+  set_mode: ['mode'],
 }
 
 function getNumericRange(capability: DeviceCapability, input: CapabilityInput) {
