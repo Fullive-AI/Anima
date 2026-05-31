@@ -49,6 +49,57 @@ class TestBrain:
         assert "current environment state" in context.lower()
         assert "planner intent" in context.lower()
 
+    def test_build_context_includes_relevant_memories(self):
+        brain = Brain.__new__(Brain)
+        brain._skill_loader = SkillLoader(skills_dir="skills")
+        brain._skill_loader.discover()
+        brain._environment_provider = None
+
+        device = Device(
+            device_id="light_01",
+            name="Bedroom Light",
+            adapter="miot",
+            type="light",
+            sensors=[Sensor(name="power", unit="", value=False)],
+        )
+        skill = brain._skill_loader.get_skill_for_device("light")
+
+        context = brain._build_prompt_context(
+            skill=skill,
+            device=device,
+            user_memory={
+                "preferences_summary": "亮度:晚上温暖偏暗",
+                "learned_profile": '{"stable_preferences":["Prefer dim warm lights at night."]}',
+                "relevant_memories": [
+                    {
+                        "topic": "night_bedside_lamp_brightness",
+                        "title": "Night bedside lamp brightness",
+                        "category": "preference",
+                        "claim_type": "explicit_preference",
+                        "status": "confirmed",
+                        "summary": "用户希望晚上床头灯亮度偏暗。",
+                        "details": ["用户明确说过以后晚上床头灯暗一点。"],
+                        "device_types": ["light"],
+                        "device_ids": ["light_01"],
+                        "scenes": ["night", "bedroom"],
+                        "confidence": "high",
+                        "evidence_count": 1,
+                        "positive_evidence": [],
+                        "negative_evidence": [],
+                        "source_actions": ["chat.reply"],
+                        "created_at": "2026-05-22T10:00:00+00:00",
+                        "updated_at": "2026-05-22T10:00:00+00:00",
+                    }
+                ],
+            },
+            planner_goal="打开床头灯",
+            planner_reason="用户请求",
+        )
+
+        assert "Relevant Long-Term Memories" in context
+        assert "night_bedside_lamp_brightness" in context
+        assert "Planner Intent" in context
+
     def test_get_environment_state(self):
         brain = Brain.__new__(Brain)
         current_device = Device(

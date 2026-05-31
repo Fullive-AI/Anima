@@ -36,6 +36,7 @@ class TestMemoryStore:
         history = await self.store.get_history("default", limit=10)
         assert len(history) == 1
         assert history[0]["action"] == "set_humidity"
+        assert history[0]["event_id"]
 
     async def test_history_limit(self):
         for i in range(20):
@@ -103,7 +104,23 @@ class TestMemoryStore:
                 "summary": "User prefers warm dim lights before sleep.",
                 "details": ["Use warmer light late at night."],
                 "device_types": ["light"],
+                "device_ids": [],
+                "scenes": ["night"],
                 "confidence": "high",
+                "claim_type": "explicit_preference",
+                "status": "confirmed",
+                "positive_evidence": [
+                    {
+                        "event_id": "evt_1",
+                        "timestamp": "2026-05-22T10:00:00+00:00",
+                        "source": "chat",
+                        "action": "chat.reply",
+                        "device_type": "light",
+                        "device_id": "",
+                        "summary": "User explicitly prefers warm dim lights before sleep.",
+                    }
+                ],
+                "negative_evidence": [],
                 "source_actions": ["set_brightness"],
             },
         )
@@ -113,6 +130,115 @@ class TestMemoryStore:
 
         assert manifest[0]["topic"] == "sleep_lighting_preference"
         assert memories["sleep_lighting_preference"]["category"] == "preference"
+        assert memories["sleep_lighting_preference"]["status"] == "confirmed"
+
+    async def test_upsert_extracted_memory_merges_evidence_and_promotes_status(self):
+        for index in range(3):
+            await self.store.upsert_extracted_memory(
+                "default",
+                "evening_light_preference",
+                {
+                    "title": "Evening light preference",
+                    "category": "preference",
+                    "claim_type": "implicit_preference",
+                    "status": "candidate",
+                    "summary": "User may prefer dim light in the evening.",
+                    "details": [f"Evidence {index}"],
+                    "device_types": ["light"],
+                    "device_ids": [],
+                    "scenes": ["evening"],
+                    "confidence": "medium",
+                    "positive_evidence": [
+                        {
+                            "event_id": f"evt_{index}",
+                            "timestamp": f"2026-05-22T10:0{index}:00+00:00",
+                            "source": "chat",
+                            "action": "set_brightness",
+                            "device_type": "light",
+                            "device_id": "light_1",
+                            "summary": f"User dimmed the light in the evening #{index}.",
+                        }
+                    ],
+                    "negative_evidence": [],
+                    "source_actions": ["set_brightness"],
+                },
+            )
+
+        memories = await self.store.get_extracted_memories("default")
+        memory = memories["evening_light_preference"]
+        assert memory["evidence_count"] == 3
+        assert memory["status"] == "confirmed"
+        assert len(memory["positive_evidence"]) == 3
+
+    async def test_search_memory_details_returns_only_relevant_confirmed_memories(self):
+        await self.store.upsert_extracted_memory(
+            "default",
+            "night_light_preference",
+            {
+                "title": "Night light preference",
+                "category": "preference",
+                "claim_type": "explicit_preference",
+                "status": "confirmed",
+                "summary": "User prefers dim lights at night.",
+                "details": ["Keep bedroom lights dim at night."],
+                "device_types": ["light"],
+                "device_ids": [],
+                "scenes": ["night"],
+                "confidence": "high",
+                "positive_evidence": [
+                    {
+                        "event_id": "evt_light",
+                        "timestamp": "2026-05-22T10:00:00+00:00",
+                        "source": "chat",
+                        "action": "chat.reply",
+                        "device_type": "light",
+                        "device_id": "",
+                        "summary": "User explicitly asked for dim lights at night.",
+                    }
+                ],
+                "negative_evidence": [],
+                "source_actions": ["chat.reply"],
+            },
+        )
+        await self.store.upsert_extracted_memory(
+            "default",
+            "one_off_humidifier_action",
+            {
+                "title": "One-off humidifier action",
+                "category": "preference",
+                "claim_type": "implicit_preference",
+                "status": "candidate",
+                "summary": "User may prefer humidifier on.",
+                "details": ["Only one action."],
+                "device_types": ["humidifier"],
+                "device_ids": [],
+                "scenes": [],
+                "confidence": "low",
+                "positive_evidence": [
+                    {
+                        "event_id": "evt_hum",
+                        "timestamp": "2026-05-22T10:00:00+00:00",
+                        "source": "chat",
+                        "action": "turn_on",
+                        "device_type": "humidifier",
+                        "device_id": "",
+                        "summary": "User turned on humidifier once.",
+                    }
+                ],
+                "negative_evidence": [],
+                "source_actions": ["turn_on"],
+            },
+        )
+
+        light_results = await self.store.search_memory_details(
+            "default",
+            device_type="light",
+            query="night bedroom light",
+        )
+        humidifier_results = await self.store.search_memory_details("default", device_type="humidifier")
+
+        assert [item["topic"] for item in light_results] == ["night_light_preference"]
+        assert humidifier_results == []
 
     async def test_memory_extractor_writes_topic_files_and_advances_cursor(self, monkeypatch):
         await self.store.append_history(
@@ -121,6 +247,7 @@ class TestMemoryStore:
         await self.store.append_history(
             "default", {"action": "set_brightness", "device_type": "light", "params": {"value": 20}}
         )
+        history = await self.store.get_history("default", limit=10)
 
         monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
         extractor = MemoryExtractionService(self.store)
@@ -135,7 +262,24 @@ class TestMemoryStore:
                             "summary": "Lights are typically turned on at low brightness in the evening.",
                             "details": ["Favor low brightness during evening hours."],
                             "device_types": ["light"],
+                            "device_ids": [],
+                            "scenes": ["evening"],
                             "confidence": "high",
+                            "claim_type": "implicit_preference",
+                            "status": "candidate",
+                            "positive_evidence": [
+                                {
+                                    "event_id": item["event_id"],
+                                    "timestamp": item["timestamp"],
+                                    "source": "chat",
+                                    "action": item["action"],
+                                    "device_type": "light",
+                                    "device_id": "",
+                                    "summary": "Light action in evening routine.",
+                                }
+                                for item in history
+                            ],
+                            "negative_evidence": [],
                             "source_actions": ["turn_on", "set_brightness"],
                         }
                     ],
@@ -232,6 +376,7 @@ class TestMemoryStore:
                             "device_types": ["smart_speaker"],
                             "confidence": "high",
                             "source_actions": ["plan.reply"],
+                            "linked_custom_skill_name": "Workday 8AM Smart Speaker Wakeup",
                         }
                     ],
                     "forget_topics": [],
@@ -292,6 +437,7 @@ class TestMemoryStore:
         await self.store.append_history(
             "default", {"action": "set_color_temp", "device_type": "light", "params": {"value": 2700}}
         )
+        history = await self.store.get_history("default", limit=10)
 
         monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
         extractor = MemoryExtractionService(self.store)
@@ -306,7 +452,24 @@ class TestMemoryStore:
                             "summary": "The user prefers warm dim lighting in the evening.",
                             "details": ["Warm and dim lighting repeats in recent history."],
                             "device_types": ["light"],
+                            "device_ids": [],
+                            "scenes": ["evening"],
                             "confidence": "high",
+                            "claim_type": "implicit_preference",
+                            "status": "candidate",
+                            "positive_evidence": [
+                                {
+                                    "event_id": item["event_id"],
+                                    "timestamp": item["timestamp"],
+                                    "source": "chat",
+                                    "action": item["action"],
+                                    "device_type": "light",
+                                    "device_id": "",
+                                    "summary": "Repeated warm dim lighting behavior.",
+                                }
+                                for item in history
+                            ],
+                            "negative_evidence": [],
                             "source_actions": ["set_brightness", "set_color_temp"],
                         }
                     ],

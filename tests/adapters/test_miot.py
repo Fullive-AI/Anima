@@ -29,7 +29,7 @@ class TestMIoTAdapter:
     def test_build_device_id(self):
         adapter = MIoTAdapter()
         did = adapter._build_device_id("192.168.1.100", "zhimi.humidifier.v1")
-        assert did == "miot_192_168_1_100_zhimi_humidifier_v1"
+        assert did == "miot_pending_192_168_1_100_zhimi_humidifier_v1"
 
     async def test_execute_calls_device(self):
         adapter = MIoTAdapter()
@@ -229,7 +229,7 @@ class TestMIoTAdapter:
 
         assert len(devices) == 1
         assert devices[0].type == "speaker"
-        assert devices[0].device_id == "miot_cloud_2039812956"
+        assert devices[0].device_id == "miot_token_f922833a841f"
         assert any(cap.name == "play_audio_file" for cap in devices[0].capabilities)
 
     def test_speaker_player_coerces_numeric_credentials(self):
