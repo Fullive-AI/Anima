@@ -468,7 +468,13 @@ class Brain:
         extra_body: dict[str, Any] = {}
         if snapshot.disable_thinking:
             extra_body["thinking"] = {"type": "disabled"}
-        prompt = f"你是 Anima，一个智能家居助手。用简短友好的中文回复用户。\n用户说：{message}"
+        prompt = (
+            "You are Anima, a smart home assistant.\n"
+            "Reply in the same language as the user's latest message: "
+            "Chinese input -> Simplified Chinese, English input -> English. "
+            "Keep the reply concise and friendly.\n"
+            f"User message: {message}"
+        )
         stream = await snapshot.client.chat.completions.create(
             model=snapshot.model,
             messages=[{"role": "user", "content": prompt}],
@@ -989,7 +995,9 @@ class Brain:
             "You are Anima's scheduler-driven planner.\n"
             "Inspect the current device state, environment, user memory, and available skills.\n"
             "Break the cycle into small tasks. Tasks may refresh environment state, execute a device skill, or reply with no-op reasoning.\n\n"
-            "All user-visible text fields such as goal, reason, reply, and question MUST be written in Simplified Chinese.\n\n"
+            "All user-visible text fields such as goal, reason, reply, and question MUST match the user's language "
+            "when the task originates from a user message: Chinese input -> Simplified Chinese, English input -> English. "
+            "For scheduler-only tasks without a user message, use Simplified Chinese.\n\n"
             f"Available skill summaries:\n{_j(skill_summaries)}\n\n"
             f"Planner hints:\n{planner_hints}\n\n"
             f"Current devices:\n{_j(device_summaries)}\n\n"
@@ -1008,7 +1016,7 @@ class Brain:
             '  {"skill_name": "humidifier", "goal": "提高室内湿度", "reason": "当前湿度低于舒适阈值", "priority": 10}\n'
             "]\n"
             "Rules:\n"
-            "- All user-facing reply text MUST be in Chinese (中文).\n"
+            "- Match user-facing reply text to the user's language when the task originates from chat; for scheduler-only tasks, use Simplified Chinese.\n"
             "- Allowed task kinds for scheduler are refresh_environment, execute_skill, and reply.\n"
             "- Only choose skill_name values from the available skill summaries.\n"
             "- Prefer no output over redundant actions.\n"
@@ -1065,20 +1073,20 @@ class Brain:
 
         return "".join(parts) + (
             "Output JSON only with this schema:\n"
-            "All user-visible text fields such as reply, goal, reason, and question MUST be written in Simplified Chinese.\n"
+            "All user-visible text fields such as reply, goal, reason, and question MUST use the same language as the user's message: Chinese input -> Simplified Chinese, English input -> English.\n"
             "{\n"
             '  "reply": "string",\n'
             '  "should_execute": true,\n'
             '  "task_plan_items": [\n'
-            '    {"kind": "ask_user", "question": "你想调节哪个房间？", "reason": "scope ambiguous", "priority": 5},\n'
-            '    {"kind": "refresh_environment", "reason": "执行前需要获取最新状态", "priority": 8},\n'
-            '    {"kind": "system_action", "system_skill": "device_discovery", "system_action": "scan_local_devices", "params": {}, "reason": "用户要求扫描设备", "priority": 10},\n'
-            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "提高室内湿度", "reason": "当前湿度低于舒适阈值", "priority": 20},\n'
-            '    {"kind": "reply", "reply": "我已经处理完成。", "priority": 30}\n'
+            '    {"kind": "ask_user", "question": "Which room do you want to adjust?", "reason": "scope ambiguous", "priority": 5},\n'
+            '    {"kind": "refresh_environment", "reason": "need fresh state before execution", "priority": 8},\n'
+            '    {"kind": "system_action", "system_skill": "device_discovery", "system_action": "scan_local_devices", "params": {}, "reason": "user requested device scanning", "priority": 10},\n'
+            '    {"kind": "execute_skill", "skill_name": "humidifier", "goal": "increase indoor humidity", "reason": "current humidity is below the comfort threshold", "priority": 20},\n'
+            '    {"kind": "reply", "reply": "Done.", "priority": 30}\n'
             "  ]\n"
             "}\n"
             "Rules:\n"
-            "- All user-facing text (reply, question in ask_user) MUST be in Chinese (中文).\n"
+            "- All user-facing text (reply, question in ask_user) MUST match the user's message language.\n"
             "- Use task_plan_items for multi-step planning.\n"
             "- Use ask_user when the request is ambiguous or missing critical information.\n"
             "- Use refresh_environment before acting when current state may be stale or must be confirmed.\n"
@@ -1377,12 +1385,12 @@ class Brain:
             return (
                 f"{base_prompt}{memory_block}\n\n"
                 "## Language Rule\n"
-                "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST be written in Simplified Chinese.\n"
+                "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST match the user's language: Chinese input -> Simplified Chinese, English input -> English.\n"
             )
         return (
             f"{base_prompt}{memory_block}\n\n"
             "## Language Rule\n"
-            "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST be written in Simplified Chinese.\n\n"
+            "All user-visible fields in the JSON response, especially `reason` and `expected_outcome`, MUST match the user's language: Chinese input -> Simplified Chinese, English input -> English.\n\n"
             "## Planner Intent\n"
             f"Goal: {planner_goal or '(none)'}\n"
             f"Reason: {planner_reason or '(none)'}\n"
