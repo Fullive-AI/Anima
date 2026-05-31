@@ -1,5 +1,6 @@
 import { CloudSun, Droplets, Gauge, Lightbulb, Loader2, RefreshCw, Thermometer, Waves, Zap } from 'lucide-react'
 import type { EnvironmentSnapshot } from '../hooks/useApi'
+import { useI18n } from '../i18n/useI18n'
 
 interface EnvironmentPanelProps {
   environment: EnvironmentSnapshot | null
@@ -53,6 +54,7 @@ function formatTime(timestamp?: string) {
 }
 
 export default function EnvironmentPanel({ environment, refreshing = false, onRefresh }: EnvironmentPanelProps) {
+  const { t } = useI18n()
   const signals = environment?.signals || {}
   const featured = ['temperature', 'humidity', 'aqi', 'pm10']
     .map((name) => ({ name, summary: summarizeSignal(signals[name]) }))
@@ -70,8 +72,8 @@ export default function EnvironmentPanel({ environment, refreshing = false, onRe
             <CloudSun className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-slate-800">当前环境</h2>
-            <p className="mt-1 text-sm text-slate-400">聚合当前空间内已上报的关键传感器状态</p>
+            <h2 className="text-base font-semibold text-slate-800">{t('environment.title')}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t('environment.subtitle')}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -82,26 +84,27 @@ export default function EnvironmentPanel({ environment, refreshing = false, onRe
             className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-50"
           >
             {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            刷新状态
+            {t('environment.refreshStatus')}
           </button>
         </div>
       </div>
 
       {!environment || environment.devices.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-400">
-          暂无环境快照，等待设备上报传感器数据
+          {t('environment.noSnapshot')}
         </div>
       ) : (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {featured.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-5 text-xs text-slate-400 md:col-span-2 xl:col-span-4">
-                当前没有可聚合的温度、湿度或空气质量类环境信号
+                {t('environment.noFeaturedSignals')}
               </div>
             ) : (
               featured.map(({ name, summary }) => {
                 const meta = SIGNAL_META[name] || { label: name, icon: Gauge }
                 const Icon = meta.icon
+                const label = t(`sensors.${name}`, undefined, meta.label)
                 return (
                   <div key={name} className="rounded-2xl border border-slate-200/70 bg-slate-50/80 px-3.5 py-3 transition-colors hover:bg-white">
                     <div className="mb-1.5 flex items-center justify-between">
@@ -109,9 +112,9 @@ export default function EnvironmentPanel({ environment, refreshing = false, onRe
                         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-violet-500 shadow-sm ring-1 ring-slate-100">
                           <Icon className="h-3.5 w-3.5" />
                         </span>
-                        <span className="text-xs">{meta.label}</span>
+                        <span className="text-xs">{label}</span>
                       </div>
-                      <span className="text-xs text-slate-400">{summary?.samples} 源</span>
+                      <span className="text-xs text-slate-400">{t('environment.sourceCount', { count: summary?.samples || 0 })}</span>
                     </div>
                     <div className="text-2xl font-semibold leading-tight text-slate-800">
                       {summary?.value}
@@ -126,27 +129,28 @@ export default function EnvironmentPanel({ environment, refreshing = false, onRe
           <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-700">设备自身状态</p>
-                <p className="mt-1 text-xs text-slate-400">这些值描述设备当前工作状态，不等同于环境信号</p>
+                <p className="text-sm font-medium text-slate-700">{t('environment.deviceState')}</p>
+                <p className="mt-1 text-xs text-slate-400">{t('environment.deviceStateHint')}</p>
               </div>
             </div>
             {deviceSignals.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-xs text-slate-400">
-                当前没有可展示的设备状态
+                {t('environment.noDeviceState')}
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {deviceSignals.map(({ name, summary }) => {
                   const meta = SIGNAL_META[name] || { label: name, icon: Gauge }
                   const Icon = meta.icon
+                  const label = t(`sensors.${name}`, undefined, meta.label)
                   return (
                     <div key={name} className="rounded-xl border border-white bg-white px-3 py-2.5 shadow-sm">
                       <div className="mb-1.5 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-slate-500">
                           <Icon className="h-3.5 w-3.5" />
-                          <span className="text-xs">{meta.label}</span>
+                          <span className="text-xs">{label}</span>
                         </div>
-                        <span className="text-xs text-slate-400">{summary?.samples} 源</span>
+                        <span className="text-xs text-slate-400">{t('environment.sourceCount', { count: summary?.samples || 0 })}</span>
                       </div>
                       <div className="text-xl font-semibold text-slate-800">
                         {summary?.value}

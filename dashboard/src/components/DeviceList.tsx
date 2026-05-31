@@ -2,21 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { Droplets, Thermometer, Lightbulb, Cpu, HelpCircle, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Home } from 'lucide-react'
 import { api } from '../hooks/useApi'
 import type { Device, Room } from '../hooks/useApi'
+import { useI18n } from '../i18n/useI18n'
 
 const TYPE_ICONS: Record<string, typeof Cpu> = {
   humidifier: Droplets,
   air_conditioner: Thermometer,
   light: Lightbulb,
   air_purifier: Cpu,
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  humidifier: '加湿器',
-  air_conditioner: '空调',
-  light: '灯光',
-  air_purifier: '净化器',
-  vacuum: '扫地机',
-  curtain: '窗帘',
 }
 
 interface DeviceListProps {
@@ -40,6 +32,7 @@ function DeviceIcon({ type }: { type: string }) {
 }
 
 export default function DeviceList({ devices, selectedId, onSelect, onDevicesChanged }: DeviceListProps) {
+  const { t } = useI18n()
   const [rooms, setRooms] = useState<Room[]>([])
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
@@ -187,11 +180,11 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
             <div className="flex items-center gap-1.5">
               <p className={`truncate text-sm font-semibold ${selectedId === d.device_id ? 'text-violet-700' : 'text-slate-700'}`}>{d.name}</p>
               {d.adapter === 'virtual' && (
-                <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 border border-violet-200">虚拟</span>
+                <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 border border-violet-200">{t('deviceList.virtual')}</span>
               )}
             </div>
             <p className="mt-0.5 truncate text-[11px] text-slate-400">
-              {d.needs_token ? '需要 Token' : (TYPE_LABELS[d.type] || d.type)} · {d.adapter}
+              {d.needs_token ? t('deviceList.needsToken') : t(`deviceTypes.${d.type}`, undefined, d.type)} · {d.adapter}
             </p>
           </div>
           <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${d.needs_token ? 'bg-amber-400' : d.online ? 'bg-emerald-400' : 'bg-slate-300'}`} />
@@ -264,7 +257,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
           <ul>
             {roomDevices.length === 0 ? (
               <li className={`mx-2 rounded-lg px-8 py-2 text-[11px] ${isOver ? 'bg-violet-50 text-violet-500' : 'text-slate-400'}`}>
-                {isOver ? '松开以移入此房间' : '拖拽设备到此处'}
+                {isOver ? t('deviceList.dropActive') : t('deviceList.dropHint')}
               </li>
             ) : roomDevices.map(renderDevice)}
           </ul>
@@ -276,11 +269,11 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
   return (
     <aside className="flex w-[328px] min-w-[328px] flex-col overflow-hidden rounded-[24px] border border-slate-200/70 bg-white/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">设备列表</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{t('deviceList.title')}</h2>
         <button
           onClick={() => setAddingRoom(true)}
           className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-violet-50 hover:text-violet-600"
-          title="新增房间"
+          title={t('deviceList.addRoom')}
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
@@ -297,7 +290,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
               if (e.key === 'Enter') handleCreateRoom()
               if (e.key === 'Escape') { setAddingRoom(false); setNewRoomName('') }
             }}
-            placeholder="房间名称..."
+            placeholder={t('deviceList.roomNamePlaceholder')}
             className="w-full rounded-lg border border-violet-300 px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-500/20"
           />
         </div>
@@ -306,8 +299,8 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
       <div className="flex-1 overflow-y-auto">
         {devices.length === 0 ? (
           <div className="p-5 text-center text-sm text-slate-400">
-            <p>暂无设备</p>
-            <p className="mt-1 text-xs">点击右上角「扫描设备」</p>
+            <p>{t('deviceList.emptyTitle')}</p>
+            <p className="mt-1 text-xs">{t('deviceList.emptyHint')}</p>
           </div>
         ) : (
           <>
@@ -324,7 +317,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                   <div className="mx-2 flex items-center gap-1 rounded-lg px-2 py-2">
                     <Home className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
                     <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-                      未分配
+                      {t('deviceList.unassigned')}
                       <span className="ml-1 text-slate-300 normal-case">({unassigned.length})</span>
                     </span>
                   </div>
@@ -338,7 +331,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
 
       <div className="flex items-center gap-1.5 border-t border-slate-100 bg-white/90 px-4 py-2.5 text-[11px] text-slate-400">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-        {devices.filter(d => d.online).length} 在线 · 共 {devices.length} 台
+        {t('deviceList.footerStats', { online: devices.filter(d => d.online).length, total: devices.length })}
       </div>
 
       {/* Right-click context menu */}
@@ -362,7 +355,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                 className="flex w-full items-center gap-2 px-3 py-2 text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-700"
               >
                 <Pencil className="w-3.5 h-3.5" />
-                重命名
+                {t('deviceList.rename')}
               </button>
               <button
                 onClick={() => {
@@ -372,7 +365,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                 className="flex w-full items-center gap-2 px-3 py-2 text-red-500 transition-colors hover:bg-red-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                删除设备
+                {t('deviceList.deleteDevice')}
               </button>
             </>
           )}
@@ -387,7 +380,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                 className="flex w-full items-center gap-2 px-3 py-2 text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-700"
               >
                 <Pencil className="w-3.5 h-3.5" />
-                重命名房间
+                {t('deviceList.renameRoom')}
               </button>
               <button
                 onClick={() => {
@@ -397,7 +390,7 @@ export default function DeviceList({ devices, selectedId, onSelect, onDevicesCha
                 className="flex w-full items-center gap-2 px-3 py-2 text-red-500 transition-colors hover:bg-red-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                删除房间
+                {t('deviceList.deleteRoom')}
               </button>
             </>
           )}

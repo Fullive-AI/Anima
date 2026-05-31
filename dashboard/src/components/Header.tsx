@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw, Wifi, WifiOff, Settings, HelpCircle, BrainCircuit, Sparkles } from 'lucide-react'
 import { api } from '../hooks/useApi'
+import { useI18n } from '../i18n/useI18n'
 
 interface HeaderProps {
   deviceCount: number
@@ -14,6 +15,7 @@ interface HeaderProps {
 export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp, onOpenMemory, onOpenSkills }: HeaderProps) {
   const [connected, setConnected] = useState(false)
   const [scanning, setScanning] = useState(false)
+  const { language, setLanguage, t } = useI18n()
 
   useEffect(() => {
     api.getHealth().then(() => setConnected(true)).catch(() => setConnected(false))
@@ -42,7 +44,7 @@ export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp
           className="h-8 w-auto max-w-[136px] object-contain"
         />
         <span className="hidden whitespace-nowrap text-xs font-medium text-slate-400 lg:block">
-          Make Every Hardware Intelligent
+          {t('header.tagline')}
         </span>
       </div>
 
@@ -53,12 +55,12 @@ export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp
             : 'bg-red-50 text-red-600 ring-1 ring-red-100'
         }`}>
           {connected
-            ? <><Wifi className="w-3.5 h-3.5" /><span>在线</span></>
-            : <><WifiOff className="w-3.5 h-3.5" /><span>离线</span></>
+            ? <><Wifi className="w-3.5 h-3.5" /><span>{t('common.online')}</span></>
+            : <><WifiOff className="w-3.5 h-3.5" /><span>{t('common.offline')}</span></>
           }
         </div>
 
-        <span className="mr-2 whitespace-nowrap text-xs font-medium text-slate-400">{deviceCount} 台设备</span>
+        <span className="mr-2 whitespace-nowrap text-xs font-medium text-slate-400">{t('header.deviceCount', { count: deviceCount })}</span>
 
         <button
           onClick={handleScan}
@@ -66,16 +68,35 @@ export default function Header({ deviceCount, onScan, onOpenSettings, onOpenHelp
           className="flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 text-xs font-semibold text-white shadow-[0_6px_16px_rgba(124,58,237,0.22)] transition-all hover:bg-violet-700 hover:shadow-[0_8px_20px_rgba(124,58,237,0.28)] disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
-          扫描
+          {t('header.scan')}
         </button>
 
         <div className="mx-1 h-5 w-px bg-slate-200" />
 
+        <div className="flex h-9 items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+          {[
+            { value: 'zh-CN' as const, label: t('header.languageZh') },
+            { value: 'en-US' as const, label: t('header.languageEn') },
+          ].map((item) => (
+            <button
+              key={item.value}
+              onClick={() => setLanguage(item.value)}
+              className={`h-7 rounded-lg px-2.5 text-xs font-semibold transition-colors ${
+                language === item.value
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         {[
-          { icon: Settings, label: '设置', onClick: onOpenSettings },
-          { icon: HelpCircle, label: '使用帮助', onClick: onOpenHelp },
-          { icon: BrainCircuit, label: '记忆调试', onClick: onOpenMemory },
-          { icon: Sparkles, label: '技能中心', onClick: onOpenSkills },
+          { icon: Settings, label: t('header.settings'), onClick: onOpenSettings },
+          { icon: HelpCircle, label: t('header.help'), onClick: onOpenHelp },
+          { icon: BrainCircuit, label: t('header.memory'), onClick: onOpenMemory },
+          { icon: Sparkles, label: t('header.skills'), onClick: onOpenSkills },
         ].map(({ icon: Icon, label, onClick }) => (
           <button
             key={label}

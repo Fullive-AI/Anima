@@ -1,6 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { Droplets, Thermometer, Lightbulb, Zap, Power, Gauge, Key, Loader2, Check, FlaskConical, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, type Device, type CapabilityInput, type DeviceCapability } from '../hooks/useApi'
+import { useI18n } from '../i18n/useI18n'
 
 const SENSOR_ICONS: Record<string, typeof Gauge> = {
   humidity: Droplets,
@@ -20,11 +21,13 @@ interface DeviceCardProps {
 type CapabilityValueState = Record<string, string | number | boolean>
 
 function SensorBadge({ name, value, unit }: { name: string; value: unknown; unit: string }) {
+  const { t } = useI18n()
   const Icon = SENSOR_ICONS[name] || Gauge
   const isOnOff = unit === 'on/off'
   const display = value !== null && value !== undefined
-    ? isOnOff ? (value ? '开' : '关') : `${value}${unit}`
+    ? isOnOff ? (value ? t('common.on') : t('common.off')) : `${value}${unit}`
     : '--'
+  const label = t(`sensors.${normalizeSensorName(name)}`, undefined, name)
 
   return (
     <div className="flex min-h-[70px] items-center gap-2 rounded-2xl border border-slate-200/60 bg-slate-50/80 px-3 py-2.5 transition-colors hover:bg-white">
@@ -32,7 +35,7 @@ function SensorBadge({ name, value, unit }: { name: string; value: unknown; unit
         <Icon className="h-3.5 w-3.5 text-violet-500" />
       </div>
       <div className="min-w-0">
-        <p className="truncate text-[10px] font-semibold capitalize tracking-wide text-slate-400">{name}</p>
+        <p className="truncate text-[10px] font-semibold capitalize tracking-wide text-slate-400">{label}</p>
         <p className="font-mono text-base font-semibold leading-tight text-slate-700">{display}</p>
       </div>
     </div>
@@ -40,6 +43,7 @@ function SensorBadge({ name, value, unit }: { name: string; value: unknown; unit
 }
 
 function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: () => void }) {
+  const { t } = useI18n()
   const [token, setToken] = useState('')
   const [activating, setActivating] = useState(false)
   const [error, setError] = useState('')
@@ -48,7 +52,7 @@ function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: 
 
   const handleActivate = async () => {
     if (!token || token.length < 16) {
-      setError('Token 格式不正确（应为 32 位十六进制）')
+      setError(t('deviceCard.tokenInvalid'))
       return
     }
     setActivating(true)
@@ -61,14 +65,14 @@ function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: 
       })
       const data = await res.json()
       if (data.success) {
-        setSuccess(`已激活: ${data.name} (${data.type})`)
+        setSuccess(t('deviceCard.activated', { name: data.name, type: data.type }))
         setToken('')
         onActivated()
       } else {
-        setError(data.error || '激活失败')
+        setError(data.error || t('deviceCard.activateFailed'))
       }
     } catch {
-      setError('网络错误')
+      setError(t('deviceCard.networkError'))
     } finally {
       setActivating(false)
     }
@@ -82,16 +86,16 @@ function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: 
           <p className="text-xs text-slate-400 mt-0.5">{device.ip || device.device_id}</p>
         </div>
         <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600">
-          需要激活
+          {t('deviceCard.needsActivation')}
         </span>
       </div>
 
       <div className="mb-4 space-y-1.5 rounded-2xl border border-amber-100 bg-amber-50/50 p-3 text-sm text-slate-600">
-        <p className="font-medium text-slate-700 text-xs">已在局域网发现此设备，但缺少 Token。</p>
+        <p className="font-medium text-slate-700 text-xs">{t('deviceCard.tokenMissing')}</p>
         <ol className="ml-4 list-decimal space-y-1 text-xs text-slate-500">
-          <li>扫码登录小米/米家账号获取 Token</li>
-          <li>如果设备还需要 Token，说明它绑定在另一个小米账号下</li>
-          <li>如果你已有 Token，也可以在这里手动输入</li>
+          <li>{t('deviceCard.tokenStepScan')}</li>
+          <li>{t('deviceCard.tokenStepOtherAccount')}</li>
+          <li>{t('deviceCard.tokenStepManual')}</li>
         </ol>
       </div>
 
@@ -100,7 +104,7 @@ function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: 
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="输入 32 位 Token"
+              placeholder={t('deviceCard.tokenPlaceholder')}
               value={token}
               onChange={(e) => setToken(e.target.value)}
               className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono transition-all focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
@@ -111,14 +115,14 @@ function NeedsTokenCard({ device, onActivated }: { device: Device; onActivated: 
               className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-40"
             >
               {activating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
-              激活
+              {t('deviceCard.activate')}
             </button>
           </div>
-          <button onClick={() => setShowTokenInput(false)} className="cursor-pointer text-xs text-slate-400 hover:text-slate-500">收起</button>
+          <button onClick={() => setShowTokenInput(false)} className="cursor-pointer text-xs text-slate-400 hover:text-slate-500">{t('deviceCard.collapse')}</button>
         </div>
       ) : (
         <button onClick={() => setShowTokenInput(true)} className="cursor-pointer text-sm font-medium text-violet-600 hover:text-violet-700">
-          输入 Token →
+          {t('deviceCard.inputToken')}
         </button>
       )}
       {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
@@ -150,6 +154,7 @@ const SENSOR_RANGES: Record<string, { min: number; max: number; step: number }> 
 }
 
 function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated: () => void }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [values, setValues] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState(false)
@@ -192,8 +197,8 @@ function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated:
       >
         {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         <FlaskConical className="w-3.5 h-3.5" />
-        <span>模拟传感器数据</span>
-        <span className="ml-auto text-[10px] text-violet-400 font-normal">修改后触发 AI 响应</span>
+        <span>{t('deviceCard.virtualSensors')}</span>
+        <span className="ml-auto text-[10px] text-violet-400 font-normal">{t('deviceCard.virtualSensorsHint')}</span>
       </button>
 
       {open && (
@@ -204,7 +209,7 @@ function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated:
             return (
               <div key={s.name}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-500">{SENSOR_LABELS[s.name] || s.name}</span>
+                  <span className="text-xs text-slate-500">{t(`sensors.${normalizeSensorName(s.name)}`, undefined, SENSOR_LABELS[s.name] || s.name)}</span>
                   <span className="text-xs font-mono font-semibold text-violet-700">{val}{s.unit}</span>
                 </div>
                 <input
@@ -230,7 +235,7 @@ function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated:
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <Check className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
-            {saved ? '已推送，AI 正在响应...' : '推送传感器数据'}
+            {saved ? t('deviceCard.pushedSensors') : t('deviceCard.pushSensors')}
           </button>
         </div>
       )}
@@ -239,6 +244,7 @@ function VirtualSensorEditor({ device, onUpdated }: { device: Device; onUpdated:
 }
 
 function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesChanged?: () => void }) {
+  const { t } = useI18n()
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -274,14 +280,14 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
     try {
       const result = await api.sendCommand(device.device_id, action, params)
       if (result.success) {
-        setMessage(`${labelForAction(action)} 已发送`)
+        setMessage(t('deviceCard.commandSent', { action: labelForAction(action, t) }))
         setValues(prev => ({ ...prev, [action]: getSubmittedCapabilityValue(action, params) ?? prev[action] }))
         onDevicesChanged?.()
       } else {
-        setError(result.message || '执行失败')
+        setError(result.message || t('deviceCard.executionFailed'))
       }
     } catch {
-      setError('控制命令发送失败')
+      setError(t('deviceCard.commandFailed'))
     } finally {
       setBusyAction(null)
     }
@@ -301,7 +307,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
           className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm disabled:opacity-50"
         >
           {isBusy ? <Loader2 className="h-4 w-4 animate-spin text-violet-500" /> : <Power className="h-4 w-4 text-slate-400" />}
-          {labelForCapability(capability)}
+          {labelForCapability(capability, t)}
         </button>
       )
     }
@@ -314,20 +320,20 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
         <div key={capability.name} className="w-full rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3.5">
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{labelForCapability(capability)}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{labelForCapability(capability, t)}</p>
               {capability.params?.help && <p className="mt-0.5 text-xs text-slate-400">{capability.params.help}</p>}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {renderInputControl(capability, capability.name, input, value, disabled, setValues)}
+            {renderInputControl(capability, capability.name, input, value, disabled, setValues, t)}
             <button
               onClick={() => handleCommand(capability.name, { [input.name]: normalizeInputValue(input, value) })}
               disabled={disabled || value === '' || value === undefined}
               className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
             >
               {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              应用
+              {t('common.apply')}
             </button>
           </div>
         </div>
@@ -349,7 +355,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
             ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
             : 'bg-slate-100 text-slate-400 border border-slate-200'
         }`}>
-          {device.online ? '在线' : '离线'}
+          {device.online ? t('common.online') : t('common.offline')}
         </span>
       </div>
 
@@ -370,7 +376,7 @@ function ActiveCard({ device, onDevicesChanged }: { device: Device; onDevicesCha
           {message && <p className="text-xs text-emerald-600 mt-1">{message}</p>}
         </div>
       ) : (
-        <p className="text-sm text-slate-400">当前没有可用控制能力。</p>
+        <p className="text-sm text-slate-400">{t('deviceCard.noCapabilities')}</p>
       )}
 
       {device.adapter === 'virtual' && (
@@ -387,6 +393,7 @@ function renderInputControl(
   value: string | number | boolean | undefined,
   disabled: boolean,
   setValues: Dispatch<SetStateAction<CapabilityValueState>>,
+  t: (key: string, params?: Record<string, string | number>, fallback?: string) => string,
 ) {
   if (input.type === 'enum') {
     return (
@@ -411,8 +418,8 @@ function renderInputControl(
         disabled={disabled}
         className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 transition-all focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
       >
-        <option value="true">开启</option>
-        <option value="false">关闭</option>
+        <option value="true">{t('common.on')}</option>
+        <option value="false">{t('common.off')}</option>
       </select>
     )
   }
@@ -561,8 +568,8 @@ function getNumericRange(capability: DeviceCapability, input: CapabilityInput) {
   return ranges[`${capability.name}:${input.name}`] || null
 }
 
-function labelForCapability(capability: DeviceCapability) {
-  return capability.params?.label || prettifyName(capability.name)
+function labelForCapability(capability: DeviceCapability, t: (key: string, params?: Record<string, string | number>, fallback?: string) => string) {
+  return capability.params?.label || t(`capabilities.${capability.name}`, undefined, prettifyName(capability.name, t))
 }
 
 function getVisibleCapabilities(device: Device) {
@@ -587,26 +594,17 @@ function getVisibleCapabilities(device: Device) {
   return filtered.length > 0 ? filtered : device.capabilities
 }
 
-function labelForAction(action: string) {
-  return prettifyName(action)
+function labelForAction(action: string, t: (key: string, params?: Record<string, string | number>, fallback?: string) => string) {
+  return prettifyName(action, t)
 }
 
-function prettifyName(name: string) {
-  const aliases: Record<string, string> = {
-    on: '开启',
-    off: '关闭',
-    play_random_audio: '随机播放一首',
-    play_audio_file: '播放本地音频',
-    play_audio_url: '播放音频 URL',
-    stop_audio: '停止播放',
-  }
-  if (aliases[name]) {
-    return aliases[name]
-  }
+function prettifyName(name: string, t?: (key: string, params?: Record<string, string | number>, fallback?: string) => string) {
+  if (t) return t(`actions.${name}`, undefined, name.replace(/^set_/, '').replace(/_/g, ' '))
   return name.replace(/^set_/, '').replace(/_/g, ' ')
 }
 
 export default function DeviceCard({ devices, selectedId, onDevicesChanged }: DeviceCardProps) {
+  const { t } = useI18n()
   const selected = selectedId ? devices.find((d) => d.device_id === selectedId) : null
   const shown = selected ? [selected] : devices
 
@@ -623,8 +621,8 @@ export default function DeviceCard({ devices, selectedId, onDevicesChanged }: De
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
               <Lightbulb className="h-7 w-7 text-slate-300" />
             </div>
-            <p className="text-sm font-medium text-slate-500">暂无设备</p>
-            <p className="mt-1 text-xs text-slate-400">点击右上角「扫描」发现局域网中的智能设备</p>
+            <p className="text-sm font-medium text-slate-500">{t('deviceCard.emptyTitle')}</p>
+            <p className="mt-1 text-xs text-slate-400">{t('deviceCard.emptyHint')}</p>
           </div>
         </div>
       ) : (

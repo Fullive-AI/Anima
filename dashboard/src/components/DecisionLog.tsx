@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { Brain, Loader2, Send, Sparkles, Wrench, Clock, ChevronDown, ChevronRight } from 'lucide-react'
 import { api, type ChatExecutionResult, type ChatResponse, type Decision } from '../hooks/useApi'
+import { useI18n } from '../i18n/useI18n'
 
 interface DecisionLogProps {
   onDevicesChanged: () => void
@@ -204,13 +205,14 @@ function MarkdownMessage({ content }: { content: string }) {
 }
 
 function ExecutionSummaryCard({ items }: { items: ChatExecutionResult[] }) {
+  const { t } = useI18n()
   return (
     <div className="rounded-2xl rounded-tl-md border border-emerald-200/70 bg-emerald-50/70 px-4 py-3">
       <div className="flex items-center gap-2 mb-2">
         <div className="flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100">
           <Wrench className="h-3 w-3 text-emerald-600" />
         </div>
-        <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-widest">已执行</span>
+        <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-widest">{t('chat.executed')}</span>
       </div>
       <div className="space-y-1">
         {items.map((item, i) => (
@@ -343,6 +345,7 @@ function historyEntriesToTurns(entries: Decision[]): ConversationTurn[] {
 }
 
 export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessageRef }: DecisionLogProps) {
+  const { t } = useI18n()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [conversation, setConversation] = useState<ConversationTurn[]>([])
@@ -509,7 +512,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
             if (parsed.type === 'error' && parsed.done) {
               updateConversation(turnId, (turn) => ({
                 ...turn,
-                result: { reply: parsed.content || '发生错误' },
+                result: { reply: parsed.content || t('chat.errorFallback') },
               }))
             }
           } catch {
@@ -518,7 +521,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '连接失败，请检查后端是否运行'
+      const errorMessage = error instanceof Error ? error.message : t('chat.connectionFailed')
       updateConversation(turnId, (turn) => ({ ...turn, result: { reply: errorMessage } }))
     } finally {
       setSending(false)
@@ -532,7 +535,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
           <Brain className="w-3.5 h-3.5 text-white" />
         </div>
         <h2 className="text-sm font-semibold text-slate-800">Anima</h2>
-        <span className="ml-auto text-[10px] text-slate-400 font-medium">AI 助手</span>
+        <span className="ml-auto text-[10px] text-slate-400 font-medium">{t('chat.assistantLabel')}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -541,8 +544,8 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 ring-1 ring-violet-100">
               <Sparkles className="w-6 h-6 text-violet-400" />
             </div>
-            <p className="text-sm font-medium text-slate-600">和 Anima 说话，控制你的设备</p>
-            <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">例如：打开客厅的灯<br />把卧室空调调到 26 度</p>
+            <p className="text-sm font-medium text-slate-600">{t('chat.emptyTitle')}</p>
+            <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">{t('chat.emptyHintLine1')}<br />{t('chat.emptyHintLine2')}</p>
           </div>
         ) : (
           <div className="space-y-1 py-4">
@@ -566,7 +569,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
               }
             }}
             rows={2}
-            placeholder="说点什么..."
+            placeholder={t('chat.placeholder')}
             className="flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/15"
           />
           <button
@@ -583,6 +586,7 @@ export default function DecisionLog({ onDevicesChanged, onChatResult, sendMessag
 }
 
 function AgentTrace({ trace }: { trace: AgentEvent[] }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   if (!trace.length) return null
   return (
@@ -593,7 +597,7 @@ function AgentTrace({ trace }: { trace: AgentEvent[] }) {
       >
         {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         <Wrench className="w-3 h-3 text-amber-400" />
-        <span>{trace.length} 步工具调用</span>
+        <span>{t('chat.toolCalls', { count: trace.length })}</span>
       </button>
       {open && (
         <div className="space-y-1 pl-2 border-l border-slate-100">
@@ -624,6 +628,7 @@ function AgentTrace({ trace }: { trace: AgentEvent[] }) {
 }
 
 function ConversationCard({ turn }: { turn: ConversationTurn }) {
+  const { t } = useI18n()
   const [replyOpen, setReplyOpen] = useState(true)
   const execResults = turn.result.execution_results || []
   const hasExecution = execResults.length > 0
@@ -639,7 +644,7 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
           <div className="max-w-[92%] overflow-hidden rounded-[18px] rounded-tl-sm border border-emerald-200/70 bg-emerald-50/60 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <div className="flex items-center gap-2 px-4 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
               <Sparkles className="h-3 w-3" />
-              <span>Anima 自动执行</span>
+              <span>{t('chat.automaticExecution')}</span>
               <span className="ml-auto text-emerald-400 normal-case font-normal">{formatTime(turn.timestamp)}</span>
             </div>
             <div className="px-4 pb-3">
@@ -696,7 +701,7 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
                     <img src={`data:image/png;base64,${turn.qrImage}`} alt="米家扫码登录" className="mx-auto h-40 w-40 rounded-lg border border-slate-200" />
                     <p className="mt-2 flex items-center justify-center gap-2 text-sm text-violet-600">
                       <Loader2 className={`h-4 w-4 ${turn.qrPolling ? 'animate-spin' : ''}`} />
-                      请打开米家 App 扫码
+                      {t('chat.qrPrompt')}
                     </p>
                   </div>
                 ) : null}
@@ -714,7 +719,7 @@ function ConversationCard({ turn }: { turn: ConversationTurn }) {
         <div className="flex mb-2">
           <div className="flex items-center gap-2 rounded-[18px] rounded-tl-sm border border-violet-100 bg-violet-50/60 px-4 py-3">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />
-            <span className="text-xs text-violet-500 font-medium">思考中...</span>
+            <span className="text-xs text-violet-500 font-medium">{t('chat.thinking')}</span>
           </div>
         </div>
       ) : null}
