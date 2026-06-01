@@ -42,15 +42,15 @@ export default function App() {
         onOpenSkills={() => setSkillsOpen(true)}
       />
 
-      <div className="flex flex-1 gap-4 overflow-hidden px-4 py-4">
+      <div className="flex flex-1 gap-3 overflow-hidden px-3 py-4">
         <DeviceList
           devices={devices}
           selectedId={selectedId}
           onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
           onDevicesChanged={refresh}
         />
-        <main className="flex-1 overflow-y-auto rounded-[24px] bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.045),transparent_32rem),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] px-6 py-5 pb-28">
-          <div className="mx-auto grid max-w-[1180px] gap-5">
+        <main className="flex-1 overflow-y-auto py-5 pl-8 pr-4 pb-28">
+          <div className="mx-auto grid w-full max-w-none gap-5">
             <EnvironmentPanel
               environment={environment}
               refreshing={refreshingEnvironment}
