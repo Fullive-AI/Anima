@@ -49,6 +49,28 @@ class TestBrain:
         assert "current environment state" in context.lower()
         assert "planner intent" in context.lower()
 
+    async def test_scheduler_task_history_is_not_learnable(self):
+        brain = Brain.__new__(Brain)
+        brain._memory = AsyncMock()
+        brain._preference_learner = None
+
+        await brain._record_task_plan_history(
+            [
+                TaskPlanItem(
+                    kind="execute_skill",
+                    skill_name="light",
+                    goal="turn on light",
+                    reason="scheduler automation",
+                    priority=10,
+                )
+            ],
+            source="scheduler",
+        )
+
+        entry = brain._memory.append_history.await_args.args[1]
+        assert entry["source"] == "scheduler"
+        assert entry["learnable"] is False
+
     def test_build_context_includes_relevant_memories(self):
         brain = Brain.__new__(Brain)
         brain._skill_loader = SkillLoader(skills_dir="skills")

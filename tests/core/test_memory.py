@@ -297,6 +297,32 @@ class TestMemoryStore:
         assert "evening_lighting_routine" in memories
         assert memories["evening_lighting_routine"]["summary"].startswith("Lights are typically")
 
+    async def test_memory_extractor_skips_unlearnable_history_and_advances_cursor(self, monkeypatch):
+        await self.store.append_history(
+            "default",
+            {
+                "record_type": "device_action",
+                "source": "scheduler",
+                "learnable": False,
+                "action": "turn_on",
+                "device_type": "light",
+                "reason": "scheduler automation",
+            },
+        )
+
+        monkeypatch.setattr("core.memory.extractor.settings.llm_api_key", "sk-test")
+        extractor = MemoryExtractionService(self.store)
+        extractor._invoke_llm_text = AsyncMock(return_value='{"memories":[],"forget_topics":[]}')
+
+        changed = await extractor.run_now("default")
+        state = await self.store.get_memory_extraction_state("default")
+        memories = await self.store.get_extracted_memories("default")
+
+        assert changed is False
+        assert state["history_cursor"] == 1
+        assert memories == {}
+        extractor._invoke_llm_text.assert_not_awaited()
+
     async def test_memory_extractor_skips_custom_skill_memory_without_real_custom_skill(self, monkeypatch):
         await self.store.append_history(
             "default",
