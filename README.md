@@ -412,13 +412,11 @@ Areas still evolving:
 
 ---
 
-## Major Updates
+## Update Log
 
 This section records Anima releases, architecture upgrades, and key capability evolution so developers can quickly understand the core changes at each stage.
 
-### 2026-06-01: Anima Officially Open-Sourced
-
-Anima's first open-source version is released, providing the foundational Agent OS capabilities for intelligent hardware: local device discovery, MIoT device integration, LLM Brain decisions, Skill mechanism, long-term Memory system, and visual Dashboard.
+- 2026-06-01: Anima's first open-source version is released, providing the foundational Agent OS capabilities for intelligent hardware: local device discovery, MIoT device integration, LLM Brain decisions, Skill mechanism, long-term Memory system, and visual Dashboard.
 
 ---
 
