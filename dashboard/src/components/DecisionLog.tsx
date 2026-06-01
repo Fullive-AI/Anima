@@ -128,7 +128,7 @@ function MarkdownMessage({ content }: { content: string }) {
         i++
       }
       blocks.push(
-        <blockquote key={`bq-${i}`} className="my-1.5 pl-3 border-l-2 border-violet-300 text-slate-500 italic text-sm">
+        <blockquote key={`bq-${i}`} className="my-1.5 pl-3 border-l-2 border-violet-300 text-slate-500 text-sm">
           {quoteLines.map((l, j) => <p key={j}>{renderInline(l)}</p>)}
         </blockquote>
       )
