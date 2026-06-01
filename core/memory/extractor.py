@@ -136,12 +136,20 @@ class MemoryExtractionService:
 
         state = await self._memory.get_memory_extraction_state(user_id)
         start_index = int(state.get("history_cursor", 0) or 0)
-        recent_history = await self._memory.get_history_slice(
+        history_batch = await self._memory.get_history_slice(
             user_id,
             start_index=start_index,
             limit=MAX_HISTORY_BATCH,
         )
+        if not history_batch:
+            return writes > 0
+        recent_history = [item for item in history_batch if item.get("learnable", True) is not False]
         if not recent_history:
+            await self._memory.update_memory_extraction_state(
+                user_id,
+                history_cursor=start_index + len(history_batch),
+                last_batch_size=len(history_batch),
+            )
             return writes > 0
         snapshot = self._llm_runtime.snapshot()
         if not snapshot.configured:
@@ -190,8 +198,8 @@ class MemoryExtractionService:
 
         await self._memory.update_memory_extraction_state(
             user_id,
-            history_cursor=start_index + len(recent_history),
-            last_batch_size=len(recent_history),
+            history_cursor=start_index + len(history_batch),
+            last_batch_size=len(history_batch),
         )
         return writes > 0
 

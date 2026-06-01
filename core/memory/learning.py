@@ -52,11 +52,14 @@ class PreferenceLearningService:
     async def _run_once(self, user_id: str) -> bool:
         state_before = await self._memory.get_memory_extraction_state(user_id)
         start_index = int(state_before.get("history_cursor", 0) or 0)
-        recent_history = await self._memory.get_history_slice(user_id, start_index=start_index, limit=50)
-        if not recent_history:
+        history_batch = await self._memory.get_history_slice(user_id, start_index=start_index, limit=50)
+        if not history_batch:
             return False
+        recent_history = [item for item in history_batch if item.get("learnable", True) is not False]
 
         await self._extractor.run_now(user_id)
+        if not recent_history:
+            return False
 
         affected_device_types = sorted(
             {

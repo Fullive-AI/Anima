@@ -409,6 +409,8 @@ class ReActAgent:
             "discovery": app_state["discovery"],
             "settings": app_state["settings"],
             "_loaded_skill": skill,
+            "_history_source": "chat",
+            "_history_learnable": True,
         }
 
         try:

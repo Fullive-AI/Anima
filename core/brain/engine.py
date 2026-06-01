@@ -639,6 +639,8 @@ class Brain:
             "user_memory": state.get("user_memory", {}),
             "environment_state": state.get("environment_state", {}),
             "discovery": self._build_discovery_proxy(),
+            "_history_source": "scheduler",
+            "_history_learnable": False,
         }
 
         execution_results: list[SkillExecutionResult] = []
@@ -718,6 +720,8 @@ class Brain:
             "environment_state": self.get_environment_state(),
             "discovery": app_state["discovery"],
             "settings": app_state["settings"],
+            "_history_source": "chat",
+            "_history_learnable": True,
         }
         execution_results: list[SkillExecutionResult] = []
         task_results: list[dict[str, Any]] = []
@@ -782,7 +786,13 @@ class Brain:
 
         async def _run_action(action_spec: SkillActionSpec) -> ActionVerificationResult:
             verification = await self._execute_action_with_retry(action_spec, context["discovery"])
-            await self._record_execution_history(plan_item, action_spec, verification)
+            await self._record_execution_history(
+                plan_item,
+                action_spec,
+                verification,
+                source=str(context.get("_history_source", "system")),
+                learnable=bool(context.get("_history_learnable", True)),
+            )
             return verification
 
         verifications = await asyncio.gather(
@@ -890,10 +900,16 @@ class Brain:
         plan_item: SkillPlanItem,
         action_spec: SkillActionSpec,
         verification: ActionVerificationResult,
+        *,
+        source: str = "system",
+        learnable: bool = True,
     ) -> None:
         await self._memory.append_history(
             "default",
             {
+                "record_type": "device_action",
+                "source": source,
+                "learnable": learnable,
                 "skill_name": plan_item.skill_name,
                 "plan_goal": plan_item.goal,
                 "device_id": action_spec.device_id,
@@ -908,7 +924,8 @@ class Brain:
                 "observed_state": verification.observed_state,
             },
         )
-        self.schedule_preference_learning("default")
+        if learnable:
+            self.schedule_preference_learning("default")
 
     async def _record_task_plan_history(
         self,
@@ -920,9 +937,11 @@ class Brain:
         for task in sorted(task_plan_items, key=lambda item: item.priority):
             if source == "scheduler" and task.kind == "reply":
                 continue
+            learnable = source != "scheduler"
             entry = {
                 "record_type": "planner_task",
                 "source": source,
+                "learnable": learnable,
                 "task_kind": task.kind,
                 "action": f"plan.{task.kind}",
                 "reason": task.reason or task.goal or task.question,
@@ -937,7 +956,7 @@ class Brain:
             if message:
                 entry["message"] = message
             await self._memory.append_history("default", entry)
-        if task_plan_items:
+        if any(source != "scheduler" for _ in task_plan_items):
             self.schedule_preference_learning("default")
 
     @staticmethod
