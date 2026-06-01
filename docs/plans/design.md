@@ -1,5 +1,7 @@
 # Anima Current Design
 
+> 中文版: [design.zh-CN.md](./design.zh-CN.md)
+>
 > Current implementation-oriented design for Anima.
 >
 > This document describes how Anima is structured today. For the original early proposal, see
@@ -34,11 +36,11 @@ streams.
                        |
                     REST / SSE
                        |
-┌──────────────────────▼────────────────────────┐
-│                  Anima Core                   │
-│             single asyncio process            │
-│                                               │
-│  DiscoveryOrchestrator ───────┐               │
+┌──────────────────────▼─────────────────────────┐
+│                  Anima Core                    │
+│             single asyncio process             │
+│                                                │
+│  DiscoveryOrchestrator ────────┐               │
 │       device registry          │               │
 │       command routing          │               │
 │                                │               │
@@ -53,10 +55,10 @@ streams.
 │    ▼            │                              │
 │  MemoryStore ◀──┘                              │
 │  history / preferences / learned / memories    │
-│                                               │
-│  Adapters                                     │
+│                                                │
+│  Adapters                                      │
 │  MIoT local/cloud, virtual, future protocols   │
-└──────────────────────┬────────────────────────┘
+└──────────────────────┬─────────────────────────┘
                        |
                  Physical Devices
 ```
