@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+
+If needed to complete the task, you may install required tools, dependencies, local utilities, skills, or MCP servers yourself.
+
+Only do this when the installation is clearly necessary for progress, validation, automation, debugging, or repository workflow support.
+
+Prefer:
+- existing project tools first
+- minimal, well-scoped additions
+- commonly used, maintainable solutions
+- setup that matches the current project and workflow
+
+Do not install unnecessary, redundant, risky, or unrelated tools.
+
+When installing something new:
+- keep the change intentional and minimal
+- document it if it affects setup, workflow, or contributor experience
+- update relevant config or docs when needed
+- avoid destructive or high-impact system changes unless explicitly requested

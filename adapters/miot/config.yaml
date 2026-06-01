@@ -1,0 +1,4 @@
+name: miot
+description: Xiaomi MIoT protocol adapter — auto-discovers and controls Xiaomi smart devices
+scan_interval_seconds: 300
+discovery_timeout_seconds: 5

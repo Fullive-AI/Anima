@@ -1,0 +1,51 @@
+---
+alwaysApply: true
+---
+
+Protect the existing architecture unless the task explicitly requires architectural change.
+
+## Core principles
+
+- Prefer local, minimal, boundary-respecting changes.
+- Fit new work into existing module boundaries whenever possible.
+- Do not introduce new layers, abstractions, or patterns unless clearly justified.
+- Do not widen the change surface unnecessarily.
+- Do not use a bug fix or small feature as an excuse for broad redesign.
+
+## Before changing code
+
+First identify:
+
+- the owning module or subsystem
+- its direct dependencies
+- the inbound callers or consumers
+- the outward contracts it exposes
+- whether the change belongs here or elsewhere
+
+## Guardrails
+
+- Keep responsibilities separated.
+- Respect dependency direction.
+- Do not move logic across layers without a strong reason.
+- Avoid creating duplicate sources of truth.
+- Prefer extending an existing abstraction over inventing a parallel one.
+- Prefer explicit data flow over hidden coupling.
+- Keep cross-module changes small and intentional.
+
+## Prohibited behavior unless clearly necessary
+
+- broad refactors unrelated to the task
+- introducing framework-level patterns for small local problems
+- changing multiple subsystems to support a narrow fix when a local fix is possible
+- creating generic helpers too early
+- mixing transport, domain, UI, persistence, and integration logic in the same place
+
+## If architectural change is genuinely required
+
+Then:
+
+1. State why the existing structure blocks the task.
+2. Keep the change as small as possible.
+3. Preserve backward compatibility where feasible.
+4. Update tests and docs affected by the architectural shift.
+5. Avoid combining architectural cleanup with unrelated feature work.

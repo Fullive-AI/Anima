@@ -1,0 +1,41 @@
+---
+alwaysApply: true
+---
+
+Use English as the default language for all implementation work.
+
+1. Use English for all engineering artifacts and execution
+- Code
+- Comments
+- Variable names, function names, class names
+- Commit messages
+- CLI commands
+- Logs
+- Error analysis
+- Tool output
+- Internal workflow notes
+- Text inside diagrams, charts, screenshots, and images produced for code or documentation
+
+2. Use Chinese only when interacting with me in the following cases
+- You need my decision
+- You need me to review an intermediate file, draft, or result
+- You need me to choose between options
+- You are giving me the final summary
+
+3. Interaction rules
+- Do not translate implementation steps into Chinese
+- Do not write comments in Chinese
+- Do not write commit messages in Chinese
+- Do not put Chinese text inside code-related images or diagrams
+- Keep the full development workflow in English unless you are explicitly asking for my decision or review, or providing the final summary
+
+4. Output behavior
+- Implementation process: English
+- Requests for my decision: Chinese
+- Requests for my review: Chinese
+- Final summary: Chinese
+
+5. Priority
+If there is any conflict:
+- 中文for decision requests, review requests, and final summaries
+- English for everything else in the engineering workflow

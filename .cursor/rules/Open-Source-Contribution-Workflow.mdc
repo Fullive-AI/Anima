@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+
+Work as if the repository is maintained in public.
+
+Keep changes understandable, testable, documented, and easy for contributors to follow.
+Do not rely on hidden local knowledge or conversation-only context.
+
+If a workflow, setup step, or behavior changes, update the relevant contributor-facing documentation.

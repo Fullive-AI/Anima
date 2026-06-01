@@ -1,0 +1,69 @@
+---
+alwaysApply: true
+---
+
+Treat shared interfaces, schemas, contracts, and dependency relationships as high-sensitivity areas.
+
+## Core rule
+
+Before changing an interface, find who depends on it.
+
+## Interfaces include
+
+- public functions
+- exported types
+- module contracts
+- API request and response shapes
+- event payloads
+- message formats
+- topic names
+- config structures
+- CLI arguments
+- database-facing schemas
+- file formats
+
+## Required behavior before changing an interface
+
+Identify:
+
+- producers
+- consumers
+- callers
+- downstream dependents
+- test coverage around the contract
+- whether the change is backward compatible
+
+## Preferred approach
+
+- preserve backward compatibility by default
+- prefer additive changes over breaking changes
+- update all affected callers when a contract must change
+- keep dependency relationships clear and stable
+- avoid hidden contract drift
+
+## Breaking changes
+
+Only make a breaking change when clearly necessary.
+
+If required:
+
+1. minimize the blast radius
+2. update all affected code paths
+3. update tests
+4. update docs
+5. call out the compatibility impact explicitly in your summary
+
+## Dependency safety
+
+- do not create circular dependencies
+- do not introduce a new dependency for a trivial local need
+- prefer existing project patterns and libraries
+- avoid tight coupling between unrelated modules
+- keep abstractions honest and narrow
+
+## Avoid
+
+- changing one side of an interface without updating the other side
+- silently altering payload meanings
+- reusing a contract for a different semantic purpose
+- weakening types or schemas just to make code compile

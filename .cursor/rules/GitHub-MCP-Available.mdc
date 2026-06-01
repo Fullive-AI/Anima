@@ -1,0 +1,19 @@
+---
+alwaysApply: true
+---
+
+GitHub MCP is installed and available.
+
+When repository work requires GitHub operations, you may use GitHub MCP directly for actions such as:
+
+- reading repository information
+- viewing issues and pull requests
+- creating or updating issues
+- creating or updating pull requests
+- reading comments, reviews, and discussions
+- checking branch and commit context
+- performing other safe repository management actions supported by GitHub MCP
+
+Prefer using GitHub MCP for GitHub-specific workflows instead of asking the user to perform those steps manually.
+
+Do not assume every GitHub action is safe to execute automatically. For destructive, irreversible, or high-impact actions, require explicit user intent.

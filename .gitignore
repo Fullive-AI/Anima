@@ -1,0 +1,27 @@
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+.env
+.ruff_cache/
+.pytest_cache/
+
+# Runtime data (persisted via Docker volume, never committed)
+data/
+
+node_modules/
+dashboard/dist/
+
+# Local IDE / tool artifacts
+.claude/settings.local.json
+.playwright-mcp/
+
+# Duplicate / temp files
+CLAUDE copy.md
+
+# Ralph automation tool
+.ralph/
+.ralphrc
+/tests/e2e/screenshots

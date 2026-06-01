@@ -1,0 +1,50 @@
+---
+alwaysApply: true
+---
+
+When code changes affect usage, setup, behavior, operations, or developer workflow, update the relevant documentation.
+
+## Update docs when changes affect
+
+- setup or installation
+- configuration or environment variables
+- API behavior
+- command usage
+- UI flows
+- operational procedures
+- architecture boundaries
+- message formats
+- testing or development workflow
+- deployment expectations
+
+## Documentation targets may include
+
+- README files
+- module-level docs
+- runbooks
+- architecture notes
+- inline examples
+- `.env.example`
+- setup instructions
+- developer guides
+- troubleshooting notes
+
+## Core rule
+
+Do not leave docs stale when the code changed in a user-visible, developer-visible, or operator-visible way.
+
+## Required behavior
+
+- update the nearest relevant documentation
+- prefer small precise documentation edits over broad rewrites
+- keep examples consistent with current behavior
+- remove or adjust outdated instructions caused by the change
+- mention new requirements and changed assumptions
+
+## If docs are not updated
+
+Be sure the omission is justified because the change is truly internal and has no effect on usage, operations, or maintenance.
+
+## Summary behavior
+
+When relevant, mention which documentation was updated or still should be updated.

@@ -1,0 +1,53 @@
+---
+alwaysApply: true
+---
+
+Keep every change tightly scoped to the requested goal.
+
+## Core rule
+
+Solve the target problem completely, but do not let the task expand into unrelated cleanup, redesign, or opportunistic refactoring.
+
+## Scope rules
+
+- Implement the smallest sufficient change that correctly solves the task.
+- Fix directly related issues when needed to make the solution complete.
+- Avoid unrelated renames, formatting sweeps, moves, or cleanups.
+- Avoid changing code that is not necessary for correctness, integration, validation, or compatibility.
+- Do not introduce new dependencies unless required.
+
+## Allowed scope expansion
+
+You may extend scope slightly only when the additional work is:
+
+- necessary to complete the task correctly
+- needed to prevent an obvious regression
+- required for compatibility
+- required to keep tests or builds passing
+- small, low-risk, and directly adjacent to the same root cause
+
+## Disallowed scope expansion
+
+Do not expand scope just because you noticed:
+
+- old code you dislike
+- naming inconsistencies
+- possible future improvements
+- architectural ideas unrelated to the request
+- broad style issues
+- unrelated technical debt
+
+## Before making extra changes
+
+Ask internally:
+
+- Is this required for the requested outcome?
+- Is it required for correctness or compatibility?
+- Is it required for validation to pass?
+- Is it directly tied to the same root cause?
+
+If not, leave it alone.
+
+## Completion rule
+
+A task is better completed with a focused, safe, reviewable diff than with a large diff that tries to improve everything.

@@ -1,0 +1,69 @@
+---
+alwaysApply: true
+---
+
+Every meaningful change should be validated as strongly as the repo allows.
+
+## Required behavior
+
+After making changes, run the most relevant available checks, such as:
+
+- targeted tests
+- affected test suites
+- lint
+- type-check
+- build
+- static analysis
+- framework-specific validation commands
+
+Do not skip validation just because the code looks correct.
+
+## Validation strategy
+
+Prefer this order:
+
+1. run the most targeted checks first
+2. fix failures
+3. run broader relevant checks as needed
+4. confirm the task outcome
+5. watch for regressions in adjacent behavior
+
+## Bug fix rule
+
+For bug fixes:
+
+- verify the original failure mode is addressed
+- add or update a regression test when feasible
+- confirm related behavior still works
+
+## Feature rule
+
+For features:
+
+- validate the happy path
+- validate obvious edge states
+- ensure the feature is actually wired into the real flow
+- confirm types, imports, and integration points are correct
+
+## Failure handling
+
+If a validation step fails:
+
+1. diagnose the failure
+2. determine whether it is caused by your change
+3. fix it if in scope or required for correctness
+4. re-run validation
+5. continue until passing or truly blocked
+
+## Minimum expectation
+
+Never treat "edited code successfully" as equivalent to "task completed successfully."
+
+## Reporting
+
+When summarizing work, include:
+
+- what was validated
+- what passed
+- what could not be validated
+- any remaining caveats
