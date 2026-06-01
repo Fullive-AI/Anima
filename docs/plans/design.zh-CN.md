@@ -233,6 +233,8 @@ skills/custom/
 - `device_discovery`
 - `skill_creator`
 
+全局 planner 策略也可在 [`core/brain/prompts/planner_hints.md`](./core/brain/prompts/planner_hints.md) 中调整。
+
 ### Skill 生命周期
 
 Skills 参与多个运行阶段：

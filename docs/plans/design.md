@@ -248,6 +248,8 @@ Current built-in skills include:
 - `device_discovery`
 - `skill_creator`
 
+Global planner policy can also be adjusted in [`core/brain/prompts/planner_hints.md`](./core/brain/prompts/planner_hints.md).
+
 ### Skill Lifecycle
 
 Skills participate in several runtime phases:
