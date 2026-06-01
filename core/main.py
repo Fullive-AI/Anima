@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import logging
 import time
+from datetime import UTC
 
 import uvicorn
 
@@ -385,7 +386,7 @@ class Anima:
 
     async def _push_brain_events(self, result: object) -> None:
         import json
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         queues = getattr(self, "_app_state", {}).get("_brain_event_queues", [])
         if not queues:
@@ -400,7 +401,7 @@ class Anima:
                 verification = verifications[index] if index < len(verifications) else None
                 msg = json.dumps({
                     "type": "proactive_action",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "skill": getattr(plan_item, "skill_name", "") if plan_item else getattr(action, "skill_name", ""),
                     "goal": getattr(plan_item, "goal", "") if plan_item else "",
                     "reason": getattr(action, "reason", "") or (getattr(plan_item, "reason", "") if plan_item else ""),
@@ -425,7 +426,7 @@ class Anima:
                 continue
             msg = json.dumps({
                 "type": "proactive_action",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "skill": getattr(item, "skill_name", ""),
                 "goal": goal,
                 "reason": getattr(item, "reason", ""),
