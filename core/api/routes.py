@@ -744,9 +744,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         manual_devices = store.get("manual_devices", [])
         # 同 IP 或同 token 的旧 manual 记录都移除，避免下次启动重复加载。
         manual_devices = [
-            d
-            for d in manual_devices
-            if d.get("ip") != req.ip and str(d.get("token", "")).strip().lower() != token
+            d for d in manual_devices if d.get("ip") != req.ip and str(d.get("token", "")).strip().lower() != token
         ]
         manual_devices.append(
             {
@@ -838,9 +836,7 @@ def create_app(app_state: dict[str, Any]) -> FastAPI:
         manual_devices = store.get("manual_devices", [])
         # 激活后的 token 已经是稳定身份；清掉同 IP/同 token 的旧记录。
         manual_devices = [
-            d
-            for d in manual_devices
-            if d.get("ip") != ip and str(d.get("token", "")).strip().lower() != token
+            d for d in manual_devices if d.get("ip") != ip and str(d.get("token", "")).strip().lower() != token
         ]
         manual_devices.append(
             {

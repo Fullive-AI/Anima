@@ -9,8 +9,9 @@ REFRESH_ENVIRONMENT_ACTIONS = {
     "plan.refresh_environment",
     "environment_refresh",
 }
-#过滤写入history文件中的refresh_environment操作
-#减少memory读取的token消耗
+# 过滤写入history文件中的refresh_environment操作
+# 减少memory读取的token消耗
+
 
 @dataclass(frozen=True)
 class HistoryFilterResult:

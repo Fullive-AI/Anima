@@ -399,18 +399,24 @@ class Anima:
             verifications = getattr(execution_result, "verifications", []) or []
             for index, action in enumerate(actions):
                 verification = verifications[index] if index < len(verifications) else None
-                msg = json.dumps({
-                    "type": "proactive_action",
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "skill": getattr(plan_item, "skill_name", "") if plan_item else getattr(action, "skill_name", ""),
-                    "goal": getattr(plan_item, "goal", "") if plan_item else "",
-                    "reason": getattr(action, "reason", "") or (getattr(plan_item, "reason", "") if plan_item else ""),
-                    "device_id": getattr(action, "device_id", ""),
-                    "action": getattr(action, "action", ""),
-                    "params": getattr(action, "params", {}),
-                    "verification_passed": getattr(verification, "verified", None) if verification else None,
-                    "final_status": getattr(verification, "status", "") if verification else "",
-                }, ensure_ascii=False)
+                msg = json.dumps(
+                    {
+                        "type": "proactive_action",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "skill": getattr(plan_item, "skill_name", "")
+                        if plan_item
+                        else getattr(action, "skill_name", ""),
+                        "goal": getattr(plan_item, "goal", "") if plan_item else "",
+                        "reason": getattr(action, "reason", "")
+                        or (getattr(plan_item, "reason", "") if plan_item else ""),
+                        "device_id": getattr(action, "device_id", ""),
+                        "action": getattr(action, "action", ""),
+                        "params": getattr(action, "params", {}),
+                        "verification_passed": getattr(verification, "verified", None) if verification else None,
+                        "final_status": getattr(verification, "status", "") if verification else "",
+                    },
+                    ensure_ascii=False,
+                )
                 for q in list(queues):
                     await q.put(msg)
 
@@ -424,13 +430,16 @@ class Anima:
             goal = getattr(item, "goal", "")
             if not goal:
                 continue
-            msg = json.dumps({
-                "type": "proactive_action",
-                "timestamp": datetime.now(UTC).isoformat(),
-                "skill": getattr(item, "skill_name", ""),
-                "goal": goal,
-                "reason": getattr(item, "reason", ""),
-            }, ensure_ascii=False)
+            msg = json.dumps(
+                {
+                    "type": "proactive_action",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "skill": getattr(item, "skill_name", ""),
+                    "goal": goal,
+                    "reason": getattr(item, "reason", ""),
+                },
+                ensure_ascii=False,
+            )
             for q in list(queues):
                 await q.put(msg)
 

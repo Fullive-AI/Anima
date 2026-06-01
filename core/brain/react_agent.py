@@ -29,6 +29,7 @@ Home/away detection:
 - Messages marked with [语音输入] come from speech recognition and may contain transcription errors.
 """
 
+
 def _preferred_language(message: str) -> str:
     if any("\u4e00" <= ch <= "\u9fff" for ch in message):
         return "zh"
@@ -96,7 +97,10 @@ TOOLS: list[dict[str, Any]] = [
                 "properties": {
                     "skill_name": {"type": "string", "description": "Skill name."},
                     "device_id": {"type": "string", "description": "Target device ID."},
-                    "goal": {"type": "string", "description": "Goal description in the user's language, such as turn on the device or set brightness to 50%."},
+                    "goal": {
+                        "type": "string",
+                        "description": "Goal description in the user's language, such as turn on the device or set brightness to 50%.",
+                    },
                 },
                 "required": ["skill_name", "device_id", "goal"],
             },
@@ -215,7 +219,9 @@ class ReActAgent:
                                     if tc_delta.function.name:
                                         collected_tool_calls[idx]["function"]["name"] += tc_delta.function.name
                                     if tc_delta.function.arguments:
-                                        collected_tool_calls[idx]["function"]["arguments"] += tc_delta.function.arguments
+                                        collected_tool_calls[idx]["function"]["arguments"] += (
+                                            tc_delta.function.arguments
+                                        )
             except Exception as exc:
                 yield AgentEvent(type="error", content=str(exc), step=step, done=True)
                 return
@@ -368,7 +374,11 @@ class ReActAgent:
                         if isinstance(readings[0], dict)
                         else getattr(readings[0], "value", None)
                     )
-            return json.dumps(compact, ensure_ascii=False) if compact else _localized(language, "暂无环境数据", "No environment data available")
+            return (
+                json.dumps(compact, ensure_ascii=False)
+                if compact
+                else _localized(language, "暂无环境数据", "No environment data available")
+            )
         return _localized(language, "暂无环境数据", "No environment data available")
 
     async def _tool_execute_skill(

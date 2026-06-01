@@ -361,7 +361,10 @@ class MIoTAdapter(BaseAdapter):
                     self._set_device_info(device_id, base_info)
 
                     logger.info(
-                        "Local scan: ip=%s did=%d token=%s", ip, did, "available" if has_resolved_token else "needs_setup"
+                        "Local scan: ip=%s did=%d token=%s",
+                        ip,
+                        did,
+                        "available" if has_resolved_token else "needs_setup",
                     )
                 except TimeoutError:
                     break
@@ -473,7 +476,11 @@ class MIoTAdapter(BaseAdapter):
             str(info.get("model", "")),
         )
         cached = self._known_devices.get(device_id)
-        if cached is not None and isinstance(cached, expected_cls) and self._known_device_keys.get(device_id) == cache_key:
+        if (
+            cached is not None
+            and isinstance(cached, expected_cls)
+            and self._known_device_keys.get(device_id) == cache_key
+        ):
             return cached
 
         try:

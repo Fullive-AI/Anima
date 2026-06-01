@@ -25,9 +25,7 @@ def resolve_llm_config(store: Any | None = None) -> RuntimeLLMConfig:
     model = dashboard_model or env_settings.llm_model
     base_url = dashboard_base_url or env_settings.llm_base_url or ""
     disable_thinking = (
-        dashboard_disable_thinking
-        if dashboard_disable_thinking is not None
-        else env_settings.llm_disable_thinking
+        dashboard_disable_thinking if dashboard_disable_thinking is not None else env_settings.llm_disable_thinking
     )
 
     return RuntimeLLMConfig(

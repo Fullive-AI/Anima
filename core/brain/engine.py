@@ -545,10 +545,7 @@ class Brain:
             *[_decide_for_device(device) for device in devices],
             return_exceptions=True,
         )
-        actions: list[SkillActionSpec] = [
-            r for r in results
-            if isinstance(r, SkillActionSpec)
-        ]
+        actions: list[SkillActionSpec] = [r for r in results if isinstance(r, SkillActionSpec)]
 
         return actions
 
@@ -1573,7 +1570,9 @@ class Brain:
                     action=command_action,
                     params=action.get("params", {}) if isinstance(action.get("params"), dict) else {},
                     reason=self._localize_user_visible_text(str(action.get("reason", ""))),
-                    expected_state=action.get("expected_state", {}) if isinstance(action.get("expected_state"), dict) else {},
+                    expected_state=action.get("expected_state", {})
+                    if isinstance(action.get("expected_state"), dict)
+                    else {},
                 )
             )
         return normalized
@@ -2155,7 +2154,9 @@ class Brain:
         if action == "set_color_temp" and "kelvin" in command.params:
             return {"color_temp": command.params["kelvin"]}
         if action in {"set_humidity", "set_target_humidity"}:
-            value = self._first_present_param(command.params, ("value", "humidity", "target_humidity", "relative_humidity"))
+            value = self._first_present_param(
+                command.params, ("value", "humidity", "target_humidity", "relative_humidity")
+            )
             if value is not None:
                 return {"target_humidity": value}
         if action in {"set_temperature", "set_target_temperature"}:

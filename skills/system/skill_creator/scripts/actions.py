@@ -1104,8 +1104,7 @@ async def create_custom_skill(
                 ]
         else:
             questions = [
-                _localize_clarification_question(item)
-                for item in _string_list(analysis.get("clarification_questions"))
+                _localize_clarification_question(item) for item in _string_list(analysis.get("clarification_questions"))
             ]
             questions = [item for item in questions if item][:3]
             question_block = "\n".join(f"{idx}. {item}" for idx, item in enumerate(questions, start=1))

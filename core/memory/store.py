@@ -703,10 +703,7 @@ class MemoryStore:
         profile_index = list(profiles.keys())  # 仅设备类型名列表
         manifest = await self.get_memory_manifest(user_id)
         # 极度压缩: 仅 topic + title
-        memory_index = [
-            {"topic": m["topic"], "title": m["title"]}
-            for m in manifest
-        ]
+        memory_index = [{"topic": m["topic"], "title": m["title"]} for m in manifest]
         return {
             "learned_profile_types": profile_index,
             "memory_topics": memory_index,
@@ -745,7 +742,7 @@ class MemoryStore:
                 # 截取括号前的核心值
                 for sep in ("（", "(", "，", ","):
                     if sep in val:
-                        val = val[:val.index(sep)]
+                        val = val[: val.index(sep)]
                         break
                 if val and val != "未设置":
                     key_lines.append(f"{key.strip()}:{val.strip()}")
