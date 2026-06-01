@@ -65,7 +65,7 @@ export default function EnvironmentPanel({ environment, refreshing = false, onRe
     .filter((item) => item.summary)
 
   return (
-    <section className="rounded-[24px] border border-slate-200/70 bg-white p-5">
+    <section className="rounded-[24px] border-2 border-slate-200 bg-white p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-amber-50 p-2.5 text-amber-500 ring-1 ring-amber-100">
@@ -126,7 +126,7 @@ export default function EnvironmentPanel({ environment, refreshing = false, onRe
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
+          <div className="rounded-[24px] border-2 border-slate-200 bg-slate-50/70 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-700">{t('environment.deviceState')}</p>

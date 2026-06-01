@@ -50,9 +50,9 @@ export default function App() {
           onDevicesChanged={refresh}
         />
         <main className="relative flex flex-1 overflow-hidden rounded-[24px] border border-slate-200/70 bg-white/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-14 bg-gradient-to-b from-white via-white/95 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-white via-white/95 to-transparent" />
-          <div className="h-full flex-1 overflow-y-auto py-5 pl-8 pr-4 pb-16">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-gradient-to-b from-white via-white/95 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-white via-white/95 to-transparent" />
+          <div className="h-full flex-1 overflow-y-auto pb-16 pl-8 pr-4 pt-12">
             <div className="mx-auto grid w-full max-w-none gap-5">
               <EnvironmentPanel
                 environment={environment}
