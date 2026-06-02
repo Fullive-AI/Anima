@@ -288,27 +288,27 @@ If you already know a device IP and token, you can also add a MIoT device manual
 
 ```text
 Anima/
-├── core/
-│   ├── api/                 # FastAPI routes
-│   ├── brain/               # Brain, planner, executor, ReAct agent, skill loader
-│   ├── devices/             # Discovery orchestrator
-│   ├── events/              # Async EventBus
-│   ├── llm/                 # LLM runtime config
-│   ├── media/               # Xiaomi speaker playback support
-│   ├── memory/              # Preferences, history, learned profiles, extracted memories
-│   ├── runtime/             # Settings and persisted config
-│   └── main.py              # Application entrypoint
-├── adapters/
-│   └── miot/                # Xiaomi MIoT adapter
-├── skills/
-│   ├── system/              # Built-in skills
-│   └── custom/              # User-defined skills
-├── dashboard/               # React + Vite dashboard
-├── tests/                   # Automated tests
-├── docs/                    # Design notes and implementation plans
-├── data/                    # Local runtime data
-├── package.json             # Root pnpm scripts
-└── pyproject.toml           # Python project config
+├── 🧠 core/                  # Backend runtime: API, brain, memory, devices
+│   ├── 🛣️  api/             # FastAPI routes and HTTP endpoints
+│   ├── 🧭 brain/            # Planner, executor, ReAct agent, skill loader
+│   ├── 🔎 devices/          # Discovery orchestration and device registry
+│   ├── 📡 events/           # Async EventBus and runtime signals
+│   ├── 🤖 llm/              # OpenAI-compatible LLM runtime config
+│   ├── 🔊 media/            # Xiaomi speaker playback support
+│   ├── 🗃️  memory/          # Preferences, history, profiles, extracted memories
+│   ├── ⚙️  runtime/         # Settings and persisted config
+│   └── ⚙️  main.py          # Application entrypoint
+├── 🔌 adapters/             # Hardware protocol adapters
+│   └── 🏠 miot/             # Xiaomi MIoT adapter
+├── ✨ skills/               # Device intelligence packages
+│   ├── 🧩 system/           # Built-in skills
+│   └── ✍️  custom/          # User-defined skills
+├── 🖥️  dashboard/           # React + Vite dashboard
+├── ✅ tests/                # Automated tests
+├── 📚 docs/                 # Design notes and implementation plans
+├── 💾 data/                 # Local runtime data
+├── 📦 package.json          # Root pnpm scripts
+└── 🧰 pyproject.toml        # Python project config
 ```
 
 ---
